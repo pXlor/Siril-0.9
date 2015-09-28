@@ -1,0 +1,65 @@
+SIRIL is an astronomical image processing tool.
+
+SIRIL is aimed at providing an easy to use processing tool for astronomical
+images. The intent is to provide linux users with an equivalent of Christian
+Buil's IRIS, only easier to use.
+
+Contributors are welcome. Coding language is C.
+Main development is done with most recent versions of libraries.
+
+Adding new commands and features is basically independent from the GUI. You just
+need to look at commands.c, siril.c and siril.h in the src subtree to see how
+the stuff works, and how to add new things that can be integrated...
+
+
+REQUIREMENTS, DEPENDENCIES
+
+New Siril uses:
+
+	* Gtk 3, (>= 3.6) for the GUI toolkit
+	* cfitsio for fits related stuff
+	* fftw3 as a FFT library
+	* The GNU Scientific Library (gsl) for FWHM implementation, histograms and background extraction
+	* libconfig++ for structured configuration file management
+
+Siril works internally with FITS files, but other file formats can be used as
+input and converted using the conversion tab of the control window. Some file
+formats are handled internally, like BMP, PPM and SER, some required external
+libraries or programs as listed below. Libraries need to be present at
+compilation time, or their support won't be compiled.
+
+	* libraw for DSLR RAW files import
+	* libffms2 for films import
+	* libtiff 4 or 5.
+	* libjpeg or compatible libraries like libjpeg-turbo
+	* libpng
+	* opencv and g++ for image rotation support and binned image resizing
+
+All these programs or libraries are available in most Linux distributions.
+
+
+The install is similar to the usual GNU/Linux package build, except that the
+configure script is not directly shipped and has to be created with the
+following command:
+
+	aclocal && autoconf && autoheader && automake --add-missing
+
+After that, it's just:
+
+	./configure
+	make
+	make install (as root)
+
+
+
+NOTES ON SIRIL FITS IMAGE FORMAT.
+
+Since FITS doesn't specify the order and size of data, it's useful to fix it at
+some point. Currently, Siril uses unsigned 16-bit per channel values (TUSHORT),
+and images are stored channel after channel on a bottom-to-top, left-to-right
+order.
+
+All files imported and converted in Siril or files exported by Siril are in this
+FITS format, except sequence files like SER and films, which are read from the
+file and converted on-the-fly.
+

@@ -1,0 +1,27 @@
+siril 0.9.0rc1
+12/29/14
+
+* many fixes including background extraction, compositing alignment, rejection algorithm, wavelets
+* threading of the heavy computations, to avoid graphical user interface freezing and provide a nice way of seeing what is happening in the console window
+* image rotation with any angle (not in registration yet)
+* new Canon banding removing tool
+* GTK+ version is now 3.6 or above
+
+
+siril 0.9.0b1
+11/11/14
+
+* new image formats supported for import and export (BMP, TIFF, JPEG, PNG, NetPBM, PIC (IRIS) RAW DSLR images)
+* better image sequence handling with non-contiguous sequences, but still requiring file names to be postfixed by integers
+* new graphical user interface based on GTK+ version 3.4 and above
+* new display modes added to the standard linear scaling with lo/hi bounds
+* manual translation as new registration method with two preview renderings of the current image with reference frame in transparency
+* automatic translation as new registration method for deep-sky images, based on the PSF analysis of one star
+* new commands available for the command line
+* a star finding algorithm with PSF information
+* new background extraction tool
+* new processing functions
+* new image compositing tool
+* new stacking methods with rejection algorithms
+* numerous bugs fixed and internal code refactoring
+

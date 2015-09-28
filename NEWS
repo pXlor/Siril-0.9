@@ -1,0 +1,67 @@
+v0.9.0-rc1, Dec 29, 2014.
+ * many fixes including background extraction, compositing alignment, rejection
+   algorithms, wavelets
+ * threading of the heavy computations, to avoid graphical user interface freezing
+   and provide a nice way of seeing what is happening in the console window
+ * image rotation with any angle (not in registration yet)
+ * Canon banding removing tool
+ * GTK+ minimal version is now 3.6
+
+v0.9.0-beta (new version), Nov 11, 2014: major refactoring. See more details at
+http://free-astro.vinvin.tf/index.php/Siril:0.9.0_beta
+ * new development team and website
+ * many new image formats supported for import (converted to Siril's FITS: 8-bit
+   and 16-bit BMP, TIFF, JPEG, PNG, NetPBM binary images, PIC (IRIS), RAW DSLR
+   images and loaded natively: SER files and any film) and export
+ * new demosaicing tool with 4 algoritms (AHD, VNG, Bilinear, Super Pixel)
+ * better image sequence handling, with non-contiguous sequences, but still
+   requiring file names to be postfixed by integers (like: image001.fit and not
+   image001L.fit)
+ * new graphical user interface based on GTK+ version 3.4 and above, and in
+   general, update of dependencies to latest versions
+ * new display modes added to the standard linear scaling with lo/hi bounds: log,
+   asinh, sqr, sqrt, histeq, negative, false colors
+ * manual translation as new registration method with two preview renderings of
+   the current image with reference frame in transparency
+ * automatic translation as new registration method for deep-sky images, based on
+   the FWHM/PSF analysis of one star instead of DFT, more suited for planetary and
+   nebula images
+ * new commands available for the command line, see the list of available commands
+ * a star finding algorithm with PSF information
+ * new processing functions: unsharp mask, background extraction, green dominance
+   removal, new method for background equalization, two-way Fourier transform used
+   to remove annoying patterns in images, kappa-sigma stacking
+ * new image compositing tool, allowing colour images to be created from multiple
+   one-channel images by affecting user-defined colours
+ * numerous bugs fixed and internal code refactoring for a better extensibility
+
+v0.8
+ * last release of the old Siril, in 2006.
+
+v0.6
+ * a intermediate release before a first beta release
+	a lot of changes both in the GUI and the inner structure.
+	48 bits RGB fits processing, bmp conversion
+
+a sample session is given here :
+	given a directory with a 24 bit bmp series 1.bmp... n.bmp,
+	a sample session producing a registered 48bit fit stack
+	of those is the following :
+		change dir (go to the desired directory)
+		file conversion: (defaults are ok for this example)
+			->go 
+		sequence processing (siril detetcs and builds the image sequence)
+		select a region in one of the R,G,B layers 
+			(registration will allways be computed on G layer)
+		click register
+		click stack
+	you are done.
+
+v0.5 
+ * first light of the sequence graphic interface
+
+v0.3 
+ * 20050820; a few corrections.
+
+v0.2
+ * siril now has wavelet and wrecons
