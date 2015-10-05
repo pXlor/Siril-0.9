@@ -262,7 +262,11 @@ int main(int argc, char *argv[]) {
 	/* initialization of swap dir chooser */
 	GtkFileChooser *swap_dir = GTK_FILE_CHOOSER(lookup_widget("filechooser_swap"));
 	GtkLabel *label = GTK_LABEL(lookup_widget("label_swap_dir"));
-	gtk_file_chooser_set_filename (swap_dir, com.swap_dir);
+
+	if (com.swap_dir && com.swap_dir[0] != '\0')
+		gtk_file_chooser_set_filename (swap_dir, com.swap_dir);
+	else
+		gtk_file_chooser_set_filename (swap_dir, g_get_tmp_dir());
 	gtk_label_set_text (label, com.swap_dir);
 
 	/* initialization of default FITS extension */

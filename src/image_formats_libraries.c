@@ -860,6 +860,8 @@ int readraw_in_cfa(const char *name, fits *fit) {
 		fit->naxis = 2;
 		fit->data = data;
 		fit->pdata[RLAYER]=fit->data;
+		fit->pdata[GLAYER]=fit->data;
+		fit->pdata[BLAYER]=fit->data;
 		fit->binning_x=fit->binning_y=1;
 		if (raw->other.focal_len>0.) fit->focal_length=raw->other.focal_len;
 		if (raw->other.iso_speed>0.) fit->iso_speed=raw->other.iso_speed;
