@@ -684,7 +684,7 @@ static gpointer convert_thread_worker(gpointer p) {
 				closedir(newdir);
 			}
 			else
-				tofits(sourcefilename, destfilename);
+				tofits(sourcefilename, remove_ext_from_filename(destfilename));
 		}
 		char *name = strrchr(sourcefilename, '/');
 		sprintf(msg_bar, "Converting %s...", name + 1);

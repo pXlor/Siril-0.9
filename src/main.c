@@ -30,6 +30,10 @@
 #include <string.h>
 #include <assert.h>
 #include <signal.h>
+#if (defined(__APPLE__) && defined(__MACH__))
+#include <stdlib.h>
+#include <libproc.h>
+#endif
 
 #include "siril.h"
 #include "proto.h"
@@ -50,6 +54,9 @@ void initialize_scrollbars();
 
 char *siril_sources[] = {
 	"",
+#if (defined(__APPLE__) && defined(__MACH__))
+	"",
+#endif
 	PACKAGE_DATA_DIR"/",
 	"/usr/share/siril/",
 	"/usr/local/share/siril/"
@@ -78,6 +85,11 @@ int main(int argc, char *argv[]) {
 	gchar *homepath, *csspath, *siril_path;
 	char *cwd_orig = NULL;
 	struct sigaction sigIntHandler;
+#if (defined(__APPLE__) && defined(__MACH__))
+	int ret;
+	pid_t pid;
+	char path[PROC_PIDPATHINFO_MAXSIZE];
+#endif
 	
 	setenv("LC_NUMERIC", "C", 1);		// avoid possible bugs using french separator ","
 	setenv("LANG", "C", 1);				// on french (or other) system, it avoids the mix between languages
@@ -133,6 +145,23 @@ int main(int argc, char *argv[]) {
 	}
 
 	gtk_init (&argc, &argv);
+
+#if (defined(__APPLE__) && defined(__MACH__))
+	pid = getpid();
+	ret = proc_pidpath ( pid, path, sizeof(path));
+	if ( ret ) {
+		int l;
+		char* sp;
+		sp = strrchr ( path, '/' );
+		sp -= 5;
+		*sp = 0;
+		l = strlen ( path );
+		if (( l + 10 ) < PROC_PIDPATHINFO_MAXSIZE ) {
+			( void ) strcat ( path, "Resources/" );
+			siril_sources[1] = path;
+		}
+	}
+#endif
 
 	/* try to load the glade file, from the sources defined above */
 	builder = gtk_builder_new();
