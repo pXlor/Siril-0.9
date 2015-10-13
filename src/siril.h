@@ -134,6 +134,7 @@ typedef enum {
 
 #define RESULT_IMAGE -1		// used as current image index in a sequence
 				// when the result of a processing is displayed
+#define UNRELATED_IMAGE -2	// image loaded while a sequence was loaded too
 
 #define MAX_STARS 20000
 

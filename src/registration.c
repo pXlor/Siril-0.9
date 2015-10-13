@@ -336,24 +336,10 @@ int register_shift_fwhm(struct registration_args *args) {
 	 * images to register, which provides FWHM but also star coordinates */
 	// TODO: detect that it was already computed, and don't do it again
 	// -> should be done at a higher level and passed in the args
-	do_fwhm_sequence_processing(args->seq, args->layer);
+	if (do_fwhm_sequence_processing(args->seq, args->layer))	// stores in regparam
+		return 1;
 
-	/* Intermediate step: allocate registration data */
-	if (!args->seq->regparam) {
-		fprintf(stderr, "regparam should have been created before\n");
-		return -1;
-	}
-	if (args->seq->regparam[args->layer]) {
-		//siril_log_message("Recomputing (and overwriting) already existing registration for this layer\n");
-		// ^ not necessarily, it can be allocated in do_fwhm_sequence_processing above.
-		current_regdata = args->seq->regparam[args->layer];
-	} else {
-		current_regdata = calloc(args->seq->number, sizeof(regdata));
-		if (current_regdata == NULL) {
-			siril_log_message("Error allocating registration data\n");
-			return -2;
-		}
-	}
+	current_regdata = args->seq->regparam[args->layer];
 
 	if (args->process_all_frames)
 		nb_frames = (float) args->seq->number;

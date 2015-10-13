@@ -46,6 +46,7 @@ void get_list_store() {
 		list_store = GTK_LIST_STORE(gtk_builder_get_object(builder, "liststore1"));
 }
 
+/* Add an image to the list. If seq is NULL, the list is cleared. */
 void add_image_to_sequence_list(sequence *seq, int index, int layer) {
 	static GtkTreeSelection *selection = NULL;
 	GtkTreeIter iter;
@@ -99,7 +100,7 @@ struct _seq_list {
  * It is executed safely in the GTK thread. */
 void fill_sequence_list(sequence *seq, int layer) {
 	struct _seq_list *args;
-	if (seq == NULL) return;
+	if (seq == NULL || layer >= seq->nb_layers) return;
 	args = malloc(sizeof(struct _seq_list));
 	args->seq = seq;
 	args->layer = layer;

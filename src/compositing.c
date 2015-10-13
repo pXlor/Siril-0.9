@@ -497,6 +497,7 @@ void on_filechooser_file_set(GtkFileChooserButton *widget, gpointer user_data) {
 	 * code taken from stacking.c:start_stacking() and read_single_image() */
 	if (number_of_images_loaded() == 1) {
 		clear_stars_list();
+		com.seq.current = UNRELATED_IMAGE;
 		com.uniq = calloc(1, sizeof(single));
 		com.uniq->comment = strdup("Compositing result image");
 		com.uniq->filename = strdup("Unsaved compositing result");

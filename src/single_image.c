@@ -210,6 +210,7 @@ int open_single_image(const char* filename) {
 void open_single_image_from_gfit(char *realname) {
 	/* now initializing everything
 	 * code based on seq_load_image or set_seq (sequence.c) */
+	com.seq.current = UNRELATED_IMAGE;
 	com.uniq = calloc(1, sizeof(single));
 	com.uniq->filename = realname;
 	com.uniq->nb_layers = gfit.naxes[2];

@@ -378,7 +378,10 @@ int seq_load_image(sequence *seq, int index, fits *dest, gboolean load_it) {
 			set_cutoff_sliders_values();	// update values for contrast sliders for this image
 			set_display_mode();		// display the display mode in the combo box
 		}
-		redraw(com.cvport, REMAP_ALL);	// redraw and display image
+		if (copy_rendering_settings_when_chained(TRUE))
+			redraw(com.cvport, REMAP_ALL);
+		else
+			redraw(com.cvport, REMAP_ONLY);
 		redraw_previews();		// redraw registration preview areas
 		display_filename();		// display filename in gray window
 		adjust_reginfo();		// change registration displayed/editable values
@@ -849,7 +852,7 @@ gboolean sequence_is_loaded() {
  */
 int sequence_processing(sequence *seq, sequence_proc process, int layer) {
 	int i;
-	float cur_nb, nb_frames;
+	float cur_nb = 0.f, nb_frames;
 	fits fit;
 	rectangle area;
 
@@ -861,18 +864,17 @@ int sequence_processing(sequence *seq, sequence_proc process, int layer) {
 	memset(&fit, 0, sizeof(fits));
 	check_or_allocate_regparam(seq, layer);
 
-	/*if (selected_images_only)
-		nb_frames = (float)seq->selnum;
-	else*/
 	nb_frames = (float)seq->number;
 
-	for (i=0, cur_nb=0.f; i<seq->number; ++i) {
-		if (!get_thread_run()) break;
-		//if (selected_images_only && !seq->imgparam[i].incl)
-		//	continue;
+	for (i=0; i<seq->number; ++i) {
+		// Don't check for thread running here, this is always false
+		// for compositing registration.
+		//if (!get_thread_run()) break;
+
 		/* opening the image */
 		if (seq_read_frame_part(seq, layer, i, &fit, &area))
 			return 1;
+
 		/* processing the image */
 		if (process(seq, layer, i, &fit) < 0)
 			return 1;
@@ -905,16 +907,16 @@ int seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit) {
 	}
 }
 
-void do_fwhm_sequence_processing(sequence *seq, int layer) {
+int do_fwhm_sequence_processing(sequence *seq, int layer) {
 	int i, retval;
 	siril_log_message("Starting sequence processing of PSF\n");
 	set_progress_bar_data("Computing PSF on selected star", PROGRESS_NONE);
-	retval = sequence_processing(seq, &seqprocess_fwhm, layer);
+	retval = sequence_processing(seq, &seqprocess_fwhm, layer);	// allocates regparam
 	siril_log_message("Finished sequence processing of PSF\n");
 	if (retval) {
 		set_progress_bar_data("Failed to compute PSF for the sequence. Ready.", PROGRESS_NONE);
 		set_cursor_waiting(FALSE);
-		return;
+		return 1;
 	}
 	// update the list
 	if (seq->type != SEQ_INTERNAL)
@@ -931,6 +933,7 @@ void do_fwhm_sequence_processing(sequence *seq, int layer) {
 	}
 	set_fwhm_star_as_star_list_with_layer(seq, layer);
 	set_progress_bar_data("Finished computing PSF for the sequence. Ready.", PROGRESS_NONE);
+	return 0;
 }
 
 /* requires seq->nb_layers and seq->number to be already set */

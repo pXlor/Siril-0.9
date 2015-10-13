@@ -379,8 +379,8 @@ void set_cutoff_sliders_values() {
 		cutmax = GTK_TOGGLE_BUTTON(
 				gtk_builder_get_object(builder, "checkcut_max"));
 	}
-	if (single_image_is_loaded() && com.cvport < com.uniq->nb_layers && com.uniq->layers
-	&& com.seq.current != RESULT_IMAGE) {
+	if (single_image_is_loaded() && com.cvport < com.uniq->nb_layers &&
+			com.uniq->layers && com.seq.current != RESULT_IMAGE) {
 		hi = com.uniq->layers[com.cvport].hi;
 		lo = com.uniq->layers[com.cvport].lo;
 		cut_over = com.uniq->layers[com.cvport].cut_over;
@@ -893,17 +893,27 @@ void remap(int vport) {
 		return;
 	}
 
-	if ((single_image_is_loaded() && vport >= com.uniq->nb_layers)
-			|| (sequence_is_loaded() && vport >= com.seq.nb_layers)
-			|| (!single_image_is_loaded() && !sequence_is_loaded())) {
+	int no_data = 0;
+	if (single_image_is_loaded()) {
+	       if (vport >= com.uniq->nb_layers)
+		       no_data = 1;
+	}
+	else if (sequence_is_loaded()) {
+		if (vport >= com.seq.nb_layers)
+			no_data = 1;
+	}
+	else no_data = 1;
+	if (no_data) {
 		fprintf(stderr, "vport is out of bounds or data is not loaded yet\n");
 		return;
 	}
 
 	// allocate if not already done or the same size
-	if (cairo_format_stride_for_width(CAIRO_FORMAT_RGB24, gfit.rx)
-			!= com.surface_stride[vport] || gfit.ry != com.surface_height[vport]
-			|| !com.surface[vport] || !com.graybuf[vport]) {
+	if (cairo_format_stride_for_width(CAIRO_FORMAT_RGB24, gfit.rx) !=
+			com.surface_stride[vport] ||
+			gfit.ry != com.surface_height[vport] ||
+			!com.surface[vport] ||
+			!com.graybuf[vport]) {
 		guchar *oldbuf = com.graybuf[vport];
 		fprintf(stderr, "Gray display buffers and surface (re-)allocation\n");
 		if (gfit.rx == 0 || gfit.ry == 0) {
@@ -937,19 +947,19 @@ void remap(int vport) {
 			return;
 		}
 	}
-	if (single_image_is_loaded() && com.cvport < com.uniq->nb_layers
-	&& com.seq.current != RESULT_IMAGE) {
-		mode = com.uniq->layers[com.cvport].rendering_mode;
+	if (single_image_is_loaded() && com.seq.current != RESULT_IMAGE) {
+		mode = com.uniq->layers[vport].rendering_mode;
 		hi = com.uniq->layers[vport].hi;
 		lo = com.uniq->layers[vport].lo;
 		do_cut_over = com.uniq->layers[vport].cut_over;
-	} else if (sequence_is_loaded() && com.cvport < com.seq.nb_layers) {
-		mode = com.seq.layers[com.cvport].rendering_mode;
+	} else if (sequence_is_loaded() && vport < com.seq.nb_layers) {
+		// the check above is needed because there may be a different
+		// number of channels between the unique image and the sequence
+		mode = com.seq.layers[vport].rendering_mode;
 		hi = com.seq.layers[vport].hi;
 		lo = com.seq.layers[vport].lo;
 		do_cut_over = com.seq.layers[vport].cut_over;
-	} else
-		return; /* Should not happend, but it avoids warning during compilation */
+	} else fprintf(stderr, "BUG in unique image remap\n");
 
 	if (lo > hi) {
 		// negative display
@@ -1003,7 +1013,8 @@ void remap(int vport) {
 	color = gtk_toggle_button_get_active(
 			GTK_TOGGLE_BUTTON(lookup_widget("colormap_button")));
 
-	make_index_for_rainbow(rainbow_index);
+	if (color == RAINBOW_COLOR)
+		make_index_for_rainbow(rainbow_index);
 	index = remap_index[vport];
 	/* cannot be parallelized because of i and j */
 	for (y = 0; y < gfit.ry; y++) {
@@ -1234,8 +1245,9 @@ gboolean redraw(int vport, int doremap) {
 	GtkWidget *widget;
 
 	if (vport >= MAXVPORT) {
-		fprintf(stderr, "redraw: vport=%d is larger than MAXVPORT %d\n", vport,
-		MAXVPORT);
+		fprintf(stderr, "redraw: maximum number of layers supported is %d"
+				" (current image has %d).\n", MAXVPORT, vport);
+		return FALSE;
 	}
 	widget = com.vport[vport];
 
@@ -1269,7 +1281,7 @@ gboolean redraw(int vport, int doremap) {
 		fprintf(stderr, "redraw: unknown viewport number %d\n", vport);
 		break;
 	}
-	fprintf(stdout, "end of redraw\n");
+	//fprintf(stdout, "end of redraw\n");
 	com.drawn = FALSE;
 	return FALSE;
 }
@@ -1323,8 +1335,9 @@ int copy_rendering_settings_when_chained(gboolean from_GUI) {
 	}
 
 	is_chained = gtk_toggle_button_get_active(chainedbutton);
-	if (single_image_is_loaded() && com.cvport < com.uniq->nb_layers && com.uniq->layers
-	&& com.seq.current != RESULT_IMAGE) {
+	if (single_image_is_loaded() &&
+			com.cvport < com.uniq->nb_layers && com.uniq->layers &&
+			com.seq.current != RESULT_IMAGE) {
 		layers = com.uniq->layers;
 		nb_layers = com.uniq->nb_layers;
 	} else if (sequence_is_loaded() && com.cvport < com.seq.nb_layers
@@ -1370,14 +1383,14 @@ void on_minscale_changed(GtkRange *range, gpointer user_data) {
 	if (minentry == NULL)
 		minentry = GTK_ENTRY(gtk_builder_get_object(builder, "min_entry"));
 
-	if (sequence_is_loaded() && com.cvport < com.seq.nb_layers) {
-		com.seq.layers[com.cvport].lo = (int) gtk_range_get_value(range);
-		g_snprintf(buffer, 6, "%u", com.seq.layers[com.cvport].lo);
-	} else if (single_image_is_loaded() && com.cvport < com.uniq->nb_layers) {
+	if (single_image_is_loaded() && com.seq.current < RESULT_IMAGE &&
+			com.cvport < com.uniq->nb_layers) {
 		com.uniq->layers[com.cvport].lo = (int) gtk_range_get_value(range);
 		g_snprintf(buffer, 6, "%u", com.uniq->layers[com.cvport].lo);
-	} else
-		return;
+	} else if (sequence_is_loaded() && com.cvport < com.seq.nb_layers) {
+		com.seq.layers[com.cvport].lo = (int) gtk_range_get_value(range);
+		g_snprintf(buffer, 6, "%u", com.seq.layers[com.cvport].lo);
+	} else return;
 	g_signal_handlers_block_by_func(minentry, on_min_entry_changed, NULL);
 	gtk_entry_set_text(minentry, buffer);
 	g_signal_handlers_unblock_by_func(minentry, on_min_entry_changed, NULL);
@@ -1405,16 +1418,14 @@ void on_maxscale_changed(GtkRange *range, gpointer user_data) {
 	if (maxentry == NULL)
 		maxentry = GTK_ENTRY(gtk_builder_get_object(builder, "max_entry"));
 
-	if (sequence_is_loaded() && com.cvport < com.seq.nb_layers) {
-		com.seq.layers[com.cvport].hi = (int) gtk_range_get_value(range);
-		g_snprintf(buffer, 6, "%u", com.seq.layers[com.cvport].hi);
-	} else if (single_image_is_loaded() && com.cvport < com.uniq->nb_layers) {
+	if (single_image_is_loaded() && com.seq.current < RESULT_IMAGE &&
+			com.cvport < com.uniq->nb_layers) {
 		com.uniq->layers[com.cvport].hi = (int) gtk_range_get_value(range);
 		g_snprintf(buffer, 6, "%u", com.uniq->layers[com.cvport].hi);
-	}
-
-	else
-		return;
+	} else if (sequence_is_loaded() && com.cvport < com.seq.nb_layers) {
+		com.seq.layers[com.cvport].hi = (int) gtk_range_get_value(range);
+		g_snprintf(buffer, 6, "%u", com.seq.layers[com.cvport].hi);
+	} else return;
 	g_signal_handlers_block_by_func(maxentry, on_max_entry_changed, NULL);
 	gtk_entry_set_text(maxentry, buffer);
 	g_signal_handlers_unblock_by_func(maxentry, on_max_entry_changed, NULL);
@@ -1426,7 +1437,7 @@ gboolean on_maxscale_release(GtkWidget *widget, GdkEvent *event,
 		com.sliders = USER;
 		sliders_mode_set_state(com.sliders);
 	}
-	if (copy_rendering_settings_when_chained(FALSE))
+	if (copy_rendering_settings_when_chained(TRUE))
 		redraw(com.cvport, REMAP_ALL);
 	else
 		redraw(com.cvport, REMAP_ONLY);

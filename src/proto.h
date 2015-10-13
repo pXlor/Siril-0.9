@@ -218,7 +218,7 @@ void	sequence_free_preprocessing_data(sequence *seq);
 gboolean sequence_is_loaded();
 int	sequence_processing(sequence *seq, sequence_proc process, int layer);
 int	seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit);
-void	do_fwhm_sequence_processing(sequence *seq, int layer);
+int	do_fwhm_sequence_processing(sequence *seq, int layer);
 int	seqprocess_planetary(sequence *seq, int seq_layer, int frame_no, fits *fit);
 void	check_or_allocate_regparam(sequence *seq, int layer);
 sequence *create_internal_sequence(int size);
