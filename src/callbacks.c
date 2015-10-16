@@ -959,7 +959,10 @@ void remap(int vport) {
 		hi = com.seq.layers[vport].hi;
 		lo = com.seq.layers[vport].lo;
 		do_cut_over = com.seq.layers[vport].cut_over;
-	} else fprintf(stderr, "BUG in unique image remap\n");
+	} else {
+		fprintf(stderr, "*** BUG in unique image remap ***\n");
+		return;
+	}
 
 	if (lo > hi) {
 		// negative display
