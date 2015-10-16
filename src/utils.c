@@ -582,25 +582,12 @@ int update_sequences_list(const char *sequence_name_to_select) {
 		if ((suf = strstr(file->d_name, ".seq")) && strlen(suf) == 4) {
 			sequence *seq = readseqfile(file->d_name);
 			if (seq != NULL) {
-				/*if (seq->type == SEQ_REGULAR) {*/
-					strncpy(filename, file->d_name, 255);
-				/*} else if (seq->type == SEQ_SER) {
-					int idx = strlen(file->d_name) - 4;
-					strncpy(filename, file->d_name, idx);
-					strcpy(filename + idx, ".ser");
-				}
-#ifdef HAVE_FFMS2
-				else if (seq->type == SEQ_AVI) {
-					int idx = strlen(file->d_name) - 4;
-					strncpy(filename, file->d_name, idx);
-					strcpy(filename + idx, ".");
-					strcpy(filename + idx + 1, seq->ext);
-				}
-#endif */
+				strncpy(filename, file->d_name, 255);
 				free_sequence(seq, TRUE);
 				gtk_combo_box_text_append_text(seqcombo, filename);
 				if (sequence_name_to_select
-						&& !strncmp(filename, sequence_name_to_select, strlen(filename))) {
+						&& !strncmp(filename, sequence_name_to_select,
+								strlen(filename))) {
 					index_of_seq_to_load = number_of_loaded_sequences;
 				}
 				++number_of_loaded_sequences;
