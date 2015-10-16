@@ -19,8 +19,9 @@ New Siril uses:
 	* Gtk 3, (>= 3.6) for the GUI toolkit
 	* cfitsio for fits related stuff
 	* fftw3 as a FFT library
-	* The GNU Scientific Library (gsl) for FWHM implementation, histograms and background extraction
-	* libconfig++ for structured configuration file management
+	* The GNU Scientific Library (gsl) for FWHM implementation, histograms
+	  and background extraction
+	* libconfig++ (>= 1.4) for structured configuration file management
 
 Siril works internally with FITS files, but other file formats can be used as
 input and converted using the conversion tab of the control window. Some file
@@ -30,26 +31,30 @@ compilation time, or their support won't be compiled.
 
 	* libraw for DSLR RAW files import
 	* libffms2 for films import
-	* libtiff 4 or 5.
+	* libtiff (>= 4)
 	* libjpeg or compatible libraries like libjpeg-turbo
 	* libpng
 	* opencv and g++ for image rotation support and binned image resizing
 
-All these programs or libraries are available in most Linux distributions.
+All these programs or libraries are available in most Linux distributions and
+free systems, maybe with the exception of ffms2 that may need to be compiled on
+some systems.
 
 
 The install is similar to the usual GNU/Linux package build, except that the
 configure script is not directly shipped and has to be created with the
 following command:
 
-	aclocal && autoconf && autoheader && automake --add-missing
+	$ autoreconf -fi
 
 After that, it's just:
 
-	./configure
-	make
-	make install (as root)
+	$ ./configure
+	$ make
+	$ make install (with the required privileges)
 
+Note that a binary package for Siril is maintained for Debian. See the download
+page for other packages that could be available.
 
 
 NOTES ON SIRIL FITS IMAGE FORMAT.

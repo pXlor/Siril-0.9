@@ -1,3 +1,21 @@
+v0.9.0, Oct 16, 2015.
+First stable version. High quality processing for deep-sky images is fully
+functional, a basic processing is available for planetary images.
+A list of solved issues and new features since the introduction of the bug
+tracking system at mid-course can be seen here:
+http://free-astro.vinvin.tf/bugs/roadmap_page.php?version_id=1
+The main features introduced since the previous version are:
+ * new global star registration, taking into account field rotation
+ * new quality evaluation method for planetary images, used to sort the best
+ * images selected for stacking
+ * new parallelized stacking algorithm for all sequences, including all SER
+   formats, allowing maximum used memory to be set
+ * threading of the most time consuming processings, to keep the GUI reactive,
+   as well as many other speed improvements
+ * tested and improved on FreeBSD and MacOS X systems, and ARM architectures
+ * undo/redo on processing operations
+ * sequence cropping tool
+
 v0.9.0-rc1, Dec 29, 2014.
  * many fixes including background extraction, compositing alignment, rejection
    algorithms, wavelets

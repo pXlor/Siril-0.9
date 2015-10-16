@@ -1,3 +1,16 @@
+siril 0.9.0
+10/16/15
+
+* new global star registration, taking into account field rotation
+* new quality evaluation method for planetary images, used to sort the best
+* images selected for stacking
+* new parallelized stacking algorithm for all sequences, including all SER formats, allowing maximum used memory to be set
+* threading of the most time consuming processings, to keep the GUI reactive, as well as many other speed improvements
+* tested and improved on FreeBSD and MacOS X systems, and ARM architectures
+* undo/redo on processing operations
+* sequence cropping tool
+
+
 siril 0.9.0rc1
 12/29/14
 
