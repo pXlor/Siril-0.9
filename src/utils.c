@@ -232,7 +232,7 @@ int readinitfile() {
 			siril_log_message(
 					"Reverting current working directory to startup directory, the saved directory is not available anymore\n");
 			set_GUI_CWD();
-			return (writeinitfile());
+			writeinitfile();
 		}
 	}
 
