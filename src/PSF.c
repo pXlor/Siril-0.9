@@ -419,7 +419,18 @@ fitted_PSF *minimiz_no_angle(gsl_matrix* z, double background, int layer) {
 		status = gsl_multifit_test_delta(s->dx, s->x, 1e-4, 1e-4);
 	} while (status == GSL_CONTINUE && iter < MAX_ITER_NO_ANGLE);
 
+#if HAVE_GSL_1
 	gsl_multifit_covar(s->J, 0.0, covar);
+#elif HAVE_GSL_2
+	gsl_matrix * J;
+
+	J = gsl_matrix_alloc(n, p);
+
+	gsl_multifit_fdfsolver_jac(s, J);
+	gsl_multifit_covar(J, 0.0, covar);
+
+	gsl_matrix_free(J);
+#endif
 
 #define FIT(i) gsl_vector_get(s->x, i)
 #define ERR(i) sqrt(gsl_matrix_get(covar,i,i))	//for now, errors are not displayed
@@ -518,7 +529,18 @@ fitted_PSF *minimiz_angle(gsl_matrix* z, fitted_PSF *psf) {
 		status = gsl_multifit_test_delta(s->dx, s->x, 1e-4, 1e-4);
 	} while (status == GSL_CONTINUE && iter < MAX_ITER_ANGLE);
 
+#if HAVE_GSL_1
 	gsl_multifit_covar(s->J, 0.0, covar);
+#elif HAVE_GSL_2
+	gsl_matrix * J;
+
+	J = gsl_matrix_alloc(n, p);
+
+	gsl_multifit_fdfsolver_jac(s, J);
+	gsl_multifit_covar(J, 0.0, covar);
+
+	gsl_matrix_free(J);
+#endif
 
 #define FIT(i) gsl_vector_get(s->x, i)
 #define ERR(i) sqrt(gsl_matrix_get(covar,i,i))	//for now, errors are not displayed
