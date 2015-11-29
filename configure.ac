@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT(siril, 0.9.1 alpha)
+AC_INIT(siril, 0.9.1)
 AM_INIT_AUTOMAKE([subdir-objects])
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_SRCDIR([src/main.c])
