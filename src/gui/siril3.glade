@@ -4184,21 +4184,6 @@ The next action for DSLR images would be to debayer the preprocessed images, go 
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkLabel" id="label13">
-                    <property name="visible">True</property>
-                    <property name="can_focus">False</property>
-                    <property name="label" translatable="yes">Image registration</property>
-                    <attributes>
-                      <attribute name="weight" value="bold"/>
-                    </attributes>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">False</property>
-                    <property name="position">2</property>
-                  </packing>
-                </child>
-                <child>
                   <object class="GtkBox" id="hbox30">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
@@ -4246,7 +4231,7 @@ The next action for DSLR images would be to debayer the preprocessed images, go 
                   <packing>
                     <property name="expand">False</property>
                     <property name="fill">False</property>
-                    <property name="position">3</property>
+                    <property name="position">2</property>
                   </packing>
                 </child>
                 <child>
@@ -4258,6 +4243,21 @@ The next action for DSLR images would be to debayer the preprocessed images, go 
                     <property name="expand">False</property>
                     <property name="fill">False</property>
                     <property name="padding">5</property>
+                    <property name="position">3</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="label13">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="label" translatable="yes">Image registration</property>
+                    <attributes>
+                      <attribute name="weight" value="bold"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">False</property>
                     <property name="position">4</property>
                   </packing>
                 </child>
@@ -6438,7 +6438,9 @@ The higher the degree order is, the stronger the gradient can be remove.</proper
                                         <property name="resizable">True</property>
                                         <property name="title" translatable="yes">Selected</property>
                                         <child>
-                                          <object class="GtkCellRendererToggle" id="cellrenderertext11"/>
+                                          <object class="GtkCellRendererToggle" id="cellrenderertext11">
+                                            <signal name="toggled" handler="on_cellrenderertext11_toggled" swapped="no"/>
+                                          </object>
                                           <attributes>
                                             <attribute name="active">1</attribute>
                                           </attributes>

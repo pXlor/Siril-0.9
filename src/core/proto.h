@@ -119,8 +119,6 @@ char*	convtoupper(char *filename);
 char*	extract_path(const char *path);
 char*	remove_ext_from_filename(const char *basename);
 char*	replace_spaces_from_filename(const char *filename);
-char* str_append(char** data, const char* newdata);
-
 
 /****************** siril.h ******************/
 /* crop sequence data from GUI */

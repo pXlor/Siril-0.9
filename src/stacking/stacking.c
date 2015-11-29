@@ -43,8 +43,6 @@
 #include "gui/histogram.h"	// update_gfit_histogram_if_needed();
 #include "io/ser.h"
 
-#undef STACK_DEBUG
-
 static struct stacking_args stackparam = {	// parameters passed to stacking
 		NULL, NULL, NULL, -1.0, 0, NULL, { '\0' }, NULL, FALSE, { 0, 0 }, -1, 0, { 0, 0 }, NO_REJEC, NO_NORM, FALSE
 };
@@ -212,12 +210,9 @@ int stack_summing(struct stacking_args *args) {
 			retval = -1;
 			goto free_and_reset_progress_bar;
 		}
-		tmpmsg = strdup("Processing image ");
-		tmpmsg = str_append(&tmpmsg, filename);
-//		tmpmsg = siril_log_message("Processing image %s\n", filename);
-//		tmpmsg[strlen(tmpmsg)-1] = '\0';
+		tmpmsg = siril_log_message("Processing image %s\n", filename);
+		tmpmsg[strlen(tmpmsg)-1] = '\0';
 		set_progress_bar_data(tmpmsg, (double)cur_nb/((double)nb_frames+1.));
-		free(tmpmsg);
 
 		cur_nb++;	// only used for progress bar
 
@@ -261,9 +256,7 @@ int stack_summing(struct stacking_args *args) {
 			shiftx = 0;
 			shifty = 0;
 		}
-#ifdef STACK_DEBUG
-		printf("Stack image %d with shift x=%d y=%d\n", j, shiftx, shifty);
-#endif
+		siril_log_message("Stack image %d with shift x=%d y=%d\n", j, shiftx, shifty);
 
 		/* Summing the exposure */
 		exposure += fit->exposure;
@@ -828,13 +821,9 @@ int stack_addmax(struct stacking_args *args) {
 			retval = -1;
 			goto free_and_reset_progress_bar;
 		}
-		tmpmsg = strdup("Processing image ");
-		tmpmsg = str_append(&tmpmsg, filename);
-//		tmpmsg = siril_log_message("Processing image %s\n", filename);
-//		tmpmsg[strlen(tmpmsg)-1] = '\0';
+		tmpmsg = siril_log_message("Processing image %s\n", filename);
+		tmpmsg[strlen(tmpmsg)-1] = '\0';
 		set_progress_bar_data(tmpmsg, (double)cur_nb/((double)nb_frames+1.));
-		free(tmpmsg);
-
 		cur_nb++;	// only used for progress bar
 
 		if (seq_read_frame(args->seq, j, fit)) {
@@ -877,9 +866,7 @@ int stack_addmax(struct stacking_args *args) {
 			shiftx = 0;
 			shifty = 0;
 		}
-#ifdef STACK_DEBUG
-		printf("stack image %d with shift x=%d y=%d\n", j, shiftx, shifty);
-#endif
+		siril_log_message("stack image %d with shift x=%d y=%d\n", j, shiftx, shifty);
 
 		/* Summing the exposure */
 		exposure += fit->exposure;
@@ -989,13 +976,9 @@ int stack_addmin(struct stacking_args *args) {
 			retval = -1;
 			goto free_and_reset_progress_bar;
 		}
-		tmpmsg = strdup("Processing image ");
-		tmpmsg = str_append(&tmpmsg, filename);
-//		tmpmsg = siril_log_message("Processing image %s\n", filename);
-//		tmpmsg[strlen(tmpmsg)-1] = '\0';
+		tmpmsg = siril_log_message("Processing image %s\n", filename);
+		tmpmsg[strlen(tmpmsg)-1] = '\0';
 		set_progress_bar_data(tmpmsg, (double)cur_nb/((double)nb_frames+1.));
-		free(tmpmsg);
-
 		cur_nb++;	// only used for progress bar
 
 		if (seq_read_frame(args->seq, j, fit)) {
@@ -1039,9 +1022,7 @@ int stack_addmin(struct stacking_args *args) {
 			shiftx = 0;
 			shifty = 0;
 		}
-#ifdef STACK_DEBUG
-		printf("stack image %d with shift x=%d y=%d\n", j, shiftx, shifty);
-#endif
+		siril_log_message("stack image %d with shift x=%d y=%d\n", j, shiftx, shifty);
 
 		/* Summing the exposure */
 		exposure += fit->exposure;
@@ -1888,27 +1869,23 @@ static void _show_summary(struct stacking_args *args) {
 
 	siril_log_message("Integration of %d images:\n", args->nb_images_to_stack);
 
-	if (args->method != &stack_mean_with_rejection) {
+	switch (args->normalize) {
+	default:
+	case NO_NORM:
 		norm_str = "None";
-	} else {
-		switch (args->normalize) {
-		default:
-		case NO_NORM:
-			norm_str = "None";
-			break;
-		case ADDITIVE:
-			norm_str = "additive";
-			break;
-		case MULTIPLICATIVE:
-			norm_str = "multiplicative";
-			break;
-		case ADDITIVE_SCALING:
-			norm_str = "additive + scaling";
-			break;
-		case MULTIPLICATIVE_SCALING:
-			norm_str = "multiplicative + scaling";
-			break;
-		}
+		break;
+	case ADDITIVE:
+		norm_str = "additive";
+		break;
+	case MULTIPLICATIVE:
+		norm_str = "multiplicative";
+		break;
+	case ADDITIVE_SCALING:
+		norm_str = "additive + scaling";
+		break;
+	case MULTIPLICATIVE_SCALING:
+		norm_str = "multiplicative + scaling";
+		break;
 	}
 
 	siril_log_message("Normalization ............. %s\n", norm_str);
