@@ -35,14 +35,14 @@
 #include <libproc.h>
 #endif
 
-#include "siril.h"
-#include "proto.h"
-#include "conversion.h"
-#include "callbacks.h"
-#include "registration.h"
-#include "stacking.h"
-#include "undo.h"
-#include "single_image.h"
+#include "core/siril.h"
+#include "core/proto.h"
+#include "io/conversion.h"
+#include "gui/callbacks.h"
+#include "registration/registration.h"
+#include "stacking/stacking.h"
+#include "core/undo.h"
+#include "io/single_image.h"
 
 /* the global variables of the whole project */
 cominfo com;	// the main data struct
