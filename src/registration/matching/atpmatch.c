@@ -3140,7 +3140,7 @@ TRANS *trans /* O: place solved coefficients into this */
 	double xdiff, ydiff;
 	double sigma;
 	double max_dist2;
-	double newx, newy;
+	double newx = 0.0, newy = 0.0;
 	s_star *sa, *sb;
 	s_star *a_prime; /* will hold transformed version of stars in set A */
 
@@ -3665,7 +3665,7 @@ int num_stars, /* I: number of stars in the array */
 TRANS *trans /* I: contains coefficients of transformation */
 ) {
 	int i;
-	double newx, newy;
+	double newx = 0.0, newy = 0.0;
 	s_star *sp;
 
 	if (num_stars == 0) {
@@ -8053,7 +8053,7 @@ TRANS *trans /* I/O: apply this trans to object in a list A */
 ) {
 	int i;
 	double dx, dy, dist, dist_sq;
-	double new_A_x, new_A_y;
+	double new_A_x = 0.0, new_A_y = 0.0;
 	double sum = 0.0, sum_sq = 0.0, mean = 0.0, stdev = 0.0;
 	struct s_star *star_A, *star_B;
 

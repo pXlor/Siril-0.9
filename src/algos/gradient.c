@@ -309,8 +309,8 @@ static int grad_extract_background(fits *imgfit, fits *bkgfit, int layer) {
 			GTK_SPIN_BUTTON(lookup_widget("spinbutton_bkg_deviation")));
 	double unbalance = (double) gtk_spin_button_get_value(
 			GTK_SPIN_BUTTON(lookup_widget("spinbutton_bkg_unbalance")));
-	int inter_type = gtk_combo_box_get_active(
-			GTK_COMBO_BOX(lookup_widget("combobox_gradient_inter")));
+//	int inter_type = gtk_combo_box_get_active(
+//			GTK_COMBO_BOX(lookup_widget("combobox_gradient_inter")));
 
 	Info->box_per_row = (size_t) ((double) Info->col
 			/ ((double) Info->box + interval - 1));
