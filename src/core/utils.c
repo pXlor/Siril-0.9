@@ -222,7 +222,7 @@ int readinitfile() {
 
 	config_init(&config);
 
-	if (!config_read_file(&config, com.initfile))
+	if (config_read_file(&config, com.initfile) == CONFIG_FALSE)
 		return 1;
 	siril_log_message("Loading init file: %s\n", com.initfile);
 
@@ -478,7 +478,7 @@ int checkinitfile() {
 	}
 	com.initfile = malloc(strlen(home) + 20);
 	sprintf(com.initfile, "%s/.siril/siril.cfg", home);
-	if (readinitfile()) {
+	if (readinitfile()) {	// couldn't read it
 		char filename[255];
 
 		set_GUI_CWD();
@@ -491,21 +491,22 @@ int checkinitfile() {
 							filename);
 					return 1;
 				}
+				com.swap_dir = strdup (g_get_tmp_dir());
+				com.ext = strdup(".fit");
 				return (writeinitfile());
 			}
 		}
 
 		if (!(S_ISDIR(sts.st_mode))) {
 			fprintf(stderr,
-					"There is a file named %s, that is not a directory.\
-					Remove or rename it first\n",
+					"There is a file named %s, that is not a directory.\n"
+					"Remove or rename it first\n",
 					filename);
-			exit(1);
+			return 1;
 		}
 
 		com.swap_dir = strdup (g_get_tmp_dir());
 		com.ext = strdup(".fit");
-
 		return (writeinitfile());
 	}
 	return 0;

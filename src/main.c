@@ -263,7 +263,11 @@ int main(int argc, char *argv[]) {
 		com.wd = NULL;
 	} else
 		cwd_orig = strdup(com.wd);
-	checkinitfile();
+
+	if (checkinitfile()) {
+		siril_log_message("could not load or create settings file in ~/.siril, exiting.\n");
+		exit(1);
+	}
 	
 	/* load the css sheet for general style */
 	homepath = getenv("HOME");
