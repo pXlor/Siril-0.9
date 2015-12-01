@@ -1,7 +1,9 @@
 siril 0.9.1
-11/30/15
+12/01/15
 
 * added support for GSL 2
+* fixed crash on startup without existing config file
+
 
 siril 0.9.0
 10/16/15

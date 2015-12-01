@@ -1,6 +1,7 @@
 v0.9.1, Nov 30, 2015.
-Update of 0.9 version.
+Stability update for v0.9.0.
  * added support for GSL 2.
+ * fixed crash on startup without existing config file
 
 v0.9.0, Oct 16, 2015.
 First stable version. High quality processing for deep-sky images is fully
