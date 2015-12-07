@@ -59,7 +59,7 @@
 #define CSS_FILE "gtk.css"                      /* CSS style sheet name */
 
 static enum {
-	CD_NULL, CD_INCALL, CD_EXCALL
+	CD_NULL, CD_INCALL, CD_EXCALL, CD_QUIT = -1
 } confirm;
 static gboolean is_shift_on = FALSE;
 
@@ -2190,9 +2190,15 @@ void on_combobox_ext_changed(GtkComboBox *box, gpointer user_data) {
 
 /**************************************************************/
 
+void gtk_main_quit() {
+	GtkWidget *widget = lookup_widget("confirmlabel");
+	confirm = CD_QUIT;
+	gtk_label_set_text(GTK_LABEL(widget), "Are you sure you want to quit ?");
+	gtk_widget_show(lookup_widget("confirm_dialog"));
+}
+
 void on_exit_activate(GtkMenuItem *menuitem, gpointer user_data) {
-	undo_flush();
-	exit(0);
+	gtk_main_quit();
 }
 
 void history_add_line(char *line) {
@@ -3365,6 +3371,11 @@ void on_confirmok_clicked(GtkButton *button, gpointer user_data) {
 		break;
 
 	case CD_NULL:
+		break;
+
+	case CD_QUIT:
+		undo_flush();
+		exit(EXIT_SUCCESS);
 		break;
 	}
 	confirm = CD_NULL;

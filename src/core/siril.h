@@ -472,7 +472,7 @@ struct cominf {
 	char *ext;		// FITS extension used in SIRIL
 	int len_ext;
 
-	int reg_settings;		// 0=DFT Translation, 1=PSF Translation - Use to save preferences in the init file
+	int reg_settings;		// Use to save registration method in the init file
 	
 	stackconf stack;
 	

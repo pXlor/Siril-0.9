@@ -3,6 +3,7 @@
 
 #include "core/siril.h"
 
+#define NUMBER_OF_METHOD 5
 struct registration_args;
 typedef int (*registration_function)(struct registration_args *);
 
@@ -21,10 +22,19 @@ struct registration_args {
 };
 
 
-typedef enum { REQUIRES_NO_SELECTION,	// selection is not used
+typedef enum {
+	REQUIRES_NO_SELECTION,	// selection is not used
 	REQUIRES_ANY_SELECTION,		// selection can be of any size and shape
 	REQUIRES_SQUARED_SELECTION	// selection needs to be square-shaped
 } selection_type;
+
+typedef enum {
+	REGTYPE_DEEPSKY, REGTYPE_PLANETARY
+} registration_type;
+
+typedef enum {
+	PLANETARY_FULLDISK, PLANETARY_SURFACE
+} planetary_type;
 
 
 /* used to register a registration method */
@@ -32,18 +42,27 @@ struct registration_method {
 	const char *name;
 	registration_function method_ptr;
 	selection_type sel;
+	registration_type type;
 };
 
 
-struct registration_method *new_reg_method(char *name, registration_function f, selection_type s); // for compositing
-void	initialize_registration_methods();
+struct registration_method *new_reg_method(char *name, registration_function f,
+		selection_type s, registration_type t); // for compositing
+void initialize_registration_methods();
 struct registration_method * get_selected_registration_method();
-int	register_shift_dft(struct registration_args *args);
-int	register_shift_fwhm(struct registration_args *args);
+int register_shift_dft(struct registration_args *args);
+int register_shift_fwhm(struct registration_args *args);
 int register_star_alignment(struct registration_args *args);
-int	get_registration_layer(sequence *seq);
-void	update_reg_interface(gboolean dont_change_reg_radio);
-void	get_the_registration_area(struct registration_args *reg_args, struct registration_method *method); // for compositing
+int register_ecc(struct registration_args *args);
+void update_reg_interface(gboolean dont_change_reg_radio);
+void get_the_registration_area(struct registration_args *reg_args,
+		struct registration_method *method); // for compositing
+void fill_comboboxregmethod();
+
+/** getter */
+int get_registration_layer(sequence *seq);
+int get_regtype();
+int get_planetarytype();
 
 
 /* mouse behaviour */

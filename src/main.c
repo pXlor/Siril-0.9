@@ -29,7 +29,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <signal.h>
 #if (defined(__APPLE__) && defined(__MACH__))
 #include <stdlib.h>
 #include <libproc.h>
@@ -73,7 +72,7 @@ void usage(const char *command) {
 void signal_handled(int s) {
 	//printf("Caught signal %d\n", s);
 	undo_flush();
-	exit(1);
+	exit(EXIT_FAILURE);
 
 }
 
@@ -116,7 +115,7 @@ int main(int argc, char *argv[]) {
 						c='f';					
 					else {
 						usage(argv[0]);
-						exit(1);
+						exit(EXIT_FAILURE);
 					}
 				}
 			}
@@ -129,18 +128,18 @@ int main(int argc, char *argv[]) {
 				break;
 			case 'v':
 				fprintf(stdout, "%s %s\n", PACKAGE, VERSION);
-				exit(1);
+				exit(EXIT_SUCCESS);
 				break;
 			case 'f':
 				list_format_available();
-				exit(1);
+				exit(EXIT_SUCCESS);
 				break;
 			default:
 				fprintf(stderr, "unknown command line parameter `%c'\n", c);
 				/* no break */
 			case 'h':
 				usage(argv[0]);
-				exit(1);
+				exit(EXIT_SUCCESS);
 		}
 	}
 
@@ -183,7 +182,7 @@ int main(int argc, char *argv[]) {
 	} while (i < sizeof(siril_sources)/sizeof(char *));
 	if (i == sizeof(siril_sources) / sizeof(char *)) {
 		fprintf(stderr, "siril3.glade was not found or contains errors, cannot render GUI. Exiting.\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	siril_path = siril_sources[i];
 
@@ -356,4 +355,3 @@ void initialize_scrollbars() {
 				G_CALLBACK(scrollbars_vadjustment_changed_handler), NULL);
 	}
 }
-
