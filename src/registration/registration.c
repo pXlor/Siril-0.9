@@ -41,39 +41,50 @@
 #include "algos/quality.h"
 #ifdef HAVE_OPENCV
 #include "opencv/opencv.h"
+#include "opencv/ecc/ecc.h"
 #endif
 
 #define MAX_STARS_FITTED 100
 #undef DEBUG
 
-static char *tooltip_text[] = { "Image pattern alignment: This is a simple registration by translation method "
-		"using cross correlation in the spatial domain. This method is fast and is used to register "
-		"planetary movies. It can also be used for some deep-sky images registration. "
-		"Shifts at pixel precision are saved in seq file.",
-		"One star registration: This is the simplest method to register deep-sky images. "
+static char *tooltip_text[] = { "One Star Registration: This is the simplest method to register deep-sky images. "
 		"Because only one star is concerned for register, images are aligned using shifting"
 		"(at a fraction of pixel). No rotation or scaling are performed. "
 		"Shifts at pixel precision are saved in seq file.",
-		"Global star alignment: This is a more powerfull and accurate algorithm (but also slower) "
+#ifdef HAVE_OPENCV
+		"Global Star Alignment: This is a more powerful and accurate algorithm (but also slower) "
 		"to perform deep-sky images. The global matching is based on triangle similarity method for automatically "
-		"identify commom stars in each image."
-		"A new sequence is created with the prefix of your choice (r_ by default). "
+		"identify common stars in each image."
+		"A new sequence is created with the prefix of your choice (r_ by default). ",
+#endif
+		"Image Pattern Alignment: This is a simple registration by translation method "
+		"using cross correlation in the spatial domain. This method is fast and is used to register "
+		"planetary movies. It can also be used for some deep-sky images registration. "
+		"Shifts at pixel precision are saved in seq file."
+#ifdef HAVE_OPENCV
+,
+		"Enhanced Correlation Coefficient Maximization: This method is based on the enhanced correlation "
+		"coefficient maximization algorithm. This method is more complex and slower than Image Pattern Alignment "
+		"but no selection is required. It is good for moon surface images registration. Only translation is taken "
+		"into account yet."
+#endif
 };
 /* callback for the selected area event */
 void _reg_selected_area_callback() {
 	update_reg_interface(TRUE);
 }
 
-static struct registration_method *reg_methods[4];
+static struct registration_method *reg_methods[NUMBER_OF_METHOD];
 static gpointer register_thread_func(gpointer p);
 static gboolean end_register_idle(gpointer p);
 
 struct registration_method *new_reg_method(char *name, registration_function f,
-		selection_type s) {
+		selection_type s, registration_type t) {
 	struct registration_method *reg = malloc(sizeof(struct registration_method));
 	reg->name = strdup(name);
 	reg->method_ptr = f;
 	reg->sel = s;
+	reg->type = t;
 	return reg;
 }
 
@@ -83,13 +94,15 @@ void initialize_registration_methods() {
 	GString *tip;
 	gchar *ctip;
 
-	reg_methods[i++] = new_reg_method("Image pattern alignment (planetary/deep-sky)",
-			&register_shift_dft, REQUIRES_SQUARED_SELECTION);
-	reg_methods[i++] = new_reg_method("One star registration (deep-sky)",
-			&register_shift_fwhm, REQUIRES_ANY_SELECTION);
+	reg_methods[i++] = new_reg_method("One Star Registration (deep-sky)",
+			&register_shift_fwhm, REQUIRES_ANY_SELECTION, REGTYPE_DEEPSKY);
 #ifdef HAVE_OPENCV
-	reg_methods[i++] = new_reg_method("Global star alignement (deep-sky)",
-			&register_star_alignment, REQUIRES_NO_SELECTION);
+	reg_methods[i++] = new_reg_method("Global Star Alignment (deep-sky)",
+			&register_star_alignment, REQUIRES_NO_SELECTION, REGTYPE_DEEPSKY);
+	reg_methods[i++] = new_reg_method("Image Pattern Alignment (planetary - Full Disk)",
+			&register_shift_dft, REQUIRES_SQUARED_SELECTION, REGTYPE_PLANETARY);
+	reg_methods[i++] = new_reg_method("Enhanced Correlation Coefficient (planetary - Surfaces)",
+			&register_ecc, REQUIRES_NO_SELECTION, REGTYPE_PLANETARY);
 #endif
 	//if (theli_is_available())
 	//	reg_methods[i++] = new_reg_method("theli", register_theli, REQUIRES_NO_SELECTION);
@@ -125,9 +138,17 @@ void initialize_registration_methods() {
 }
 
 struct registration_method *get_selected_registration_method() {
-	GtkComboBox *regcombo = GTK_COMBO_BOX(
+	GtkComboBoxText *regcombo = GTK_COMBO_BOX_TEXT(
 			gtk_builder_get_object(builder, "comboboxregmethod"));
-	int index = gtk_combo_box_get_active(regcombo);
+	int index = 0;
+
+	gchar *text = gtk_combo_box_text_get_active_text (regcombo);
+	while (reg_methods[index] && text != NULL) {
+		if (!strcmp(reg_methods[index]->name, text))
+			break;
+		index++;
+	}
+	g_free(text);
 	return reg_methods[index];
 }
 
@@ -557,7 +578,7 @@ int register_star_alignment(struct registration_args *args) {
 				_print_result(&trans, FWHMx, FWHMy);
 				current_regdata[frame].fwhm = FWHMx;
 
-				transforme_image(&fit, trans, 0);
+				cvTransformImage(&fit, trans, 0);
 
 				i = 0;
 				while (i < MAX_STARS && stars[i])
@@ -579,12 +600,123 @@ int register_star_alignment(struct registration_args *args) {
 
 	return 0;
 }
+
+int register_ecc(struct registration_args *args) {
+	int frame, ref_image, ret;
+	float nb_frames, cur_nb;
+	regdata *current_regdata;
+	fits ref, im;
+	double q_max = 0;
+	int q_index = -1;
+
+	memset(&im, 0, sizeof(fits));
+	memset(&ref, 0, sizeof(fits));
+
+	if (!args->seq->regparam) {
+		fprintf(stderr, "regparam should have been created before\n");
+		return -1;
+	}
+	if (args->seq->regparam[args->layer]) {
+		current_regdata = args->seq->regparam[args->layer];
+		/* we reset all values as we built another sequence */
+		memset(current_regdata, 0, args->seq->number * sizeof(regdata));
+	} else {
+		current_regdata = calloc(args->seq->number, sizeof(regdata));
+		if (current_regdata == NULL) {
+			siril_log_message("Error allocating registration data\n");
+			return -2;
+		}
+	}
+
+	if (args->process_all_frames)
+		nb_frames = (float) args->seq->number;
+	else
+		nb_frames = (float) args->seq->selnum;
+
+	/* loading reference frame */
+	if (args->seq->reference_image == -1)
+		ref_image = 0;
+	else
+		ref_image = args->seq->reference_image;
+
+	/* first we're looking for stars in reference image */
+	ret = seq_read_frame(args->seq, ref_image, &ref);
+	if (ret) {
+		siril_log_message("Could not load reference image\n");
+		if (current_regdata == args->seq->regparam[args->layer])
+			args->seq->regparam[args->layer] = NULL;
+		free(current_regdata);
+		return 1;
+	}
+	current_regdata[ref_image].quality = QualityEstimate(&ref, args->layer, QUALTYPE_NORMAL);
+	q_max = current_regdata[ref_image].quality;
+	q_index = ref_image;
+
+	/* then we compare to other frames */
+	args->seq->new_total = args->seq->number;
+	for (frame = 0, cur_nb = 0.f; frame < args->seq->number; frame++) {
+		if (args->run_in_thread && !get_thread_run())
+			break;
+		if (!args->process_all_frames && !args->seq->imgparam[frame].incl)
+			continue;
+		current_regdata[frame].shiftx = 0;
+		current_regdata[frame].shifty = 0;
+
+		if (args->run_in_thread && !get_thread_run())
+			break;
+		if (!args->process_all_frames && !args->seq->imgparam[frame].incl)
+			continue;
+
+		if (frame != ref_image) {
+			ret = seq_read_frame(args->seq, frame, &im);
+			if (!ret) {
+				reg_ecc reg_param;
+				memset(&reg_param, 0, sizeof(reg_ecc));
+
+				if (findTransform(&ref, &im, args->layer, &reg_param)) {
+					siril_log_message("Cannot perform ECC alignment\n");
+					break;
+				}
+				// We don't need fit anymore, we can destroy it.
+				current_regdata[frame].quality = QualityEstimate(&im, args->layer,
+						QUALTYPE_NORMAL);
+
+				if (current_regdata[frame].quality > q_max) {
+					q_max = current_regdata[frame].quality;
+					q_index = frame;
+				}
+
+				current_regdata[frame].shiftx = -round_to_int(reg_param.dx);
+				current_regdata[frame].shifty = -round_to_int(reg_param.dy);
+
+				cur_nb += 1.f;
+				set_progress_bar_data(NULL, cur_nb / nb_frames);
+			}
+		}
+	}
+	args->seq->regparam[args->layer] = current_regdata;
+	update_used_memory();
+	siril_log_message("Registration finished.\n");
+	siril_log_color_message("Best frame: #%d with quality=%g.\n", "bold",
+			q_index, q_max);
+
+	return 0;
+}
+
 #endif
 
 void on_comboboxregmethod_changed(GtkComboBox *box, gpointer user_data) {
-	int reg = gtk_combo_box_get_active(box);
+	int index = 0;
+	gchar *text = gtk_combo_box_text_get_active_text (GTK_COMBO_BOX_TEXT(box));
 
-	com.reg_settings = reg;
+	while (reg_methods[index] && text != NULL) {
+		if (!strcmp(reg_methods[index]->name, text))
+			break;
+		index++;
+	}
+	g_free(text);
+
+	com.reg_settings = index;
 	update_reg_interface(TRUE);
 	writeinitfile();
 }
@@ -624,8 +756,12 @@ int get_registration_layer(sequence *seq) {
  * selected images, if argument is false.
  * Verifies that enough images are selected and an area is selected.
  */
+/* Selects the "register all" or "register selected" according to the number of
+ * selected images, if argument is false.
+ * Verifies that enough images are selected and an area is selected.
+ */
 void update_reg_interface(gboolean dont_change_reg_radio) {
-	static GtkWidget *go_register = NULL, *w_entry = NULL;
+	static GtkWidget *go_register = NULL, *newSequence = NULL;
 	static GtkLabel *labelreginfo = NULL;
 	static GtkToggleButton *reg_all = NULL, *reg_sel = NULL;
 	int nb_images_reg; /* the number of images to register */
@@ -639,7 +775,7 @@ void update_reg_interface(gboolean dont_change_reg_radio) {
 				gtk_builder_get_object(builder, "regselbutton"));
 		labelreginfo = GTK_LABEL(
 				gtk_builder_get_object(builder, "labelregisterinfo"));
-		w_entry = lookup_widget("regseqname_entry");
+		newSequence = lookup_widget("box29");
 	}
 
 	if (!dont_change_reg_radio) {
@@ -661,11 +797,11 @@ void update_reg_interface(gboolean dont_change_reg_radio) {
 		gtk_widget_set_sensitive(go_register, TRUE);
 		gtk_label_set_text(labelreginfo, "");
 #ifdef HAVE_OPENCV
-		gtk_widget_set_sensitive(w_entry, method->method_ptr == &register_star_alignment);
+		gtk_widget_set_visible(newSequence, method->method_ptr == &register_star_alignment);
 #endif
 	} else {
 		gtk_widget_set_sensitive(go_register, FALSE);
-		gtk_widget_set_sensitive(w_entry, FALSE);
+		gtk_widget_set_visible(newSequence, FALSE);
 		if (nb_images_reg <= 1 && com.selection.w <= 0 && com.selection.h <= 0)
 			if (!sequence_is_loaded())
 				gtk_label_set_text(labelreginfo, "Load a sequence first.");
