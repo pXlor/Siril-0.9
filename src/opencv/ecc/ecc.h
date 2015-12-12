@@ -6,8 +6,6 @@
 #endif
 #ifdef HAVE_OPENCV
 
-#include <opencv2/core/core.hpp>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
