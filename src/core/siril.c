@@ -29,7 +29,7 @@
 #include <math.h>
 #include <gsl/gsl_integration.h>
 #include <gsl/gsl_sf_erf.h>
-#include <gsl/gsl_statistics.h>
+#include <gsl/gsl_statistics_ushort.h>
 #include <fitsio.h>
 #include <complex.h>
 #include <float.h>
@@ -49,6 +49,9 @@
 #include "algos/Def_Math.h"
 #include "algos/Def_Wavelet.h"
 #include "io/ser.h"
+
+#define SIGMA_PER_FWHM 2.35482
+#define AVGDEV_NORM 1.2533
 
 /* this file contains all functions for image processing */
 
@@ -347,7 +350,7 @@ int unsharp(fits *fit, double sigma, double amount, gboolean verbose) {
 		siril_log_color_message("Unsharp: processing...\n", "red");
 		gettimeofday(&t_start, NULL);
 	}
-	unsharp_filter(fit, sigma, amount);
+	cvUnsharpFilter(fit, sigma, amount);
 
 	if (verbose) {
 		gettimeofday(&t_end, NULL);
@@ -1132,11 +1135,15 @@ int backgroundnoise(fits* fit, double sigma[]) {
 	ndata = fit->rx * fit->ry;
 
 	copyfits(fit, waveimage, CP_ALLOC | CP_FORMAT | CP_COPYA, 0);
+#ifdef HAVE_OPENCV	// a bit faster
+	cvComputeFinestScale(waveimage);
+#else
 	if (get_wavelet_layers(waveimage, 2, 0, TO_PAVE_BSPLINE, -1)) {
 		siril_log_message("Siril cannot evaluate the noise in the image\n");
 		clearfits(waveimage);
 		return 1;
 	}
+#endif
 
 	for (layer = 0; layer < fit->naxes[2]; layer++) {
 		imstats *stat = statistics(waveimage, layer, NULL);
@@ -1145,8 +1152,8 @@ int backgroundnoise(fits* fit, double sigma[]) {
 		double mean = stat->mean;
 		WORD *buf = waveimage->pdata[layer];
 		assert(ndata > 0);
-		double *array1 = calloc(ndata, sizeof(double));
-		double *array2 = calloc(ndata, sizeof(double));
+		WORD *array1 = calloc(ndata, sizeof(WORD));
+		WORD *array2 = calloc(ndata, sizeof(WORD));
 		if (array1 == NULL || array2 == NULL) {
 			siril_log_message("backgroundnoise : Error allocating data\n");
 			if (array1)
@@ -1156,10 +1163,10 @@ int backgroundnoise(fits* fit, double sigma[]) {
 			free(stat);
 			return 1;
 		}
-		double *set = array1, *subset = array2;
+		WORD *set = array1, *subset = array2;
 
 		for (i = 0; i < ndata; i++)
-			set[i] = (double) buf[i];
+			set[i] = buf[i];
 		int n = 0;
 		do {
 			sigma0 = sigma[layer];
@@ -1169,7 +1176,7 @@ int backgroundnoise(fits* fit, double sigma[]) {
 					k++;
 				}
 			}
-			sigma[layer] = gsl_stats_sd(subset, 1, k);
+			sigma[layer] = gsl_stats_ushort_sd(subset, 1, k);
 			set = subset;
 			(set == array1) ? (subset = array2) : (subset = array1);
 			ndata = k;
@@ -1183,7 +1190,7 @@ int backgroundnoise(fits* fit, double sigma[]) {
 			}
 			n++;
 		} while (fabs(sigma[layer] - sigma0) / sigma[layer] > 0.0001 && n < 10);
-		sigma[layer] *= 2.35482;
+		sigma[layer] *= SIGMA_PER_FWHM;
 		free(array1);
 		free(array2);
 		free(stat);
@@ -1193,64 +1200,80 @@ int backgroundnoise(fits* fit, double sigma[]) {
 	return 0;
 }
 
+static void select_area(fits *fit, rectangle *bounds) {
+	int i, j, layer;
+	int newnbdata;
+
+	newnbdata = bounds->w * bounds->h;
+	for (layer = 0; layer < fit->naxes[2]; ++layer) {
+		WORD *from = fit->pdata[layer]
+				+ (fit->ry - bounds->y - bounds->h) * fit->rx + bounds->x;
+		fit->pdata[layer] = fit->data + layer * newnbdata;
+		WORD *to = fit->pdata[layer];
+		int stridefrom = fit->rx - bounds->w;
+
+		for (i = 0; i < bounds->h; ++i) {
+			for (j = 0; j < bounds->w; ++j) {
+				*to++ = *from++;
+			}
+			from += stridefrom;
+		}
+	}
+	fit->rx = fit->naxes[0] = bounds->w;
+	fit->ry = fit->naxes[1] = bounds->h;
+}
+
 /* computes statistics on the given layer of the given image. It creates the
- * histogram to easily extract the min and max value, the median, mean, sigma
- * and average deviation.
+ * histogram to easily extract the median. min and max value, mean, sigma
+ * and average deviation are computed with gsl stats.
  */
 imstats* statistics(fits *fit, int layer, rectangle *selection) {
-	double sigma, mean = 0.0, avgdev = 0.0, max = 0.0, min = 0.0, sum = 0.0,
-			median = 0.0;
-	double nbdata = fit->rx * fit->ry;
+	double sigma, mean, avgDev, median;
+	double sum = 0.0;
+	WORD min, max, *data;
 	gsl_histogram* histo;
-	size_t i, hist_size;
+	size_t i, hist_size, count;
 	imstats* stat = malloc(sizeof(imstats));
+	fits sfit;
+
+	count = fit->rx * fit->ry;
 
 	if (selection && selection->h > 0 && selection->w > 0) {
 		histo = computeHisto_Selection(fit, layer, selection);
-		nbdata = selection->h * selection->w;
-	} else
+		count = selection->h * selection->w;
+		memcpy(&sfit, fit, sizeof(fits));
+		select_area(&sfit, selection);
+		data = sfit.pdata[layer];
+
+	} else {
 		histo = computeHisto(fit, layer);
+		data = fit->pdata[layer];
+	}
 	hist_size = gsl_histogram_bins(histo);
 
-	/* Calcul of sigma */
-	sigma = gsl_histogram_sigma(histo);
-
-	/* Calcul of the median */
-	/* Get the maximum non null element */
-	for (i = hist_size - 1; i > 0; i--) {
-		if (gsl_histogram_get(histo, i)) {
-			max = (double) i;
-			break;	//we get out of the loop
-		}
-	}
-	/* Get the minimum non null element */
-	for (i = 0; i < hist_size; i++) {
-		if (gsl_histogram_get(histo, i)) {
-			min = (double) i;
-			break;	//we get out of the loop
-		}
-	}
 	/* Get the median value */
 	for (i = 0; i < hist_size; i++) {
 		sum += gsl_histogram_get(histo, i);
-		if (sum > (nbdata * 0.5)) {
+		if (sum > ((double) count * 0.5)) {
 			median = (double) i;
 			break;	//we get out of the loop
 		}
 	}
-	/* Calcul of the Mean and the Average Absolute Deviation from the Median */
-	int k;
-	for (i = 0, k = 0; i < hist_size; i++) {
-		double pxl = gsl_histogram_get(histo, i);
-		mean += pxl * (double) i;
-		if (i > 0 && i < USHRT_MAX) {			// we reject hot and cold pixels
-			avgdev += fabs(pxl - median) * (double) i;
-			k = k + i;
-		}
-	}
-	mean /= nbdata;
-	avgdev /= (double) k;
+
 	gsl_histogram_free(histo);
+
+	/* Mean */
+	mean = gsl_stats_ushort_mean(data, 1, count);
+
+	/* Calculation of sigma */
+	sigma = gsl_stats_ushort_sd_m(data, 1, count, mean);
+
+	/* Calculation of average absolute deviation from the median */
+	avgDev = gsl_stats_ushort_absdev_m(data, 1, count, median);
+
+	/* Minimum and Maximum */
+	gsl_stats_ushort_minmax(&min, &max, data, 1, count);
+
 	switch (layer) {
 	case 0:
 		if (fit->naxes[2] == 1)
@@ -1265,12 +1288,15 @@ imstats* statistics(fits *fit, int layer, rectangle *selection) {
 		strcpy(stat->layername, "Blue");
 		break;
 	}
+
+	stat->count = count;
 	stat->mean = mean;
-	stat->avgdev = avgdev;
+	stat->avgDev = avgDev;
 	stat->median = median;
 	stat->sigma = sigma;
-	stat->min = min;
-	stat->max = max;
+	stat->min = (double) min;
+	stat->max = (double) max;
+	stat->normValue = (double) hist_size - 1;
 	return stat;
 }
 
@@ -1312,7 +1338,7 @@ int verbose_resize_gaussian(fits *image, int toX, int toY, int interpolation) {
 	free(str_inter);
 	gettimeofday(&t_start, NULL);
 
-	retvalue = resize_gaussian(&gfit, toX, toY, interpolation);
+	retvalue = cvResizeGaussian(&gfit, toX, toY, interpolation);
 
 	gettimeofday(&t_end, NULL);
 	show_time(t_start, t_end);
@@ -1352,7 +1378,7 @@ int verbose_rotate_image(fits *image, double angle, int interpolation,
 			str_inter, angle);
 	gettimeofday(&t_start, NULL);
 
-	rotate_image(&gfit, angle, interpolation, cropped);
+	cvRotateImage(&gfit, angle, interpolation, cropped);
 
 	gettimeofday(&t_end, NULL);
 	show_time(t_start, t_end);
@@ -1360,65 +1386,6 @@ int verbose_rotate_image(fits *image, double angle, int interpolation,
 	return 0;
 }
 
-#endif
-
-#if 0
-/* Algorithm written in order to display the gaussian equalized image : 
- * http://www.ifa.hawaii.edu/users/ishida/gauss_equal.pro */
-
-double gauss_int(double value) {
-	return gsl_sf_erf_Q(-value);
-}
-
-double bisect_pdf(double p, double up, double low) {
-	if (p < 0.0 || p > 1.0) return -1.0;
-	double mid = low + (up - low) * p;
-	double z=gauss_int(mid);
-	int count = 1;
-	while ((fabs(up - low) > (mid * 1.0e-6)) && (count < 100)) {
-		if (z > p)
-		up = mid;
-		else
-		low = mid;
-		mid = (up + low)/2.;
-		z = gauss_int(mid);
-		count ++;
-	}
-	return mid;
-}
-
-/* The GAUSS_CVF function computes the cutoff value V in a standard 
- * Gaussian (normal) distribution with a mean of 0.0 and a variance of 
- * 1.0 such that the probability that a random variable X is greater 
- * than V is equal to a user-supplied probability P . */
-double gauss_cvf(double p) {
-	double cutoff = 0.0, below, up;
-	int adjust;
-
-	if (p > 1.0 || p < 0.0) return -1.0;
-	if (p==0.0) return 1.0e12;
-	if (p==1.0) return -1.0e12;
-
-	if (p > 0.5) {
-		p = 1.0 - p;
-		adjust = 1;
-	}
-	else adjust = 0;
-	below = 0.0;
-	up = 1.0;
-
-	while (gauss_int(up) < (1.0 - p)) {
-		below = up;
-		up = 2 * up;
-	}
-	cutoff = bisect_pdf(1.0 - p, up, below);
-	if (adjust) {
-		p = 1.0 - p;
-		return -cutoff;
-	}
-	else
-	return cutoff;
-}
 #endif
 
 /* This function computes wavelets with the number of Nbr_Plan and
@@ -1490,20 +1457,19 @@ int find_hot_pixels(fits *fit, double sigma, char *filename) {
 
 	for (y = 1; y < fit->ry - 1; y++) {
 		for (x = 1; x < fit->rx - 1; x++) {
-			double tab[8];
-			tab[0] = (double) buf[x - 1 + y * fit->rx];
-			tab[1] = (double) buf[x + 1 + y * fit->rx];
-			tab[2] = (double) buf[x + (y - 1) * fit->rx];
-			tab[3] = (double) buf[x + (y + 1) * fit->rx];
-			tab[4] = (double) buf[x - 1 + (y - 1) * fit->rx];
-			tab[5] = (double) buf[x + 1 + (y - 1) * fit->rx];
-			tab[6] = (double) buf[x - 1 + (y + 1) * fit->rx];
-			tab[7] = (double) buf[x + 1 + (y + 1) * fit->rx];
-			quicksort_d(tab, 8);
+			WORD tab[8];
+			tab[0] = buf[x - 1 + y * fit->rx];
+			tab[1] = buf[x + 1 + y * fit->rx];
+			tab[2] = buf[x + (y - 1) * fit->rx];
+			tab[3] = buf[x + (y + 1) * fit->rx];
+			tab[4] = buf[x - 1 + (y - 1) * fit->rx];
+			tab[5] = buf[x + 1 + (y - 1) * fit->rx];
+			tab[6] = buf[x - 1 + (y + 1) * fit->rx];
+			tab[7] = buf[x + 1 + (y + 1) * fit->rx];
+			quicksort_s(tab, 8);
 			//~ double median = gsl_stats_median_from_sorted_data (tab, 1, 8);
-			double mean = gsl_stats_mean(tab, 1, 8);
-			//~ double sd = gsl_stats_sd_m(tab, 1, 8, mean);
-			double absdev = gsl_stats_absdev_m(tab, 1, 8, mean);
+			double mean = gsl_stats_ushort_mean(tab, 1, 8);
+			double absdev = gsl_stats_ushort_absdev_m(tab, 1, 8, mean);
 			double pixel = (double) buf[x + y * fit->rx];
 			if ((pixel - mean) > absdev * sigma) {
 				fprintf(cosme_file, "P %d %d\n", x, y);
@@ -1673,7 +1639,7 @@ gpointer BandingEngine(gpointer p) {
 			return GINT_TO_POINTER(1);
 		}
 		if (args->protect_highlights) {
-			globalsigma = stat->avgdev * 1.2533;
+			globalsigma = stat->avgDev * AVGDEV_NORM;
 		}
 		for (row = 0; row < args->fit->ry; row++) {
 			line = args->fit->pdata[chan] + row * args->fit->rx;

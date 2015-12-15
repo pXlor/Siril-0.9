@@ -21,7 +21,6 @@ struct registration_args {
 	const gchar *text;
 };
 
-
 typedef enum {
 	REQUIRES_NO_SELECTION,	// selection is not used
 	REQUIRES_ANY_SELECTION,		// selection can be of any size and shape
@@ -36,7 +35,6 @@ typedef enum {
 	PLANETARY_FULLDISK, PLANETARY_SURFACE
 } planetary_type;
 
-
 /* used to register a registration method */
 struct registration_method {
 	const char *name;
@@ -44,7 +42,6 @@ struct registration_method {
 	selection_type sel;
 	registration_type type;
 };
-
 
 struct registration_method *new_reg_method(char *name, registration_function f,
 		selection_type s, registration_type t); // for compositing
@@ -61,17 +58,14 @@ void fill_comboboxregmethod();
 
 /** getter */
 int get_registration_layer(sequence *seq);
-int get_regtype();
-int get_planetarytype();
-
 
 /* mouse behaviour */
-
 typedef enum {
 	MOUSE_ACTION_NONE,
 	MOUSE_ACTION_SELECT_REG_AREA,
 	MOUSE_ACTION_SELECT_PREVIEW1,
 	MOUSE_ACTION_SELECT_PREVIEW2,
+	MOUSE_ACTION_DRAW_SAMPLES,
 } mouse_status_enum;
 
 extern mouse_status_enum mouse_status;	// defined in registration_preview.c

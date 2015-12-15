@@ -92,7 +92,7 @@ static int _compute_normalization_for_image(struct stacking_args *args, int i,
 	switch (mode) {
 	default:
 	case ADDITIVE_SCALING:
-		scale[i] = stat->avgdev;
+		scale[i] = stat->avgDev;
 		if (i == 0)
 			*scale0 = scale[0];
 		scale[i] = *scale0 / scale[i];
@@ -104,7 +104,7 @@ static int _compute_normalization_for_image(struct stacking_args *args, int i,
 		offset[i] = scale[i] * offset[i] - *offset0;
 		break;
 	case MULTIPLICATIVE_SCALING:
-		scale[i] = stat->avgdev;
+		scale[i] = stat->avgDev;
 		if (i == 0)
 			*scale0 = scale[0];
 		scale[i] = *scale0 / scale[i];
@@ -214,8 +214,6 @@ int stack_summing(struct stacking_args *args) {
 		}
 		tmpmsg = strdup("Processing image ");
 		tmpmsg = str_append(&tmpmsg, filename);
-//		tmpmsg = siril_log_message("Processing image %s\n", filename);
-//		tmpmsg[strlen(tmpmsg)-1] = '\0';
 		set_progress_bar_data(tmpmsg, (double)cur_nb/((double)nb_frames+1.));
 		free(tmpmsg);
 
@@ -1714,14 +1712,14 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 				case LINEARFIT:
 					do {
 						double *xf = malloc(N * sizeof(double));
-						double *yf = malloc(N*sizeof(double));
+						double *yf = malloc(N * sizeof(double));
 						double a, b, cov00, cov01, cov11, sumsq;
 						quicksort_s(data->stack, N);
-						for (frame=0; frame < N; frame++) {
-							xf[frame] = (double)frame;
-							yf[frame] = (double)data->stack[frame];
+						for (frame = 0; frame < N; frame++) {
+							xf[frame] = (double) frame;
+							yf[frame] = (double) data->stack[frame];
 						}
-						gsl_fit_linear (xf, 1, yf, 1, N, &b, &a, &cov00, &cov01, &cov11, &sumsq);
+						gsl_fit_linear(xf, 1, yf, 1, N, &b, &a, &cov00, &cov01, &cov11, &sumsq);
 						sigma = 0.0;
 						for (frame=0; frame < N; frame++)
 							sigma += (fabs((double)data->stack[frame] - (a*(double)frame + b)));

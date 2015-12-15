@@ -880,7 +880,7 @@ int process_clearstar(int nb){
 int process_contrast(int nb){
 	int layer;
 	double result[gfit.naxes[2]], value=0;
-	
+
 	for (layer = 0; layer < gfit.naxes[2]; layer++)
 		result[layer] = contrast(&gfit, layer);
 	for (layer = 0; layer < gfit.naxes[2]; layer++)
@@ -1007,11 +1007,14 @@ int process_split(int nb){
 int process_stat(int nb){
 	int nplane = gfit.naxes[2];
 	int layer;
-	
-	for (layer=0;layer<nplane;layer++){
+
+	for (layer = 0; layer < nplane; layer++) {
 		imstats* stat = statistics(&gfit, layer, &com.selection);
-		siril_log_message("%s layer: Mean: %0.1lf, Median: %0.1lf, Sigma: %0.1lf, Min: %0.1lf, Max: %0.1lf\n",
-					stat->layername, stat->mean, stat->median, stat->sigma, stat->min, stat->max);
+		siril_log_message(
+				"%s layer: Count: %0.1lf px, Mean: %0.1lf, Median: %0.1lf, Sigma: %0.1lf, "
+						"AvgDev: %0.1lf, Min: %0.1lf, Max: %0.1lf\n",
+				stat->count, stat->layername, stat->mean, stat->median,
+				stat->sigma, stat->avgDev, stat->min, stat->max);
 		free(stat);
 		stat = NULL;
 	}
@@ -1025,8 +1028,8 @@ int process_set_cpu(int nb){
 	proc_in = atoi(word[1]);
 	proc_max = omp_get_num_procs();
 	if (proc_in > proc_max || proc_in < 1) {
-		siril_log_message(
-				"Number of logical processor MUST be greater than 0 and lower or equal to %d.\n", proc_max);
+		siril_log_message("Number of logical processor MUST be greater "
+				"than 0 and lower or equal to %d.\n", proc_max);
 		return 1;
 	}
 	omp_set_num_threads(proc_in);

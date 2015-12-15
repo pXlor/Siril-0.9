@@ -454,7 +454,7 @@ void on_filechooser_file_set(GtkFileChooserButton *widget, gpointer user_data) {
 						layers[layer]->the_fit.ry, gfit.rx, gfit.ry);
 				sprintf(buf, "OK upscaled from %ux%u",
 						layers[layer]->the_fit.rx, layers[layer]->the_fit.ry);
-				resize_gaussian(&layers[layer]->the_fit, gfit.rx, gfit.ry, 0);	//0: INTER_LINEAR
+				cvResizeGaussian(&layers[layer]->the_fit, gfit.rx, gfit.ry, 0);	//0: INTER_LINEAR
 				image_find_minmax(&layers[layer]->the_fit, 0);
 				gtk_label_set_text(layers[layer]->label, buf);
 			}

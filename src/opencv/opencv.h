@@ -12,10 +12,11 @@ extern "C" {
 
 #include "registration/matching/misc.h"
 
-int resize_gaussian(fits *, int, int, int);
-int rotate_image(fits *, double, int, int);
-int transforme_image(fits *, TRANS, int);
-int unsharp_filter(fits*, double, double);
+int cvResizeGaussian(fits *, int, int, int);
+int cvRotateImage(fits *, double, int, int);
+int cvTransformImage(fits *, TRANS, int);
+int cvUnsharpFilter(fits*, double, double);
+int cvComputeFinestScale(fits *image);
 #ifdef __cplusplus
 }
 #endif

@@ -25,22 +25,20 @@
 #  include <config.h>
 #endif
 #ifdef HAVE_OPENCV
-#include <math.h>
 #include <assert.h>
+#include <iostream>
+#include <iomanip>
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include "core/siril.h"
 #include "core/proto.h"
 #include "registration/matching/misc.h"
 #include "opencv.h"
-#include <iostream>
-#include <iomanip>
-#include "opencv.h"
-#include <opencv2/core/core.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
 #include "opencv/ecc/ecc.h"
 
 using namespace cv;
 
-WORD *fits_to_bgrbgr(fits *image) {
+static WORD *fits_to_bgrbgr(fits *image) {
 	int ndata = image->rx * image->ry;
 	WORD *bgrbgr = new WORD[ndata * 3];
 	for (int i = 0, j = 0; i < ndata * 3; i += 3, j++) {
@@ -52,7 +50,7 @@ WORD *fits_to_bgrbgr(fits *image) {
 }
 
 /* resizes image to the sizes toX * toY, and stores it back in image */
-int resize_gaussian(fits *image, int toX, int toY, int interpolation) {
+int cvResizeGaussian(fits *image, int toX, int toY, int interpolation) {
 	assert(image->data);
 	assert(image->rx);
 
@@ -101,7 +99,7 @@ int resize_gaussian(fits *image, int toX, int toY, int interpolation) {
 }
 
 /* Rotate an image with the angle "angle" */
-int rotate_image(fits *image, double angle, int interpolation, int cropped) {
+int cvRotateImage(fits *image, double angle, int interpolation, int cropped) {
 	assert(image->data);
 	assert(image->rx);
 	assert(image->ry);
@@ -173,7 +171,7 @@ int rotate_image(fits *image, double angle, int interpolation, int cropped) {
 	return 0;
 }
 
-int transforme_image(fits *image, TRANS trans, int interpolation) {
+int cvTransformImage(fits *image, TRANS trans, int interpolation) {
 	assert(image->data);
 	assert(image->rx);
 	assert(image->ry);
@@ -224,7 +222,7 @@ int transforme_image(fits *image, TRANS trans, int interpolation) {
 	return 0;
 }
 
-int unsharp_filter(fits* image, double sigma, double amount) {
+int cvUnsharpFilter(fits* image, double sigma, double amount) {
 	assert(image->data);
 	assert(image->rx);
 	int type = CV_16U;
@@ -252,6 +250,51 @@ int unsharp_filter(fits* image, double sigma, double amount) {
 		image->pdata[2] = image->data + (image->rx * image->ry) * 2;
 	}
 	in.release();
+	return 0;
+}
+
+int cvComputeFinestScale(fits *image) {
+	assert(image->data);
+	assert(image->rx);
+	assert(image->ry);
+
+	int ndata = image->rx * image->ry;
+
+	WORD *bgrbgr = fits_to_bgrbgr(image);
+
+	Mat in(image->ry, image->rx, CV_16UC3, bgrbgr);
+	Mat out(image->ry, image->rx, CV_16UC3);
+	blur(in, out, Size(3, 3));
+	out = in - out;
+
+	Mat channel[3];
+	split(out, channel);
+
+	memcpy(image->data, channel[2].data, ndata * sizeof(WORD));
+	if (image->naxes[2] == 3) {
+		memcpy(image->data + ndata, channel[1].data, ndata * sizeof(WORD));
+		memcpy(image->data + ndata * 2, channel[0].data, ndata * sizeof(WORD));
+	}
+
+	if (image->naxes[2] == 1) {
+		image->pdata[RLAYER] = image->data;
+		image->pdata[GLAYER] = image->data;
+		image->pdata[BLAYER] = image->data;
+	} else {
+		image->pdata[RLAYER] = image->data;
+		image->pdata[GLAYER] = image->data + ndata;
+		image->pdata[BLAYER] = image->data + ndata * 2;
+	}
+	image->rx = out.cols;
+	image->ry = out.rows;
+	image->naxes[0] = image->rx;
+	image->naxes[1] = image->ry;
+
+	/* free data */
+	delete[] bgrbgr;
+	in = Mat();
+	out = Mat();
+
 	return 0;
 }
 

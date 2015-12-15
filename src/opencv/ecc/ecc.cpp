@@ -304,7 +304,7 @@ static void update_warping_matrix_ECC(Mat& map_matrix, const Mat& update,
 	}
 }
 
-double findTransform(InputArray templateImage, InputArray inputImage,
+double findTransform_ECC(InputArray templateImage, InputArray inputImage,
 		InputOutputArray warpMatrix, int motionType, TermCriteria criteria,
 		InputArray inputMask) {
 
@@ -553,7 +553,7 @@ double findTransform(InputArray templateImage, InputArray inputImage,
 	return rho;
 }
 
-int cfindTransform(fits *reference, fits *image, int layer,
+int findTransform(fits *reference, fits *image, int layer,
 		reg_ecc *reg_param) {
 	Mat ref(reference->ry, reference->rx, CV_16UC1, reference->pdata[layer]);
 	Mat im(image->ry, image->rx, CV_16UC1, image->pdata[layer]);
@@ -573,7 +573,7 @@ int cfindTransform(fits *reference, fits *image, int layer,
 	// Define termination criteria
 	TermCriteria criteria (TermCriteria::COUNT+TermCriteria::EPS, number_of_iterations, termination_eps);
 
-	double rho = findTransform(ref, im, warp_matrix, warp_mode, criteria,
+	double rho = findTransform_ECC(ref, im, warp_matrix, warp_mode, criteria,
 			noArray());
 
 	if (rho > 0) {

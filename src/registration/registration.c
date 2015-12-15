@@ -69,7 +69,6 @@ static char *tooltip_text[] = { "One Star Registration: This is the simplest met
 		"into account yet."
 #endif
 };
-
 /* callback for the selected area event */
 void _reg_selected_area_callback() {
 	update_reg_interface(TRUE);
@@ -432,8 +431,6 @@ int register_shift_fwhm(struct registration_args *args) {
 
 #ifdef HAVE_OPENCV
 
-
-
 static void _print_result(TRANS *trans, float FWHMx, float FWHMy) {
 	double rotation, scale;
 	point shift;
@@ -582,7 +579,7 @@ int register_star_alignment(struct registration_args *args) {
 				_print_result(&trans, FWHMx, FWHMy);
 				current_regdata[frame].fwhm = FWHMx;
 
-				transforme_image(&fit, trans, 0);
+				cvTransformImage(&fit, trans, 0);
 
 				i = 0;
 				while (i < MAX_STARS && stars[i])
@@ -677,7 +674,7 @@ int register_ecc(struct registration_args *args) {
 				reg_ecc reg_param;
 				memset(&reg_param, 0, sizeof(reg_ecc));
 
-				if (cfindTransform(&ref, &im, args->layer, &reg_param)) {
+				if (findTransform(&ref, &im, args->layer, &reg_param)) {
 					siril_log_message("Cannot perform ECC alignment\n");
 					break;
 				}
@@ -706,6 +703,7 @@ int register_ecc(struct registration_args *args) {
 
 	return 0;
 }
+
 #endif
 
 void on_comboboxregmethod_changed(GtkComboBox *box, gpointer user_data) {
@@ -759,8 +757,12 @@ int get_registration_layer(sequence *seq) {
  * selected images, if argument is false.
  * Verifies that enough images are selected and an area is selected.
  */
+/* Selects the "register all" or "register selected" according to the number of
+ * selected images, if argument is false.
+ * Verifies that enough images are selected and an area is selected.
+ */
 void update_reg_interface(gboolean dont_change_reg_radio) {
-	static GtkWidget *go_register = NULL, *w_entry = NULL;
+	static GtkWidget *go_register = NULL, *newSequence = NULL;
 	static GtkLabel *labelreginfo = NULL;
 	static GtkToggleButton *reg_all = NULL, *reg_sel = NULL;
 	int nb_images_reg; /* the number of images to register */
@@ -774,7 +776,7 @@ void update_reg_interface(gboolean dont_change_reg_radio) {
 				gtk_builder_get_object(builder, "regselbutton"));
 		labelreginfo = GTK_LABEL(
 				gtk_builder_get_object(builder, "labelregisterinfo"));
-		w_entry = lookup_widget("regseqname_entry");
+		newSequence = lookup_widget("box29");
 	}
 
 	if (!dont_change_reg_radio) {
@@ -796,11 +798,11 @@ void update_reg_interface(gboolean dont_change_reg_radio) {
 		gtk_widget_set_sensitive(go_register, TRUE);
 		gtk_label_set_text(labelreginfo, "");
 #ifdef HAVE_OPENCV
-		gtk_widget_set_sensitive(w_entry, method->method_ptr == &register_star_alignment);
+		gtk_widget_set_visible(newSequence, method->method_ptr == &register_star_alignment);
 #endif
 	} else {
 		gtk_widget_set_sensitive(go_register, FALSE);
-		gtk_widget_set_sensitive(w_entry, FALSE);
+		gtk_widget_set_visible(newSequence, FALSE);
 		if (nb_images_reg <= 1 && com.selection.w <= 0 && com.selection.h <= 0)
 			if (!sequence_is_loaded())
 				gtk_label_set_text(labelreginfo, "Load a sequence first.");
@@ -1025,46 +1027,4 @@ static gboolean end_register_idle(gpointer p) {
 	show_time(args->t_start, t_end);
 	free(args);
 	return FALSE;
-}
-
-/****** getter *******/
-
-int get_regtype() {
-	GtkToggleButton *deepsky;
-
-	deepsky = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder, "regdeepsky"));
-	if (gtk_toggle_button_get_active(deepsky))
-		return REGTYPE_DEEPSKY;
-	else
-		return REGTYPE_PLANETARY;
-}
-
-int get_planetarytype() {
-	GtkToggleButton *fulldisk;
-
-	fulldisk = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder, "regfulldisk"));
-	if (gtk_toggle_button_get_active(fulldisk))
-		return PLANETARY_FULLDISK;
-	else
-		return PLANETARY_SURFACE;
-}
-
-/***** setter *******/
-
-void set_regtype(int type) {
-	GtkToggleButton *deepsky, *planetary;
-
-	if (type == REGTYPE_DEEPSKY)
-		gtk_toggle_button_set_active(deepsky, TRUE);
-	else
-		gtk_toggle_button_set_active(planetary, TRUE);
-}
-
-void set_planetarytype(int type) {
-	GtkToggleButton *fulldisk, *surface;
-
-	if (type == PLANETARY_FULLDISK)
-		gtk_toggle_button_set_active(fulldisk, TRUE);
-	else
-		gtk_toggle_button_set_active(surface, TRUE);
 }

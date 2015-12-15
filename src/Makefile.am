@@ -11,7 +11,8 @@ siril_SOURCES = \
 	io/image_formats_libraries.c io/image_formats_internal.c io/image_format_fits.c \
 	io/sequence.c io/seqfile.c io/single_image.c io/single_image.h \
 	gui/callbacks.c gui/callbacks.h gui/histogram.c gui/histogram.h \
-	gui/PSF_list.h gui/PSF_list.c gui/sequence_list.c gui/registration_preview.c\
+	gui/PSF_list.h gui/PSF_list.c gui/sequence_list.c gui/registration_preview.c \
+	gui/statistics_list.c \
 	registration/registration.c registration/registration.h \
 	registration/matching/match.c registration/matching/atpmatch.c registration/matching/misc.c \
 	stacking/stacking.c stacking/stacking.h \

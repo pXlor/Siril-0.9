@@ -682,7 +682,7 @@ gboolean redraw_drawingarea(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	if (com.grad && com.grad_boxes_drawn) {
 		int i = 0;
 		while (i < com.grad_nb_boxes) {
-			if (com.grad[i].boxvalue != -1.0) {
+			if (com.grad[i].boxvalue[0] != -1.0) {
 				cairo_set_line_width(cr, 1.5);
 				cairo_set_source_rgba(cr, 0.2, 1.0, 0.3, 1.0);
 				cairo_rectangle(cr, com.grad[i].centre.x - com.grad_size_boxes,
@@ -846,7 +846,7 @@ void remaprgb(void) {
 	cairo_surface_mark_dirty(com.surface[RGB_VPORT]);
 }
 
-void activate_widgets_for_histeq(gboolean sensitive) {
+void set_viewer_mode_widgets_sensitive(gboolean sensitive) {
 	static GtkWidget *scalemax = NULL;
 	static GtkWidget *scalemin = NULL;
 	static GtkWidget *entrymin = NULL;
@@ -1000,11 +1000,14 @@ void remap(int vport) {
 		}
 
 		last_mode[vport] = mode;
-		activate_widgets_for_histeq(FALSE);
+		set_viewer_mode_widgets_sensitive(FALSE);
 	} else {
 		// for all other modes, the index can be reused
 		make_index_for_current_display(mode, lo, hi, vport);
-		activate_widgets_for_histeq(TRUE);
+		if (mode == STF_DISPLAY)
+			set_viewer_mode_widgets_sensitive(FALSE);
+		else
+			set_viewer_mode_widgets_sensitive(TRUE);
 	}
 
 	src = gfit.pdata[vport];	// index is i
@@ -1022,7 +1025,7 @@ void remap(int vport) {
 	/* cannot be parallelized because of i and j */
 	for (y = 0; y < gfit.ry; y++) {
 		for (x = 0; x < gfit.rx; x++, i++) {
-			if (mode == HISTEQ_DISPLAY)	// special case, no lo & hi
+			if (mode == HISTEQ_DISPLAY || mode == STF_DISPLAY)	// special case, no lo & hi
 				dst_pixel_value = index[src[i]];
 			else if (do_cut_over && src[i] > hi)	// cut
 				dst_pixel_value = 0;
@@ -1068,6 +1071,10 @@ int make_index_for_current_display(display_mode mode, WORD lo, WORD hi,
 	float pente;
 	int i;
 	BYTE *index;
+	double m = 0.0;
+	double pxl, shadows = 0.0;
+	if (mode == STF_DISPLAY)
+		m = findMidtonesBalance(&gfit, &shadows);
 
 	/* initialization of data required to build the remap_index */
 	switch (mode) {
@@ -1086,11 +1093,14 @@ int make_index_for_current_display(display_mode mode, WORD lo, WORD hi,
 	case ASINH_DISPLAY:
 		pente = UCHAR_MAX_SINGLE / asinhf(((float) (hi - lo)) * 0.001f);
 		break;
+	case STF_DISPLAY:
+		pente = UCHAR_MAX_SINGLE;
+		break;
 	default:
 		return 1;
 	}
-	if (mode != HISTEQ_DISPLAY && pente == last_pente[vport]
-			&& mode == last_mode[vport]) {
+	if (mode != HISTEQ_DISPLAY && mode != STF_DISPLAY
+			&& pente == last_pente[vport] && mode == last_mode[vport]) {
 		fprintf(stdout, "Re-using previous remap_index\n");
 		return 0;
 	}
@@ -1106,6 +1116,7 @@ int make_index_for_current_display(display_mode mode, WORD lo, WORD hi,
 		}
 	}
 	index = remap_index[vport];
+
 	for (i = 0; i <= USHRT_MAX; i++) {
 		switch (mode) {
 		case LOG_DISPLAY:
@@ -1129,6 +1140,12 @@ int make_index_for_current_display(display_mode mode, WORD lo, WORD hi,
 			break;
 		case NORMAL_DISPLAY:
 			index[i] = round_to_BYTE((float) i * pente);
+			break;
+		case STF_DISPLAY:
+			pxl = (double) i / USHRT_MAX_DOUBLE;
+			pxl = (pxl - shadows < 0.0) ? 0.0 : pxl - shadows;
+			pxl /= (1.0 - shadows);
+			index[i] = round_to_BYTE((float) (MTF(pxl, m)) * pente);
 			break;
 		default:
 			return 1;
@@ -1463,8 +1480,10 @@ void opendial(void) {
 	GtkWidget *widgetdialog = NULL;
 	GtkFileChooser *dialog = NULL;
 	gint res;
-	GtkWindow *parent_window = GTK_WINDOW(
-			gtk_builder_get_object(builder, "control_window"));
+	GtkWindow *main_window = GTK_WINDOW(
+			gtk_builder_get_object(builder, "main_window"));
+	GtkWindow *controle_window = GTK_WINDOW(
+			gtk_builder_get_object(builder, "controle_window"));
 
 	if (!com.wd)
 		return;
@@ -1476,7 +1495,7 @@ void opendial(void) {
 	case OD_FLAT:
 	case OD_DARK:
 	case OD_OFFSET:
-		widgetdialog = gtk_file_chooser_dialog_new("Open File", parent_window,
+		widgetdialog = gtk_file_chooser_dialog_new("Open File", controle_window,
 				GTK_FILE_CHOOSER_ACTION_OPEN, ("_Cancel"), GTK_RESPONSE_CANCEL,
 				("_Open"), GTK_RESPONSE_ACCEPT,
 				NULL);
@@ -1486,7 +1505,7 @@ void opendial(void) {
 		set_filters_dialog(dialog);
 		break;
 	case OD_CWD:
-		widgetdialog = gtk_file_chooser_dialog_new("Open File", parent_window,
+		widgetdialog = gtk_file_chooser_dialog_new("Open File", controle_window,
 				GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, ("_Cancel"),
 				GTK_RESPONSE_CANCEL, ("_Open"), GTK_RESPONSE_ACCEPT,
 				NULL);
@@ -1495,7 +1514,7 @@ void opendial(void) {
 		gtk_file_chooser_set_select_multiple(dialog, FALSE);
 		break;
 	case OD_OPEN:
-		widgetdialog = gtk_file_chooser_dialog_new("Open File", parent_window,
+		widgetdialog = gtk_file_chooser_dialog_new("Open File", main_window,
 				GTK_FILE_CHOOSER_ACTION_OPEN, ("_Cancel"), GTK_RESPONSE_CANCEL,
 				("_Open"), GTK_RESPONSE_ACCEPT,
 				NULL);
@@ -1505,7 +1524,7 @@ void opendial(void) {
 		set_filters_dialog(dialog);
 		break;
 	case OD_CONVERT:
-		widgetdialog = gtk_file_chooser_dialog_new("Open File", parent_window,
+		widgetdialog = gtk_file_chooser_dialog_new("Open File", controle_window,
 				GTK_FILE_CHOOSER_ACTION_OPEN, ("_Cancel"), GTK_RESPONSE_CANCEL,
 				("_Open"), GTK_RESPONSE_ACCEPT,
 				NULL);
@@ -1634,11 +1653,9 @@ void set_filters_dialog(GtkFileChooser *chooser) {
 	is_cfa = gtk_toggle_button_get_active(cfaButton);
 #endif
 
-	if (!(whichdial == OD_CONVERT && !is_cfa)) {
-		gtk_filter_add(chooser, "FITS Files (*.fit, *.fits, *.fts)",
-				"*.fit;*.FIT;*.fits;*.FITS;*.fts;*.FTS",
-				com.filter == TYPEFITS);
-	}
+	gtk_filter_add(chooser, "FITS Files (*.fit, *.fits, *.fts)",
+			"*.fit;*.FIT;*.fits;*.FITS;*.fts;*.FTS",
+			com.filter == TYPEFITS);
 	if (whichdial == OD_OPEN || (whichdial == OD_CONVERT && !is_cfa)) {
 #ifdef HAVE_LIBRAW
 		/* RAW FILES */
@@ -2361,6 +2378,36 @@ gboolean on_drawingarea_button_press_event(GtkWidget *widget,
 					com.selection.w = 0;
 				}
 				gtk_widget_queue_draw(widget);
+			}
+			else if (mouse_status == MOUSE_ACTION_DRAW_SAMPLES) {
+				double zoom = get_zoom_val();
+				if (!com.grad) {
+					com.grad = malloc(NB_MAX_OF_SAMPLES * sizeof(gradient));
+					com.grad_boxes_drawn = TRUE;
+					com.grad_nb_boxes = 0;
+				}
+				int i = com.grad_nb_boxes;
+				int layer;
+				GtkSpinButton *size = GTK_SPIN_BUTTON(lookup_widget("spinbutton_bkg_sizebox"));
+				point pt;
+				int midbox;
+
+				midbox = (size_t) gtk_spin_button_get_value(size);
+				com.grad_size_boxes = midbox * 2;
+				pt.x = (event->x / zoom);
+				pt.y = (event->y / zoom);
+
+				if (pt.x + midbox <= gfit.rx && pt.y + midbox <= gfit.ry
+						&& pt.x - midbox >= 0 && pt.y - midbox >= 0) {
+					com.grad[i].centre.x = pt.x + midbox;
+					com.grad[i].centre.y = pt.y + midbox;
+					for (layer = 0; layer < gfit.naxes[2]; layer++)
+						com.grad[i].boxvalue[layer] = get_value_from_box(&gfit, pt,
+								com.grad_size_boxes, layer);
+					com.grad_nb_boxes++;
+					redraw(com.cvport, REMAP_NONE);
+					redraw_previews();
+				}
 			}
 		} else if (event->button == 2) {	// middle click
 
@@ -3754,8 +3801,7 @@ double get_zoom_val() {
 	double wtmp, htmp;
 	static GtkWidget *scrolledwin = NULL;
 	if (scrolledwin == NULL)
-		scrolledwin = GTK_WIDGET(
-				gtk_builder_get_object(builder, "scrolledwindowr"));
+		scrolledwin = lookup_widget("scrolledwindowr");
 	if (com.zoom_value > 0.)
 		return com.zoom_value;
 	/* else if zoom is < 0, it means fit to window */
@@ -3812,6 +3858,7 @@ void scrollbars_hadjustment_changed_handler(GtkAdjustment *adjustment,
 		gpointer user_data) {
 	int i;
 	double value = gtk_adjustment_get_value(adjustment);
+
 	for (i = 0; i < MAXVPORT; i++) {
 		if (com.hadj[i] != adjustment) {
 			gtk_adjustment_set_value(com.hadj[i], value);
@@ -4665,21 +4712,33 @@ void on_menuitem_bkg_extraction_activate(GtkMenuItem *menuitem,
 		gtk_widget_show(lookup_widget("Bkg_extract_window"));
 }
 
-void on_button_extract_clicked(GtkButton *button, gpointer user_data) {
-	static GtkToggleButton *imgbutton = NULL;
+void on_bkgButtonManual_toggled(GtkToggleButton *togglebutton,
+		gpointer user_data) {
 
-	if (imgbutton == NULL)
+	update_bkg_interface();
+	redraw(com.cvport, REMAP_NONE);
+	redraw_previews();
+}
+
+void on_bkgCompute_clicked(GtkButton *button, gpointer user_data) {
+	static GtkToggleButton *imgbutton = NULL, *bgkAutoButton = NULL;
+	gboolean automatic;
+
+	if (imgbutton == NULL) {
 		imgbutton = GTK_TOGGLE_BUTTON(lookup_widget("radiobutton_bkg_img"));
+		bgkAutoButton = GTK_TOGGLE_BUTTON(lookup_widget("bkgButtonAuto"));
+	}
+	automatic = gtk_toggle_button_get_active(bgkAutoButton);
 
 	if (!gtk_toggle_button_get_active(imgbutton)) {
-		char *msg =
-				siril_log_message(
-						"Background cannot be extracted from itself. Please, click on Show Image\n");
+		char *msg =	siril_log_message("Background cannot be extracted"
+				" from itself. Please, click on Show Image\n");
 		show_dialog(msg, "Error", "gtk-dialog-error");
 		return;
 	}
+
 	set_cursor_waiting(TRUE);
-	grad_background_extraction(&wfit[0]);
+	bkgExtractBackground(&wfit[0], automatic);
 	redraw(com.cvport, REMAP_NONE);
 	redraw_previews();
 	set_cursor_waiting(FALSE);
@@ -4756,12 +4815,9 @@ void on_combobox_gradient_inter_changed(GtkComboBox* box, gpointer user_data) {
 	gtk_notebook_set_current_page(notebook, gtk_combo_box_get_active(box));
 }
 
-void on_button_bkg_extract_close_clicked(GtkButton *button, gpointer user_data) {
-	gtk_widget_hide(lookup_widget("Bkg_extract_window"));
-}
-
-void on_Bkg_extract_window_hide(GtkWidget *widget, gpointer user_data) {
+void on_bkgClearSamples_clicked(GtkButton *button, gpointer user_data) {
 	static GtkToggleButton *imgbutton = NULL, *bkgbutton = NULL;
+	int remap_option;
 
 	if (imgbutton == NULL) {
 		imgbutton = GTK_TOGGLE_BUTTON(lookup_widget("radiobutton_bkg_img"));
@@ -4769,17 +4825,45 @@ void on_Bkg_extract_window_hide(GtkWidget *widget, gpointer user_data) {
 	}
 	gtk_widget_set_sensitive(lookup_widget("frame_bkg_tools"), FALSE);
 	gtk_widget_set_sensitive(lookup_widget("button_bkg_correct"), FALSE);
-	int remap = REMAP_NONE;
+	remap_option = REMAP_NONE;
 
 	set_cursor_waiting(TRUE);
 	if (gtk_toggle_button_get_active(bkgbutton)) {
 		gtk_toggle_button_set_active(imgbutton, TRUE);
-		remap = REMAP_ALL;
+		remap_option = REMAP_ALL;
 	}
-	if (com.grad)
-		free(com.grad);
-	com.grad = NULL;
-	redraw(com.cvport, remap);
+	clearSamples();
+	redraw(com.cvport, remap_option);
+	redraw_previews();
+	clearfits(&wfit[0]);
+	set_cursor_waiting(FALSE);
+}
+
+void on_button_bkg_extract_close_clicked(GtkButton *button, gpointer user_data) {
+	gtk_widget_hide(lookup_widget("Bkg_extract_window"));
+}
+
+void on_Bkg_extract_window_hide(GtkWidget *widget, gpointer user_data) {
+	static GtkToggleButton *imgbutton = NULL, *bkgbutton = NULL, *bgkAutoButton = NULL;
+	int remap_option;
+
+	if (imgbutton == NULL) {
+		imgbutton = GTK_TOGGLE_BUTTON(lookup_widget("radiobutton_bkg_img"));
+		bkgbutton = GTK_TOGGLE_BUTTON(lookup_widget("radiobutton_bkg_bkg"));
+		bgkAutoButton = GTK_TOGGLE_BUTTON(lookup_widget("bkgButtonAuto"));
+	}
+	gtk_widget_set_sensitive(lookup_widget("frame_bkg_tools"), FALSE);
+	gtk_widget_set_sensitive(lookup_widget("button_bkg_correct"), FALSE);
+	gtk_toggle_button_set_active(bgkAutoButton, TRUE);
+	remap_option = REMAP_NONE;
+
+	set_cursor_waiting(TRUE);
+	if (gtk_toggle_button_get_active(bkgbutton)) {
+		gtk_toggle_button_set_active(imgbutton, TRUE);
+		remap_option = REMAP_ALL;
+	}
+	clearSamples();
+	redraw(com.cvport, remap_option);
 	redraw_previews();
 	clearfits(&wfit[0]);
 	set_cursor_waiting(FALSE);
@@ -5048,40 +5132,8 @@ void on_menu_gray_crop_seq_activate(GtkMenuItem *menuitem, gpointer user_data) {
 }
 
 void on_menu_gray_stat_activate(GtkMenuItem *menuitem, gpointer user_data) {
-	int layer = match_drawing_area_widget(com.vport[com.cvport], FALSE);
-	if (layer != -1) {
-		char msg[512];
-		char name[256];
-		char sel[64];
-		imstats* stat = statistics(&gfit, layer, &com.selection);
-
-		if (single_image_is_loaded())
-			g_snprintf(name, sizeof(name), "%s (%s layer)\n\n",
-					com.uniq->filename, stat->layername);
-		else if (sequence_is_loaded())
-			g_snprintf(name, sizeof(name),
-					"Image %d/%d from the sequence %s (%s layer)\n\n",
-					com.seq.current, com.seq.number, com.seq.seqname,
-					stat->layername);
-		else
-			g_snprintf(name, sizeof(name), "unknown image (%s layer)\n\n",
-					stat->layername);
-
-		if (com.selection.h && com.selection.w) {
-			g_snprintf(sel, sizeof(sel),
-					"%sSize of selection in pixel:\t(%d,%d)\n\n", name,
-					com.selection.w, com.selection.h);
-		} else {
-			g_snprintf(sel, sizeof(sel), "%s", name);
-		}
-		g_snprintf(msg, sizeof(msg),
-				"%sMean:\t\t%.1lf\n\nMedian:\t\t%.1lf\n\nSigma:\t\t%.1lf\n\n"
-						"Minimum:\t%.1lf\n\nMaximum:\t%.1lf", sel, stat->mean,
-				stat->median, stat->sigma, stat->min, stat->max);
-		show_data_dialog(msg, "Statistics");
-		free(stat);
-		stat = NULL;
-	}
+	computeStat();
+	gtk_widget_show_all(lookup_widget("StatWindow"));
 }
 
 /************************* GUI for FFT ********************************/

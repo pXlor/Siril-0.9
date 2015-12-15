@@ -118,6 +118,7 @@ typedef enum {
 #define CONVCFA (1 << 7)
 #define CONVTIF (1 << 8)
 #define CONVPIC (1 << 9)
+#define CONVFIT (1 << 10)
 /* layer conversion type */
 #define CONV1X3	(1 << 16)
 #define CONV3X1	(1 << 17)
@@ -220,6 +221,7 @@ typedef enum {
 	SQRT_DISPLAY,
 	SQUARED_DISPLAY,
 	ASINH_DISPLAY,
+	STF_DISPLAY,
 	HISTEQ_DISPLAY
 } display_mode;			// used in the layer_info_struct below
 #define DISPLAY_MODE_MAX HISTEQ_DISPLAY
@@ -419,7 +421,7 @@ struct point_struct {
 
 struct gradient_struct {
 	point centre;
-	double boxvalue;
+	double boxvalue[3];
 };
 
 struct historic_struct {
@@ -517,7 +519,8 @@ struct cominf {
 
 /* this structure is used to characterize the statistics of the image */
 struct image_stats {
-	double mean, avgdev, median, sigma, min, max;
+	size_t count;
+	double mean, avgDev, median, sigma, min, max, normValue;
 	char layername[6];
 };
 

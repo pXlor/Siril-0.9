@@ -7005,7 +7005,7 @@ TRANS *output_trans /* I/O: "order" field must be set on input */
 
 				/* we should check here to see if "num_winners" is high enough ... */
 
-				nbright = num_winners;
+				// nbright = num_winners;
 
 				/*
 				 * At this point, we have created the best TRANS we can, starting

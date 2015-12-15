@@ -440,11 +440,9 @@ gpointer enhance_saturation(gpointer p) {
 	args->h_min /= 360.0;
 	args->h_max /= 360.0;
 	if (args->preserve) {
-		double norm = (double) get_normalized_value(args->fit);
-
 		imstats *stat = statistics(args->fit, GLAYER, NULL);
 		bg = stat->median + stat->sigma;
-		bg /= norm;
+		bg /= stat->normValue;
 		free(stat);
 	}
 

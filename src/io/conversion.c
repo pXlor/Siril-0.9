@@ -195,15 +195,14 @@ void on_radiobutton_conv_cfa_toggled (GtkToggleButton *togglebutton, gpointer us
 			show_dialog(msg, "ERROR", "gtk-dialog-error");
 			return;
 		}
-		else if (ends_with(str_data, ".fit") && (!is_cfa)) {
+		/*else if (ends_with(str_data, ".fit") && (!is_cfa)) {
 			g_signal_handlers_block_by_func(togglebutton, on_radiobutton_conv_cfa_toggled, NULL);
 			gtk_toggle_button_set_active (togglebutton, TRUE);
 			g_signal_handlers_unblock_by_func(togglebutton, on_radiobutton_conv_cfa_toggled, NULL);
 			msg = siril_log_message("There is at least one file not compatible. No *.fit files allowed in FITS conversion.\n");
 			show_dialog(msg, "ERROR", "gtk-dialog-error");
 			return;
-
-		}
+		}*/
 		valid = gtk_tree_model_iter_next (model, &iter);
 	}
 }
@@ -462,11 +461,12 @@ int set_convflags_from_extension() {
 			convflags |= CONVRAW;
 			return 0;
 		}
-	} else if (!strcasecmp(sourcesuf, "fit")){
-		if (supported_filetypes & CONVCFA) {
+	} else if (!strcasecmp(sourcesuf, "fit") || !strcasecmp(sourcesuf, "fits") ||
+			!strcasecmp(sourcesuf, "fts")) {
+		if (com.raw_set.cfa && (supported_filetypes & CONVCFA))
 			convflags |= CONVCFA;
-			return 0;
-		}
+		else convflags |= CONVFIT;
+		return 0;
 	}
 	return 1;	// not recognized of not in supported list
 }
@@ -1022,6 +1022,27 @@ int tofits(char *source, char *dest){
 			siril_log_message("Cannot perform debayering\n");
 		}
 	}
+
+/**********************************************************************
+ * ***                     CONVERSION OF FITS                    **** *
+ * *******************************************************************/
+	else if (convflags & CONVFIT) {
+		readfits(source, tmpfit, NULL);
+		if (tmpfit->naxes[2] == 3 && (convflags & CONV3X1)){
+			snprintf(filename, 255, "r_%s", dest);
+			if (save1fits16(filename, tmpfit, RLAYER)) {
+				return 1;
+			}
+			snprintf(filename ,255, "g_%s", dest);
+			save1fits16(filename, tmpfit, GLAYER);
+			snprintf(filename, 255, "b_%s", dest);
+			save1fits16(filename, tmpfit, BLAYER);
+		}
+		else {
+			savefits(dest, tmpfit);
+		}
+	}
+
 	clearfits(tmpfit);
 	return 0;
 }

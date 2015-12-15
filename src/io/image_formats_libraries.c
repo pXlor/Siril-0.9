@@ -686,7 +686,7 @@ int readraw(const char *name, fits *fit) {
 	else {
 		float mul[4];					/* 3 multipliers (r,g,b) from the camera white balance.  */
 		mul[0] = raw->color.pre_mul[0]/raw->color.pre_mul[1];
-		mul[1] = raw->color.pre_mul[1]/raw->color.pre_mul[1];
+		mul[1] = 1.0; /* raw->color.pre_mul[1]/raw->color.pre_mul[1]; */
 		mul[2] = raw->color.pre_mul[2]/raw->color.pre_mul[1];
 		mul[3] = raw->color.pre_mul[3]/raw->color.pre_mul[1];
 		siril_log_message("Daylight multipliers: %f, %f, %f\n", mul[0], mul[1], mul[2]);
