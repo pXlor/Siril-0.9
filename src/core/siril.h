@@ -366,7 +366,7 @@ struct ffit {
 	WORD lo;	// MIPS-LO key in FITS file, which is "Lower visualization cutoff"
 	WORD hi;	// MIPS-HI key in FITS file, which is "Upper visualization cutoff"
 	float pixel_size_x, pixel_size_y;	// XPIXSZ and YPIXSZ keys
-	short binning_x, binning_y;		// XBINNING and YBINNING keys
+	unsigned int binning_x, binning_y;		// XBINNING and YBINNING keys
 	char date_obs[FLEN_VALUE];		// YYYY-MM-DDThh:mm:ss observation start, UT
 	char instrume[FLEN_VALUE];		// INSTRUME key
 	/* data obtained from FITS or RAW files */

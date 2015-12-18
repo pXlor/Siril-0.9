@@ -30,6 +30,15 @@
 #include "core/proto.h"
 #include "gui/callbacks.h"
 
+static char *MIPSHI[] = {"MIPS-HI", "CWHITE", NULL };
+static char *MIPSLO[] = {"MIPS-LO", "CBLACK", NULL };
+static char *PixSizeX[] = { "XPIXSZ", "XPIXELSZ", NULL };
+static char *PixSizeY[] = { "YPIXSZ", "YPIXELSZ", NULL };
+static char *BinX[] = { "XBINNING", "BINX", NULL };
+static char *BinY[] = { "YBINNING", "BINY", NULL };
+static char *Focal[] = { "FOCAL", "FOCALLEN", NULL };
+static char *Exposure[] = { "EXPTIME", "EXPOSURE", NULL };
+
 // return 0 on success, fills realname if not NULL with the opened file's name
 int readfits(const char *filename, fits *fit, char *realname) {
 	int status;
@@ -227,22 +236,58 @@ int readfits(const char *filename, fits *fit, char *realname) {
 	return 0;
 }
 
+static void tryToFindKeywordsFloat(fits *fit, char **keyword, float *value) {
+	int i = 0;
+	int status;
+
+	do {
+		status = 0;
+		fits_read_key(fit->fptr, TFLOAT, keyword[i], value, NULL, &status);
+		i++;
+	} while (keyword[i] && status);
+}
+
+static void tryToFindKeywordsDouble(fits *fit, char **keyword, double *value) {
+	int i = 0;
+	int status;
+
+	do {
+		status = 0;
+		fits_read_key(fit->fptr, TDOUBLE, keyword[i], value, NULL, &status);
+		i++;
+	} while (keyword[i] && status);
+}
+
+static void tryToFindKeywordsUint(fits *fit, char **keyword, unsigned int *value) {
+	int i = 0;
+	int status;
+
+	do {
+		status = 0;
+		fits_read_key(fit->fptr, TUINT, keyword[i], value, NULL, &status);
+		i++;
+	} while (keyword[i] && status);
+}
+
+static void tryToFindKeywordsUshort(fits *fit, char **keyword, unsigned short *value) {
+	int i = 0;
+	int status;
+
+	do {
+		status = 0;
+		fits_read_key(fit->fptr, TUSHORT, keyword[i], value, NULL, &status);
+		i++;
+	} while (keyword[i] && status);
+}
+
 /* reading the FITS header to get useful information */
 void read_fits_header(fits *fit) {
 	/* about the status argument: http://heasarc.gsfc.nasa.gov/fitsio/c/c_user/node28.html */
 	int status = 0;
 	int zero;
-	fits_read_key(fit->fptr, TUSHORT, "MIPS-HI", &(fit->hi), NULL, &status);
-	if (status || fit->hi == 0) {
-		status = 0;
-		fits_read_key(fit->fptr, TUSHORT, "CWHITE", &(fit->hi), NULL, &status);
-	}
-	status = 0;
-	fits_read_key(fit->fptr, TUSHORT, "MIPS-LO", &(fit->lo), NULL, &status);
-	if (status) {
-		status = 0;
-		fits_read_key(fit->fptr, TUSHORT, "CBLACK", &(fit->lo), NULL, &status);
-	}
+
+	tryToFindKeywordsUshort(fit, MIPSHI, &fit->hi);
+	tryToFindKeywordsUshort(fit, MIPSLO, &fit->lo);
 
 	status = 0;
 	fits_read_key(fit->fptr, TINT, "BSCALE", &zero, NULL, &status);
@@ -258,19 +303,10 @@ void read_fits_header(fits *fit) {
 	if (fit->bitpix == SHORT_IMG && zero == 32768)
 		fit->bitpix = USHORT_IMG;
 
-	status = 0;
-	fits_read_key(fit->fptr, TFLOAT, "XPIXSZ", &(fit->pixel_size_x), NULL,
-			&status);
-	fits_read_key(fit->fptr, TFLOAT, "YPIXSZ", &(fit->pixel_size_y), NULL,
-			&status);
-
-	status = 0;
-	if (fits_read_key(fit->fptr, TUINT, "XBINNING", &(fit->binning_x), NULL,
-			&status))
-		fit->binning_x = 1;
-	if (fits_read_key(fit->fptr, TUINT, "YBINNING", &(fit->binning_y), NULL,
-			&status))
-		fit->binning_y = 1;
+	tryToFindKeywordsFloat(fit, PixSizeX, &fit->pixel_size_x);
+	tryToFindKeywordsFloat(fit, PixSizeY, &fit->pixel_size_y);
+	tryToFindKeywordsUint(fit, BinX, &fit->binning_x);
+	tryToFindKeywordsUint(fit, BinY, &fit->binning_y);
 
 	/*******************************************************************
 	 * ************* CAMERA AND INSTRUMENT KEYWORDS ********************
@@ -284,9 +320,7 @@ void read_fits_header(fits *fit) {
 	fits_read_key(fit->fptr, TSTRING, "DATE-OBS", &(fit->date_obs), NULL,
 			&status);
 
-	status = 0;
-	fits_read_key(fit->fptr, TDOUBLE, "FOCALLEN", &(fit->focal_length), NULL,
-			&status);
+	tryToFindKeywordsDouble(fit, Focal, &fit->focal_length);
 	if (!sequence_is_loaded() || com.seq.current == 0)
 		fprintf(stdout,
 				"Read from FITS header: pix size %gx%g, binning %hix%hi, focal %g\n",
@@ -297,14 +331,7 @@ void read_fits_header(fits *fit) {
 	fits_read_key(fit->fptr, TDOUBLE, "CCD-TEMP", &(fit->ccd_temp), NULL,
 			&status);	// Non-standard keywords used in MaxIm DL
 
-	status = 0;
-	fits_read_key(fit->fptr, TDOUBLE, "EXPTIME", &(fit->exposure), NULL,
-			&status);
-	if (status || fit->exposure == 0.0) {
-		status = 0;
-		fits_read_key(fit->fptr, TDOUBLE, "EXPOSURE", &(fit->exposure), NULL,
-				&status);
-	}
+	tryToFindKeywordsDouble(fit, Exposure, &fit->exposure);
 
 	status = 0;
 	fits_read_key(fit->fptr, TDOUBLE, "APERTURE", &(fit->aperture), NULL,
@@ -721,10 +748,10 @@ void save_fits_header(fits *fit) {
 
 	status = 0;
 	if (fit->binning_x)
-		fits_update_key(fit->fptr, TSHORT, "XBINNING", &(fit->binning_x),
+		fits_update_key(fit->fptr, TUINT, "XBINNING", &(fit->binning_x),
 				"Camera binning mode", &status);
 	if (fit->binning_y)
-		fits_update_key(fit->fptr, TSHORT, "YBINNING", &(fit->binning_y),
+		fits_update_key(fit->fptr, TUINT, "YBINNING", &(fit->binning_y),
 				"Camera binning mode", &status);
 
 	status = 0;

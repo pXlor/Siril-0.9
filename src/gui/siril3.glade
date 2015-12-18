@@ -5269,6 +5269,7 @@ If the selection is empty, the whole image will be used as reference.</property>
               <object class="GtkToolButton" id="histoToolAutoStretch">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Apply autostretch algorithm to images</property>
                 <property name="label" translatable="yes">autoStretch</property>
                 <property name="use_underline">True</property>
                 <property name="stock_id">gtk-execute</property>
