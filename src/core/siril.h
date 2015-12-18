@@ -358,7 +358,7 @@ struct ffit {
 	int naxis;		// number of dimensions of the image
 	long naxes[3];		// size of each dimension
 	/* naxes[0] is rx, naxes[1] is ry
-	 * Then, for gray images, naxes[2] is unused in FITS but set to 1, and naxes is 2.
+	 * Then, for gray images, naxes[2] is unused in FITS but set to 1, and naxis is 2.
 	 * For RGB images, naxes[2] is 3 and naxis is 3.
 	 * */
 

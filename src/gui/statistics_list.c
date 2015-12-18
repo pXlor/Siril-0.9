@@ -72,15 +72,15 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 		normValue[RLAYER] = stat[RLAYER]->normValue;
 		normValue[GLAYER] = stat[RLAYER]->normValue;
 		normValue[BLAYER] = stat[RLAYER]->normValue;
-		sprintf(format, "%%.5lf");
+		sprintf(format, "%%.7lf");
 	}
 	else
 		sprintf(format, "%%.1lf");
 
-	sprintf(rvalue, "%u", stat[RLAYER]->count);
+	sprintf(rvalue, "%lu", stat[RLAYER]->count);
 	if (nblayer > 1) {
-		sprintf(gvalue, "%u", stat[GLAYER]->count);
-		sprintf(bvalue, "%u", stat[BLAYER]->count);
+		sprintf(gvalue, "%lu", stat[GLAYER]->count);
+		sprintf(bvalue, "%lu", stat[BLAYER]->count);
 	} else {
 		sprintf(gvalue, "--");
 		sprintf(bvalue, "--");

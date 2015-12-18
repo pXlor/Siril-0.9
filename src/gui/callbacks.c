@@ -1072,9 +1072,9 @@ int make_index_for_current_display(display_mode mode, WORD lo, WORD hi,
 	int i;
 	BYTE *index;
 	double m = 0.0;
-	double pxl, shadows = 0.0;
+	double pxl, shadows = 0.0, highlights = 0.0;
 	if (mode == STF_DISPLAY)
-		m = findMidtonesBalance(&gfit, &shadows);
+		m = findMidtonesBalance(&gfit, &shadows, &highlights);
 
 	/* initialization of data required to build the remap_index */
 	switch (mode) {
@@ -1144,7 +1144,7 @@ int make_index_for_current_display(display_mode mode, WORD lo, WORD hi,
 		case STF_DISPLAY:
 			pxl = (double) i / USHRT_MAX_DOUBLE;
 			pxl = (pxl - shadows < 0.0) ? 0.0 : pxl - shadows;
-			pxl /= (1.0 - shadows);
+			pxl /= (highlights - shadows);
 			index[i] = round_to_BYTE((float) (MTF(pxl, m)) * pente);
 			break;
 		default:
@@ -3580,6 +3580,7 @@ void show_main_gray_window() {
 			gtk_builder_get_object(builder, "menuitemgray"));
 	gtk_check_menu_item_set_active(graycheck, TRUE);
 	gtk_widget_show_all(lookup_widget("main_window"));
+	gtk_window_present(GTK_WINDOW(lookup_widget("main_window")));
 }
 
 void show_rgb_window() {
@@ -4681,8 +4682,13 @@ void on_menuitem_mirrory_activate(GtkMenuItem *menuitem, gpointer user_data) {
 }
 
 void on_menuAnalysis_activate(GtkMenuItem *menuitem, gpointer user_data) {
-	if (single_image_is_loaded() || (sequence_is_loaded()))
+	if (single_image_is_loaded() || (sequence_is_loaded())) {
 		gtk_widget_set_sensitive(lookup_widget("menuitem_noise"), TRUE);
+		gtk_widget_set_sensitive(lookup_widget("menuitem_stat"), TRUE);
+	} else {
+		gtk_widget_set_sensitive(lookup_widget("menuitem_noise"), FALSE);
+		gtk_widget_set_sensitive(lookup_widget("menuitem_stat"), FALSE);
+	}
 }
 
 void on_menuitem_noise_activate(GtkMenuItem *menuitem, gpointer user_data) {
@@ -4704,6 +4710,12 @@ void on_menuitem_noise_activate(GtkMenuItem *menuitem, gpointer user_data) {
 	start_in_new_thread(noise, args);
 }
 
+void on_menuitem_stat_activate(GtkMenuItem *menuitem, gpointer user_data) {
+	set_cursor_waiting(TRUE);
+	computeStat();
+	gtk_widget_show_all(lookup_widget("StatWindow"));
+	set_cursor_waiting(FALSE);
+}
 /**************** GUI for Background extraction *******************/
 
 void on_menuitem_bkg_extraction_activate(GtkMenuItem *menuitem,

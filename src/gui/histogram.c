@@ -45,9 +45,35 @@ static double histo_color_r[] = { 1.0, 0.0, 0.0, 0.0 };
 static double histo_color_g[] = { 0.0, 1.0, 0.0, 0.0 };
 static double histo_color_b[] = { 0.0, 0.0, 1.0, 0.0 };
 static double graph_height = 0.;
+static gsl_histogram *histCpy[MAXVPORT] = { NULL, NULL, NULL, NULL };
 static uint64_t clipped[] = { 0, 0 };
 
-static GtkToggleButton *toggles[MAXVPORT] = { NULL };
+const gchar stylered[] = "* {"
+		"color : red"
+		"}";
+
+const gchar stylegray[] = "* {"
+		"color : black"
+		"}";
+
+static GtkToggleToolButton *toggles[MAXVPORT] = { NULL };
+static GtkToggleToolButton *toggleGrid = NULL;
+
+static void get_sliders_values(double *m, double *lo, double *hi) {
+	static GtkRange *scale_transfert_function[3] = { NULL, NULL, NULL };
+
+	if (scale_transfert_function[1] == NULL) {
+		scale_transfert_function[0] = GTK_RANGE(lookup_widget("scale_shadows"));
+		scale_transfert_function[1] = GTK_RANGE(
+				lookup_widget("scale_midtones"));
+		scale_transfert_function[2] = GTK_RANGE(
+				lookup_widget("scale_highlights"));
+	}
+
+	*m = gtk_range_get_value(scale_transfert_function[1]);
+	*lo = gtk_range_get_value(scale_transfert_function[0]);
+	*hi = gtk_range_get_value(scale_transfert_function[2]);
+}
 
 static void _init_clipped_pixels() {
 	clipped[0] = 0;
@@ -182,25 +208,31 @@ void clear_histograms() {
 
 void init_toggles() {
 	if (!toggles[0]) {
-		toggles[0] = GTK_TOGGLE_BUTTON(
-				gtk_builder_get_object(builder, "check_histo_r"));
-		toggles[1] = GTK_TOGGLE_BUTTON(
-				gtk_builder_get_object(builder, "check_histo_g"));
-		toggles[2] = GTK_TOGGLE_BUTTON(
-				gtk_builder_get_object(builder, "check_histo_b"));
-		toggles[3] = NULL; //GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder, "check_histo_rgb"));
+		toggles[0] = GTK_TOGGLE_TOOL_BUTTON(
+				gtk_builder_get_object(builder, "histoToolRed"));
+		toggles[1] = GTK_TOGGLE_TOOL_BUTTON(
+				gtk_builder_get_object(builder, "histoToolGreen"));
+		toggles[2] = GTK_TOGGLE_TOOL_BUTTON(
+				gtk_builder_get_object(builder, "histoToolBlue"));
+		toggles[3] = NULL;
 	}
+	toggleGrid = GTK_TOGGLE_TOOL_BUTTON(
+			gtk_builder_get_object(builder, "histoToolGrid"));
 }
 
 // sets the channel names of the toggle buttons in the histogram window, based on
 // the number of layers of gfit
 void set_histo_toggles_names() {
 	init_toggles();
+	GtkCssProvider *provider = gtk_css_provider_new();
+
 	if (gfit.naxis == 2) {
-		const char* test = gtk_button_get_label(GTK_BUTTON(toggles[0]));
-		if (strcmp(test, "gray"))
-			gtk_button_set_label(GTK_BUTTON(toggles[0]), "gray");
-		gtk_toggle_button_set_active(toggles[0], TRUE);
+		const char* test = gtk_tool_button_get_label(GTK_TOOL_BUTTON(toggles[0]));
+		if (strcmp(test, "K")) {
+			gtk_tool_button_set_label(GTK_TOOL_BUTTON(toggles[0]), "K");
+			gtk_widget_set_tooltip_text(GTK_WIDGET(toggles[0]), "Gray channel");
+		}
+		gtk_toggle_tool_button_set_active(toggles[0], TRUE);
 		gtk_widget_set_visible(GTK_WIDGET(toggles[1]), FALSE);
 		gtk_widget_set_visible(GTK_WIDGET(toggles[2]), FALSE);
 		/* visible has no effect in GTK+ 3.12, trying sensitive too 
@@ -210,21 +242,34 @@ void set_histo_toggles_names() {
 		gtk_widget_set_sensitive(GTK_WIDGET(toggles[2]), FALSE);
 		if (toggles[3])
 			gtk_widget_set_visible(GTK_WIDGET(toggles[3]), FALSE);
+
+		gtk_css_provider_load_from_data(provider, stylegray, -1, NULL);
+		gtk_style_context_add_provider(
+				gtk_widget_get_style_context(lookup_widget("histoToolRed")),
+				GTK_STYLE_PROVIDER(provider),
+				GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 	} else {
-		const char* test = gtk_button_get_label(GTK_BUTTON(toggles[0]));
-		if (strcmp(test, "red"))
-			gtk_button_set_label(GTK_BUTTON(toggles[0]), "red");
-		gtk_toggle_button_set_active(toggles[0], TRUE);
-		gtk_toggle_button_set_active(toggles[1], TRUE);
-		gtk_toggle_button_set_active(toggles[2], TRUE);
+		const char* test = gtk_tool_button_get_label(GTK_TOOL_BUTTON(toggles[0]));
+		if (strcmp(test, "R")) {
+			gtk_tool_button_set_label(GTK_TOOL_BUTTON(toggles[0]), "R");
+			gtk_widget_set_tooltip_text(GTK_WIDGET(toggles[0]), "Red channel");
+		}
+		gtk_toggle_tool_button_set_active(toggles[0], TRUE);
+		gtk_toggle_tool_button_set_active(toggles[1], TRUE);
+		gtk_toggle_tool_button_set_active(toggles[2], TRUE);
 		gtk_widget_set_sensitive(GTK_WIDGET(toggles[1]), TRUE);
 		gtk_widget_set_sensitive(GTK_WIDGET(toggles[2]), TRUE);
 		gtk_widget_set_visible(GTK_WIDGET(toggles[1]), TRUE);
 		gtk_widget_set_visible(GTK_WIDGET(toggles[2]), TRUE);
 		if (toggles[3]) {
 			gtk_widget_set_visible(GTK_WIDGET(toggles[3]), TRUE);
-			gtk_toggle_button_set_active(toggles[3], TRUE);
+			gtk_toggle_tool_button_set_active(toggles[3], TRUE);
 		}
+		gtk_css_provider_load_from_data(provider, stylered, -1, NULL);
+		gtk_style_context_add_provider(
+				gtk_widget_get_style_context(lookup_widget("histoToolRed")),
+				GTK_STYLE_PROVIDER(provider),
+				GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 	}
 }
 
@@ -278,13 +323,18 @@ gboolean redraw_histo(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	zoomH = get_histoZoomValueH();
 	zoomV = get_histoZoomValueV();
 
+	if (histCpy[0] == NULL) {
+		for (i = 0; i < gfit.naxes[2]; i++)
+			histCpy[i] = gsl_histogram_clone(com.layers_hist[i]);
+	}
+
 	if (height == 1)
 		return FALSE;
-	erase_histo_display(cr, width, height, zoomH, zoomV);
+	erase_histo_display(cr, width, height);
 	graph_height = 0.0;
 	for (i = 0; i < MAXVPORT; i++) {
 		if (com.layers_hist[i]
-				&& (!toggles[i] || gtk_toggle_button_get_active(toggles[i])))
+				&& (!toggles[i] || gtk_toggle_tool_button_get_active(toggles[i])))
 			display_histo(com.layers_hist[i], cr, i, width, height, zoomH, zoomV);
 	}
 	return FALSE;
@@ -298,17 +348,33 @@ void on_histo_toggled(GtkToggleButton *togglebutton, gpointer user_data) {
 	gtk_widget_queue_draw(drawarea);
 }
 
-// erase image and redraw the background color and grid
-void erase_histo_display(cairo_t *cr, int width, int height, double zoomH, double zoomV) {
-	double dash_format[] = { 1.0 / zoomH, 1.0 / zoomV };
-	// clear all with background color
-	cairo_scale(cr, zoomH, zoomV);
-	cairo_set_source_rgb(cr, 0, 0, 0);
-	cairo_rectangle(cr, 0, 0, width, height);
-	cairo_fill(cr);
+#if 0
+static void draw_MTF_curve(cairo_t *cr, int width, int height) {
+	double m, lo, hi, y;
 
-	// draw grid 
-	cairo_set_line_width(cr, 1.0 / zoomH);
+	get_sliders_values(&m, &lo, &hi);
+
+	if (m != 0.0 && m != 1.0) {
+
+		cairo_set_line_width(cr, 1.0);
+		cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+
+		y = MTF(0.5, m);
+//		cairo_curve_to(cr, lo * width, height, (((hi - lo) / 2.0 + lo) / 0.5) * m * width,
+//				((1 - y) * height), hi * width, 0.0);
+		cairo_curve_to(cr, 0, height, 0.01 * width, 0.01 * height, hi * width, 0.0);
+//		printf("test : %.9lf et %.9lf\n", 1 - y,
+//				(((hi - lo) / 2.0 + lo) / 0.5) * m);
+
+		cairo_stroke(cr);
+	}
+}
+#endif
+
+static void draw_grid(cairo_t *cr, int width, int height) {
+	double dash_format[] = { 1.0, 1.0};
+
+	cairo_set_line_width(cr, 1.0);
 	cairo_set_source_rgb(cr, 0.4, 0.4, 0.4);
 	// quarters in solid, eights in dashed line
 	cairo_set_dash(cr, NULL, 0, 0);
@@ -319,7 +385,7 @@ void erase_histo_display(cairo_t *cr, int width, int height, double zoomH, doubl
 	cairo_move_to(cr, width * 0.75, 0);
 	cairo_line_to(cr, width * 0.75, height);
 
-	cairo_set_line_width(cr, 1.0 / zoomV);
+	cairo_set_line_width(cr, 1.0);
 	cairo_move_to(cr, 0, height * 0.25);
 	cairo_line_to(cr, width, height * 0.25);
 	cairo_move_to(cr, 0, height * 0.5);
@@ -329,7 +395,7 @@ void erase_histo_display(cairo_t *cr, int width, int height, double zoomH, doubl
 
 	cairo_stroke(cr);
 
-	cairo_set_line_width(cr, 1.0 / zoomV);
+	cairo_set_line_width(cr, 1.0);
 	cairo_set_dash(cr, dash_format, 2, 0);
 	cairo_move_to(cr, width * 0.125, 0);
 	cairo_line_to(cr, width * 0.125, height);
@@ -340,7 +406,7 @@ void erase_histo_display(cairo_t *cr, int width, int height, double zoomH, doubl
 	cairo_move_to(cr, width * 0.875, 0);
 	cairo_line_to(cr, width * 0.875, height);
 
-	cairo_set_line_width(cr, 1.0 / zoomH);
+	cairo_set_line_width(cr, 1.0);
 	cairo_move_to(cr, 0, height * 0.125);
 	cairo_line_to(cr, width, height * 0.125);
 	cairo_move_to(cr, 0, height * 0.375);
@@ -350,6 +416,25 @@ void erase_histo_display(cairo_t *cr, int width, int height, double zoomH, doubl
 	cairo_move_to(cr, 0, height * 0.875);
 	cairo_line_to(cr, width, height * 0.875);
 	cairo_stroke(cr);
+
+}
+
+// erase image and redraw the background color and grid
+void erase_histo_display(cairo_t *cr, int width, int height) {
+	gboolean drawGrid;
+	// clear all with background color
+	cairo_set_source_rgb(cr, 0, 0, 0);
+	cairo_rectangle(cr, 0, 0, width, height);
+	cairo_fill(cr);
+
+	// draw curve // disabled because bugged
+#if 0
+		draw_MTF_curve(cr, width, height);
+#endif
+	// draw grid
+	drawGrid = gtk_toggle_tool_button_get_active(toggleGrid);
+	if (drawGrid)
+		draw_grid(cr, width, height);
 }
 
 void display_histo(gsl_histogram *histo, cairo_t *cr, int layer, int width,
@@ -386,7 +471,7 @@ void display_histo(gsl_histogram *histo, cairo_t *cr, int layer, int width,
 		cairo_set_source_rgb(cr, histo_color_r[layer], histo_color_g[layer],
 				histo_color_b[layer]);
 	cairo_set_dash(cr, NULL, 0, 0);
-	cairo_set_line_width(cr, 1.5 / max(zoomV, zoomH));
+	cairo_set_line_width(cr, 1.5);
 
 	// first loop builds the bins and finds the maximum
 	i = 0;
@@ -403,9 +488,6 @@ void display_histo(gsl_histogram *histo, cairo_t *cr, int layer, int width,
 			graph_height = bin_val;
 		current_bin++;
 	} while (i < nb_orig_bins && current_bin < nb_bins_allocated);
-
-	//graph_height *= 1.05;	// margin, but grid is not aligned anymore
-	//cairo_move_to(cr, 0, height);	// first line_to will act as move_to
 	for (i = 0; i < nb_bins_allocated; i++) {
 		double bin_height = height
 				- height * displayed_values[i] / graph_height;
@@ -448,29 +530,17 @@ void on_button_histo_reset_clicked() {
 	set_cursor_waiting(FALSE);
 }
 
-void apply_mtf_to_fits(fits *fit) {
-	double m, lo, hi, pente;
+void apply_mtf_to_fits(fits *fit, double m, double lo, double hi) {
+	double pente;
 	int i, chan, nb_chan, ndata;
 	WORD *buf[3] =
 			{ fit->pdata[RLAYER], fit->pdata[GLAYER], fit->pdata[BLAYER] };
-	static GtkRange *scale_transfert_function[3] = { NULL, NULL, NULL };
 	WORD norm = get_normalized_value(fit);
-
-	if (scale_transfert_function[1] == NULL) {
-		scale_transfert_function[0] = GTK_RANGE(lookup_widget("scale_shadows"));
-		scale_transfert_function[1] = GTK_RANGE(
-				lookup_widget("scale_midtones"));
-		scale_transfert_function[2] = GTK_RANGE(
-				lookup_widget("scale_highlights"));
-	}
 
 	assert(fit->naxes[2] == 1 || fit->naxes[2] == 3);
 	nb_chan = fit->naxes[2];
 	ndata = fit->rx * fit->ry;
 
-	m = gtk_range_get_value(scale_transfert_function[1]);
-	lo = gtk_range_get_value(scale_transfert_function[0]);
-	hi = gtk_range_get_value(scale_transfert_function[2]);
 	pente = 1.0 / (hi - lo);
 
 	undo_save_state("Processing: Histogram Transformation "
@@ -487,11 +557,10 @@ void apply_mtf_to_fits(fits *fit) {
 	}
 }
 
-gboolean on_scale_button_release_event(GtkWidget *widget, GdkEvent *event,
-		gpointer user_data) {
-	set_cursor_waiting(TRUE);
+gboolean on_scale_change_value(GtkRange *range, GtkScrollType scroll,
+		gdouble value, gpointer user_data) {
+
 	update_histo_mtf();
-	set_cursor_waiting(FALSE);
 	return FALSE;
 }
 
@@ -504,14 +573,20 @@ gboolean on_scale_key_release_event(GtkWidget *widget, GdkEvent *event,
 }
 
 void on_button_histo_apply_clicked(GtkButton *button, gpointer user_data) {
+	double m, lo, hi;
+
+	get_sliders_values(&m, &lo, &hi);
+
 	set_cursor_waiting(TRUE);
-	apply_mtf_to_fits(&gfit);
+	apply_mtf_to_fits(&gfit, m, lo, hi);
 	_init_clipped_pixels();
 	update_gfit_histogram_if_needed();
 	reset_curors_and_values();
+
 	adjust_cutoff_from_updated_gfit();
 	redraw(com.cvport, REMAP_ALL);
 	redraw_previews();
+
 	set_cursor_waiting(FALSE);
 }
 
@@ -568,42 +643,32 @@ void apply_mtf_to_histo(gsl_histogram *histo, double norm, double m, double lo,
 }
 
 void update_histo_mtf() {
-	double lo, hi, mid;
+	double lo, hi, m;
 	unsigned int i, data = 0;
 	static GtkRange *scale_transfert_function[3] = { NULL, NULL, NULL };
-	static GtkAdjustment *adjustment[3] = { NULL, NULL, NULL };
 	static GtkWidget *drawarea = NULL;
 	double norm = (double) gsl_histogram_bins(com.layers_hist[0]) - 1;
 
-	if (drawarea == NULL) {
-		drawarea = lookup_widget("drawingarea_histograms");
-	}
 	if (scale_transfert_function[0] == NULL) {
 		scale_transfert_function[0] = GTK_RANGE(lookup_widget("scale_shadows"));
 		scale_transfert_function[1] = GTK_RANGE(
 				lookup_widget("scale_midtones"));
 		scale_transfert_function[2] = GTK_RANGE(
 				lookup_widget("scale_highlights"));
-		adjustment[0] = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "adj_shadows"));
-		adjustment[1] = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "adj_midtones"));
-		adjustment[2] = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "adj_highlights"));
 	}
 
-	lo = gtk_range_get_value(scale_transfert_function[0]);
-	mid = gtk_range_get_value(scale_transfert_function[1]);
-	hi = gtk_range_get_value(scale_transfert_function[2]);
-
-	for (i = 0; i < 3; i++)
-		gtk_adjustment_set_step_increment(adjustment[i], 0.00001);
+	if (drawarea == NULL) {
+		drawarea = lookup_widget("drawingarea_histograms");
+	}
+	get_sliders_values(&m, &lo, &hi);
 
 	gtk_range_set_range(scale_transfert_function[0], 0.0, hi);
 	gtk_range_set_range(scale_transfert_function[2], lo, 1.0);
 
-	update_gfit_histogram_if_needed();	// take time. Need to be optimized
-
 	_init_clipped_pixels();
 	for (i = 0; i < gfit.naxes[2]; i++) {
-		apply_mtf_to_histo(com.layers_hist[i], norm, mid, lo, hi);
+		gsl_histogram_memcpy(com.layers_hist[i], histCpy[i]);
+		apply_mtf_to_histo(com.layers_hist[i], norm, m, lo, hi);
 	}
 	data = gfit.rx * gfit.ry * gfit.naxes[2];
 	_update_clipped_pixels(data);
@@ -612,30 +677,57 @@ void update_histo_mtf() {
 	gtk_widget_queue_draw(drawarea);
 }
 
-double findMidtonesBalance(fits *fit, double *shadows) {
-	double c0 = 0.0;
+double findMidtonesBalance(fits *fit, double *shadows, double *highlights) {
+	double c0 = 0.0, c1 = 0.0;
 	double m = 0.0;
-	int i, n;
+	int i, n, invertedChannels = 0;
+	imstats *stat[3];
 
-	n = (fit->naxes[2] == 2) ? 3 : 1;
+	n = fit->naxes[2];
 
 	for (i = 0; i < n; ++i) {
-		double median, avgDev, normValue;
-		imstats *stat = statistics(fit, i, NULL);
+		stat[i] = statistics(fit, i, NULL);
 
-		normValue = stat->normValue;
-		median = stat->median / normValue;
-		avgDev = stat->avgDev / normValue;
-
-		c0 += median + shadowsClipping * avgDev;
-		m += median;
-		free(stat);
+		if (stat[i]->median / stat[i]->normValue > 0.5)
+			++invertedChannels;
 	}
-	c0 /= n;
-	double m2 = m/n - c0;
-	m = MTF(m2, targetBackground);
-	//printf("c0 = %lf et m=%lf\n", c0, m);
-	*shadows = c0;
+
+	if (invertedChannels < n) {
+		for (i = 0; i < n; ++i) {
+			double median, avgDev, normValue;
+
+			normValue = stat[i]->normValue;
+			median = stat[i]->median / normValue;
+			avgDev = stat[i]->avgDev / normValue;
+
+			c0 += median + shadowsClipping * avgDev;
+			m += median;
+		}
+		c0 /= n;
+		double m2 = m / n - c0;
+		m = MTF(m2, targetBackground);
+		*shadows = c0;
+		*highlights = 1.0;
+	} else {
+		for (i = 0; i < n; ++i) {
+			double median, avgDev, normValue;
+
+			normValue = stat[i]->normValue;
+			median = stat[i]->median / normValue;
+			avgDev = stat[i]->avgDev / normValue;
+
+			m += median;
+			c1 += median - shadowsClipping * avgDev;
+		}
+		c1 /= n;
+		double m2 = c1 - m / n;
+		m = 1.0 - MTF(m2, targetBackground);
+		*shadows = 0.0;
+		*highlights = c1;
+
+	}
+	for (i = 0; i < n; ++i)
+		free(stat[i]);
 	return m;
 }
 
@@ -644,8 +736,18 @@ void on_histoMidEntry_changed(GtkEditable *editable, gpointer user_data) {
 	GtkAdjustment *Midtones;
 	GtkRange *MidRange;
 
-	set_cursor_waiting(TRUE);
 	value = atof(gtk_entry_get_text(GTK_ENTRY(editable)));
+	if (value < 0.0) {
+		gtk_entry_set_text(GTK_ENTRY(editable), "0.0000000");
+		return;
+	}
+
+	if (value > 1.0) {
+		gtk_entry_set_text(GTK_ENTRY(editable), "1.0000000");
+		value = 0;
+	}
+
+	set_cursor_waiting(TRUE);
 	Midtones = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "adj_midtones"));
 	MidRange = GTK_RANGE(GTK_SCALE(gtk_builder_get_object(builder, "scale_midtones")));
 
@@ -661,8 +763,18 @@ void on_histoShadEntry_changed(GtkEditable *editable, gpointer user_data) {
 	GtkAdjustment *Shadows;
 	GtkRange *ShadRange;
 
-	set_cursor_waiting(TRUE);
 	value = atof(gtk_entry_get_text(GTK_ENTRY(editable)));
+	if (value < 0.0) {
+		gtk_entry_set_text(GTK_ENTRY(editable), "0.0000000");
+		return;
+	}
+
+	if (value > 1.0) {
+		gtk_entry_set_text(GTK_ENTRY(editable), "1.0000000");
+		value = 0;
+	}
+
+	set_cursor_waiting(TRUE);
 	Shadows = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "adj_shadows"));
 	ShadRange = GTK_RANGE(GTK_SCALE(gtk_builder_get_object(builder, "scale_shadows")));
 
@@ -678,8 +790,19 @@ void on_histoHighEntry_changed(GtkEditable *editable, gpointer user_data) {
 	GtkAdjustment *Highligts;
 	GtkRange *HighRange;
 
-	set_cursor_waiting(TRUE);
 	value = atof(gtk_entry_get_text(GTK_ENTRY(editable)));
+	if (value < 0.0) {
+		gtk_entry_set_text(GTK_ENTRY(editable), "0.0000000");
+		return;
+	}
+
+	if (value > 1.0) {
+		gtk_entry_set_text(GTK_ENTRY(editable), "1.0000000");
+		value = 0;
+	}
+
+	set_cursor_waiting(TRUE);
+
 	Highligts = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "adj_highlights"));
 	HighRange = GTK_RANGE(GTK_SCALE(gtk_builder_get_object(builder, "scale_highlights")));
 
@@ -692,7 +815,7 @@ void on_histoHighEntry_changed(GtkEditable *editable, gpointer user_data) {
 
 void on_scale_midtones_value_changed(GtkRange *range, gpointer user_data) {
 	static GtkEntry *histoMidEntry = NULL;
-	char buffer[10];
+	char buffer[15];
 	double value;
 
 	if (histoMidEntry == NULL)
@@ -700,7 +823,7 @@ void on_scale_midtones_value_changed(GtkRange *range, gpointer user_data) {
 				gtk_builder_get_object(builder, "histoMidEntry"));
 
 	value = gtk_range_get_value(range);
-	g_snprintf(buffer, 8, "%lf", value);
+	g_snprintf(buffer, 15, "%.10lf", value);
 
 	g_signal_handlers_block_by_func(histoMidEntry, on_histoMidEntry_changed,
 			NULL);
@@ -711,7 +834,7 @@ void on_scale_midtones_value_changed(GtkRange *range, gpointer user_data) {
 
 void on_scale_shadows_value_changed(GtkRange *range, gpointer user_data) {
 	static GtkEntry *histoShadEntry = NULL;
-	char buffer[10];
+	char buffer[15];
 	double value;
 
 	if (histoShadEntry == NULL)
@@ -719,7 +842,7 @@ void on_scale_shadows_value_changed(GtkRange *range, gpointer user_data) {
 				gtk_builder_get_object(builder, "histoShadEntry"));
 
 	value = gtk_range_get_value(range);
-	g_snprintf(buffer, 8, "%lf", value);
+	g_snprintf(buffer, 15, "%.10lf", value);
 
 	g_signal_handlers_block_by_func(histoShadEntry, on_histoShadEntry_changed, NULL);
 	gtk_entry_set_text(histoShadEntry, buffer);
@@ -728,7 +851,7 @@ void on_scale_shadows_value_changed(GtkRange *range, gpointer user_data) {
 
 void on_scale_highlights_value_changed(GtkRange *range, gpointer user_data) {
 	static GtkEntry *histoHighEntry = NULL;
-	char buffer[10];
+	char buffer[15];
 	double value;
 
 	if (histoHighEntry == NULL)
@@ -736,7 +859,7 @@ void on_scale_highlights_value_changed(GtkRange *range, gpointer user_data) {
 				gtk_builder_get_object(builder, "histoHighEntry"));
 
 	value = gtk_range_get_value(range);
-	g_snprintf(buffer, 8, "%lf", value);
+	g_snprintf(buffer, 15, "%.10lf", value);
 
 	g_signal_handlers_block_by_func(histoHighEntry, on_histoHighEntry_changed, NULL);
 	gtk_entry_set_text(histoHighEntry, buffer);
@@ -755,9 +878,50 @@ void on_histoZoom100_clicked(GtkButton *button, gpointer user_data) {
 
 void on_histoSpinZoom_value_changed(GtkRange *range, gpointer user_data) {
 	static GtkWidget *drawarea = NULL;
+
 	if (!drawarea) {
 		drawarea = lookup_widget("drawingarea_histograms");
 	}
 	adjust_histogram_vport_size();
 	gtk_widget_queue_draw(drawarea);
+}
+
+void on_histoToolAutoStretch_clicked(GtkToolButton *button, gpointer user_data) {
+	double m, shadows = 0.0, highlights = 0.0;
+	int i;
+	unsigned int data;
+	static GtkWidget *drawarea = NULL;
+	double norm = (double) gsl_histogram_bins(com.layers_hist[0]) - 1;
+	static GtkRange *scale_transfert_function[3] = { NULL, NULL, NULL };
+
+	if (scale_transfert_function[1] == NULL) {
+		scale_transfert_function[0] = GTK_RANGE(lookup_widget("scale_shadows"));
+		scale_transfert_function[1] = GTK_RANGE(
+				lookup_widget("scale_midtones"));
+		scale_transfert_function[2] = GTK_RANGE(
+				lookup_widget("scale_highlights"));
+	}
+
+	if (drawarea == NULL) {
+		drawarea = lookup_widget("drawingarea_histograms");
+	}
+
+	set_cursor_waiting(TRUE);
+
+	m = findMidtonesBalance(&gfit, &shadows, &highlights);
+	_init_clipped_pixels();
+	for (i = 0; i < gfit.naxes[2]; i++) {
+		gsl_histogram_memcpy(com.layers_hist[i], histCpy[i]);
+		apply_mtf_to_histo(com.layers_hist[i], norm, m, shadows, 1.0);
+	}
+	data = gfit.rx * gfit.ry * gfit.naxes[2];
+	gtk_range_set_value(scale_transfert_function[1], m);
+	gtk_range_set_value(scale_transfert_function[0], shadows);
+	gtk_range_set_value(scale_transfert_function[2], highlights);
+	_update_clipped_pixels(data);
+
+	/* redraw the histogram */
+	gtk_widget_queue_draw(drawarea);
+
+	set_cursor_waiting(FALSE);
 }

@@ -10,3 +10,11 @@ GtkTextView {
 	-GtkWidget-focus-padding : 0;
 	padding: 0;
 }
+
+#histoToolGreen {
+	color : green;
+}
+
+#histoToolBlue {
+	color : blue;
+}

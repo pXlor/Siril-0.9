@@ -232,8 +232,7 @@ along with Siril.  If not, see <http://www.gnu.org/licenses/>.
   <object class="GtkAdjustment" id="adj_midtones">
     <property name="upper">1</property>
     <property name="value">0.5</property>
-    <property name="step_increment">0.01</property>
-    <property name="page_increment">10</property>
+    <property name="page_increment">1</property>
   </object>
   <object class="GtkAdjustment" id="adj_plans_w">
     <property name="lower">2</property>
@@ -627,6 +626,11 @@ enter a visible wavelength in nm</property>
     <patterns>
       <pattern>*.fit</pattern>
     </patterns>
+  </object>
+  <object class="GtkImage" id="grid">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <property name="pixbuf">pixmaps/grid.png</property>
   </object>
   <object class="GtkAdjustment" id="histoAdjZoomH">
     <property name="lower">1</property>
@@ -5060,65 +5064,69 @@ If the selection is empty, the whole image will be used as reference.</property>
         <property name="can_focus">False</property>
         <property name="orientation">vertical</property>
         <child>
-          <object class="GtkBox" id="box69">
+          <object class="GtkToolbar" id="histoToolbar1">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
+            <property name="toolbar_style">icons</property>
+            <property name="icon_size">2</property>
             <child>
-              <object class="GtkSpinButton" id="histoSpinZoomH">
+              <object class="GtkToolItem" id="toolbutton1">
                 <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="tooltip_text" translatable="yes">Horizontal Zoom</property>
-                <property name="adjustment">histoAdjZoomH</property>
-                <property name="numeric">True</property>
-                <property name="value">1</property>
-                <signal name="value-changed" handler="on_histoSpinZoom_value_changed" swapped="no"/>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="position">0</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkSpinButton" id="histoSpinZoomV">
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="tooltip_text" translatable="yes">Vertical Zoom</property>
-                <property name="adjustment">histoAdjZoomV</property>
-                <property name="numeric">True</property>
-                <property name="value">1</property>
-                <signal name="value-changed" handler="on_histoSpinZoom_value_changed" swapped="no"/>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="position">1</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkButton" id="histoZoom100">
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="receives_default">True</property>
-                <property name="tooltip_text" translatable="yes">Zoom 1:1</property>
-                <property name="always_show_image">True</property>
-                <signal name="clicked" handler="on_histoZoom100_clicked" swapped="no"/>
+                <property name="can_focus">False</property>
                 <child>
-                  <object class="GtkImage" id="image2">
+                  <object class="GtkSpinButton" id="histoSpinZoomH">
                     <property name="visible">True</property>
-                    <property name="can_focus">False</property>
-                    <property name="stock">gtk-zoom-100</property>
+                    <property name="can_focus">True</property>
+                    <property name="tooltip_text" translatable="yes">Horizontal Zoom</property>
+                    <property name="text" translatable="yes">1</property>
+                    <property name="adjustment">histoAdjZoomH</property>
+                    <property name="numeric">True</property>
+                    <property name="value">1</property>
+                    <signal name="value-changed" handler="on_histoSpinZoom_value_changed" swapped="no"/>
                   </object>
                 </child>
               </object>
               <packing>
                 <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="position">2</property>
+                <property name="homogeneous">True</property>
               </packing>
             </child>
             <child>
-              <placeholder/>
+              <object class="GtkToolItem" id="toolbutton2">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <child>
+                  <object class="GtkSpinButton" id="histoSpinZoomV">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="tooltip_text" translatable="yes">Vertical Zoom</property>
+                    <property name="text" translatable="yes">1</property>
+                    <property name="adjustment">histoAdjZoomV</property>
+                    <property name="numeric">True</property>
+                    <property name="value">1</property>
+                    <signal name="value-changed" handler="on_histoSpinZoom_value_changed" swapped="no"/>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="homogeneous">True</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkToolButton" id="histoZoom100">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="halign">center</property>
+                <property name="valign">center</property>
+                <property name="use_underline">True</property>
+                <property name="stock_id">gtk-zoom-100</property>
+                <signal name="clicked" handler="on_histoZoom100_clicked" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="homogeneous">False</property>
+              </packing>
             </child>
           </object>
           <packing>
@@ -5153,65 +5161,129 @@ If the selection is empty, the whole image will be used as reference.</property>
           </packing>
         </child>
         <child>
-          <object class="GtkBox" id="box32">
+          <object class="GtkLabel" id="label68">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">2</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkToolbar" id="histoToolbar2">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="icon_size">4</property>
             <child>
-              <object class="GtkCheckButton" id="check_histo_r">
-                <property name="label" translatable="yes">red</property>
+              <object class="GtkToggleToolButton" id="histoToolRed">
+                <property name="name">histoToolRed</property>
                 <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="receives_default">False</property>
-                <property name="xalign">0</property>
-                <property name="draw_indicator">True</property>
+                <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Red channel</property>
+                <property name="halign">center</property>
+                <property name="valign">center</property>
+                <property name="label" translatable="yes">R</property>
+                <property name="use_underline">True</property>
+                <property name="active">True</property>
                 <signal name="toggled" handler="on_histo_toggled" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="padding">6</property>
-                <property name="position">0</property>
+                <property name="homogeneous">True</property>
               </packing>
             </child>
             <child>
-              <object class="GtkCheckButton" id="check_histo_g">
-                <property name="label" translatable="yes">green</property>
+              <object class="GtkToggleToolButton" id="histoToolGreen">
+                <property name="name">histoToolGreen</property>
                 <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="receives_default">False</property>
-                <property name="xalign">0</property>
-                <property name="draw_indicator">True</property>
+                <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Green channel</property>
+                <property name="halign">center</property>
+                <property name="valign">center</property>
+                <property name="label" translatable="yes">G</property>
+                <property name="use_underline">True</property>
                 <signal name="toggled" handler="on_histo_toggled" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="padding">6</property>
-                <property name="position">1</property>
+                <property name="homogeneous">True</property>
               </packing>
             </child>
             <child>
-              <object class="GtkCheckButton" id="check_histo_b">
-                <property name="label" translatable="yes">blue</property>
+              <object class="GtkToggleToolButton" id="histoToolBlue">
+                <property name="name">histoToolBlue</property>
                 <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="receives_default">False</property>
-                <property name="xalign">0</property>
-                <property name="draw_indicator">True</property>
+                <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Blue channel</property>
+                <property name="halign">center</property>
+                <property name="valign">center</property>
+                <property name="label" translatable="yes">B</property>
+                <property name="use_underline">True</property>
                 <signal name="toggled" handler="on_histo_toggled" swapped="no"/>
               </object>
               <packing>
                 <property name="expand">False</property>
-                <property name="fill">True</property>
-                <property name="padding">6</property>
-                <property name="position">2</property>
+                <property name="homogeneous">True</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkSeparatorToolItem" id="&lt;séparateur&gt;3">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="homogeneous">False</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkToggleToolButton" id="histoToolGrid">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="tooltip_text" translatable="yes">Histogram grid</property>
+                <property name="halign">center</property>
+                <property name="valign">center</property>
+                <property name="use_underline">True</property>
+                <property name="icon_widget">grid</property>
+                <property name="active">True</property>
+                <signal name="toggled" handler="on_histo_toggled" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="homogeneous">True</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkSeparatorToolItem" id="toolbutton3">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="homogeneous">True</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkToolButton" id="histoToolAutoStretch">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="label" translatable="yes">autoStretch</property>
+                <property name="use_underline">True</property>
+                <property name="stock_id">gtk-execute</property>
+                <signal name="clicked" handler="on_histoToolAutoStretch_clicked" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="homogeneous">True</property>
               </packing>
             </child>
           </object>
           <packing>
             <property name="expand">False</property>
             <property name="fill">True</property>
-            <property name="position">2</property>
+            <property name="position">3</property>
           </packing>
         </child>
         <child>
@@ -5288,10 +5360,10 @@ If the selection is empty, the whole image will be used as reference.</property>
                 <property name="tooltip_text" translatable="yes">Highlights clipping</property>
                 <property name="hexpand">True</property>
                 <property name="adjustment">adj_highlights</property>
-                <property name="round_digits">1</property>
+                <property name="round_digits">9</property>
                 <property name="digits">5</property>
                 <property name="draw_value">False</property>
-                <signal name="button-release-event" handler="on_scale_button_release_event" swapped="no"/>
+                <signal name="change-value" handler="on_scale_change_value" swapped="no"/>
                 <signal name="key-release-event" handler="on_scale_key_release_event" swapped="no"/>
                 <signal name="value-changed" handler="on_scale_highlights_value_changed" swapped="no"/>
               </object>
@@ -5307,10 +5379,12 @@ If the selection is empty, the whole image will be used as reference.</property>
                 <property name="tooltip_text" translatable="yes">Midtones balance</property>
                 <property name="hexpand">True</property>
                 <property name="adjustment">adj_midtones</property>
-                <property name="round_digits">5</property>
-                <property name="digits">5</property>
+                <property name="lower_stepper_sensitivity">on</property>
+                <property name="upper_stepper_sensitivity">on</property>
+                <property name="round_digits">9</property>
+                <property name="digits">7</property>
                 <property name="draw_value">False</property>
-                <signal name="button-release-event" handler="on_scale_button_release_event" swapped="no"/>
+                <signal name="change-value" handler="on_scale_change_value" swapped="no"/>
                 <signal name="key-release-event" handler="on_scale_key_release_event" swapped="no"/>
                 <signal name="value-changed" handler="on_scale_midtones_value_changed" swapped="no"/>
               </object>
@@ -5326,10 +5400,10 @@ If the selection is empty, the whole image will be used as reference.</property>
                 <property name="tooltip_text" translatable="yes">Shadows clipping</property>
                 <property name="hexpand">True</property>
                 <property name="adjustment">adj_shadows</property>
-                <property name="round_digits">1</property>
+                <property name="round_digits">9</property>
                 <property name="digits">5</property>
                 <property name="draw_value">False</property>
-                <signal name="button-release-event" handler="on_scale_button_release_event" swapped="no"/>
+                <signal name="change-value" handler="on_scale_change_value" swapped="no"/>
                 <signal name="key-release-event" handler="on_scale_key_release_event" swapped="no"/>
                 <signal name="value-changed" handler="on_scale_shadows_value_changed" swapped="no"/>
               </object>
@@ -5420,10 +5494,10 @@ If the selection is empty, the whole image will be used as reference.</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="tooltip_text" translatable="yes">Midtones balance</property>
-                <property name="max_length">7</property>
-                <property name="width_chars">7</property>
-                <property name="max_width_chars">7</property>
-                <property name="text" translatable="yes">0.50000</property>
+                <property name="max_length">9</property>
+                <property name="width_chars">9</property>
+                <property name="max_width_chars">9</property>
+                <property name="text" translatable="yes">0.5000000</property>
                 <property name="overwrite_mode">True</property>
                 <property name="input_purpose">digits</property>
                 <signal name="changed" handler="on_histoMidEntry_changed" swapped="no"/>
@@ -5438,10 +5512,10 @@ If the selection is empty, the whole image will be used as reference.</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="tooltip_text" translatable="yes">Shadows clipping</property>
-                <property name="max_length">7</property>
-                <property name="width_chars">7</property>
-                <property name="max_width_chars">7</property>
-                <property name="text" translatable="yes">0.00000</property>
+                <property name="max_length">9</property>
+                <property name="width_chars">9</property>
+                <property name="max_width_chars">9</property>
+                <property name="text" translatable="yes">0.0000000</property>
                 <property name="overwrite_mode">True</property>
                 <property name="input_purpose">digits</property>
                 <signal name="changed" handler="on_histoShadEntry_changed" swapped="no"/>
@@ -5456,10 +5530,10 @@ If the selection is empty, the whole image will be used as reference.</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="tooltip_text" translatable="yes">Highlights clipping</property>
-                <property name="max_length">7</property>
-                <property name="width_chars">7</property>
-                <property name="max_width_chars">7</property>
-                <property name="text" translatable="yes">1.00000</property>
+                <property name="max_length">9</property>
+                <property name="width_chars">9</property>
+                <property name="max_width_chars">9</property>
+                <property name="text" translatable="yes">1.0000000</property>
                 <property name="overwrite_mode">True</property>
                 <property name="input_purpose">digits</property>
                 <signal name="changed" handler="on_histoHighEntry_changed" swapped="no"/>
@@ -8112,6 +8186,7 @@ WARNING: Reducing the ratio of memory allocated to computation will degrade perf
             <property name="visible">True</property>
             <property name="can_focus">False</property>
             <property name="label" translatable="yes">Name</property>
+            <property name="ellipsize">start</property>
           </object>
           <packing>
             <property name="expand">False</property>
@@ -9635,6 +9710,15 @@ Warning: ensure you have a good reason to change this value because it may degra
                         <property name="label" translatable="yes">Dynamic PSF...</property>
                         <property name="use_underline">True</property>
                         <signal name="toggled" handler="on_menuitemPSF_toggled" swapped="no"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="menuitem_stat">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="label" translatable="yes">Statistics...</property>
+                        <property name="use_underline">True</property>
+                        <signal name="activate" handler="on_menuitem_stat_activate" swapped="no"/>
                       </object>
                     </child>
                     <child>
