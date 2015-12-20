@@ -178,6 +178,9 @@ void compute_histo_for_gfit(int force) {
 	for (i = 0; i < nb_layers; i++) {
 		if (force || !com.layers_hist[i])
 			set_histogram(computeHisto(&gfit, i), i);
+		if (histCpy[i])
+			gsl_histogram_free(histCpy[i]);
+		histCpy[i] = gsl_histogram_clone(com.layers_hist[i]);
 	}
 	set_histo_toggles_names();
 }
