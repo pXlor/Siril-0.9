@@ -202,8 +202,12 @@ void set_histogram(gsl_histogram *histo, int layer) {
 
 void clear_histograms() {
 	int i;
-	for (i = 0; i < MAXVPORT; i++)
+	for (i = 0; i < MAXVPORT; i++) {
 		set_histogram(NULL, i);
+		if (histCpy[i])
+			gsl_histogram_free(histCpy[i]);
+		histCpy[i] = NULL;
+	}
 }
 
 void init_toggles() {
@@ -557,13 +561,6 @@ void apply_mtf_to_fits(fits *fit, double m, double lo, double hi) {
 	}
 }
 
-gboolean on_scale_change_value(GtkRange *range, GtkScrollType scroll,
-		gdouble value, gpointer user_data) {
-
-	update_histo_mtf();
-	return FALSE;
-}
-
 gboolean on_scale_key_release_event(GtkWidget *widget, GdkEvent *event,
 		gpointer user_data) {
 	set_cursor_waiting(TRUE);
@@ -574,6 +571,7 @@ gboolean on_scale_key_release_event(GtkWidget *widget, GdkEvent *event,
 
 void on_button_histo_apply_clicked(GtkButton *button, gpointer user_data) {
 	double m, lo, hi;
+	int i;
 
 	get_sliders_values(&m, &lo, &hi);
 
@@ -581,6 +579,8 @@ void on_button_histo_apply_clicked(GtkButton *button, gpointer user_data) {
 	apply_mtf_to_fits(&gfit, m, lo, hi);
 	_init_clipped_pixels();
 	update_gfit_histogram_if_needed();
+	for (i = 0; i < gfit.naxes[2]; i++)
+		gsl_histogram_memcpy(histCpy[i], com.layers_hist[i]);
 	reset_curors_and_values();
 
 	adjust_cutoff_from_updated_gfit();
@@ -731,9 +731,73 @@ double findMidtonesBalance(fits *fit, double *shadows, double *highlights) {
 	return m;
 }
 
+void on_histoMidEntry_changed(GtkEditable *editable, gpointer user_data);
+void on_histoShadEntry_changed(GtkEditable *editable, gpointer user_data);
+void on_histoHighEntry_changed(GtkEditable *editable, gpointer user_data);
+
+void on_scale_midtones_value_changed(GtkRange *range, gpointer user_data) {
+	static GtkEntry *histoMidEntry = NULL;
+	char buffer[10];
+	double value;
+
+	value = gtk_range_get_value(range);
+
+	if (histoMidEntry == NULL)
+		histoMidEntry = GTK_ENTRY(
+				gtk_builder_get_object(builder, "histoMidEntry"));
+
+	g_snprintf(buffer, 10, "%.7lf", value);
+	g_signal_handlers_block_by_func(histoMidEntry, on_histoMidEntry_changed,
+			NULL);
+	gtk_entry_set_text(histoMidEntry, buffer);
+	g_signal_handlers_unblock_by_func(histoMidEntry, on_histoMidEntry_changed,
+			NULL);
+
+	update_histo_mtf();
+}
+
+void on_scale_shadows_value_changed(GtkRange *range, gpointer user_data) {
+	static GtkEntry *histoShadEntry = NULL;
+	char buffer[10];
+	double value;
+
+	value = gtk_range_get_value(range);
+
+	if (histoShadEntry == NULL)
+		histoShadEntry = GTK_ENTRY(
+				gtk_builder_get_object(builder, "histoShadEntry"));
+
+	g_snprintf(buffer, 10, "%.7lf", value);
+
+	g_signal_handlers_block_by_func(histoShadEntry, on_histoShadEntry_changed, NULL);
+	gtk_entry_set_text(histoShadEntry, buffer);
+	g_signal_handlers_unblock_by_func(histoShadEntry, on_histoShadEntry_changed, NULL);
+
+	update_histo_mtf();
+}
+
+void on_scale_highlights_value_changed(GtkRange *range, gpointer user_data) {
+	static GtkEntry *histoHighEntry = NULL;
+	char buffer[10];
+	double value;
+
+	value = gtk_range_get_value(range);
+
+	if (histoHighEntry == NULL)
+		histoHighEntry = GTK_ENTRY(
+				gtk_builder_get_object(builder, "histoHighEntry"));
+
+	g_snprintf(buffer, 10, "%.7lf", value);
+
+	g_signal_handlers_block_by_func(histoHighEntry, on_histoHighEntry_changed, NULL);
+	gtk_entry_set_text(histoHighEntry, buffer);
+	g_signal_handlers_unblock_by_func(histoHighEntry, on_histoHighEntry_changed, NULL);
+
+	update_histo_mtf();
+}
+
 void on_histoMidEntry_changed(GtkEditable *editable, gpointer user_data) {
 	double value;
-	GtkAdjustment *Midtones;
 	GtkRange *MidRange;
 
 	value = atof(gtk_entry_get_text(GTK_ENTRY(editable)));
@@ -747,15 +811,12 @@ void on_histoMidEntry_changed(GtkEditable *editable, gpointer user_data) {
 		value = 0;
 	}
 
-	set_cursor_waiting(TRUE);
-	Midtones = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "adj_midtones"));
 	MidRange = GTK_RANGE(GTK_SCALE(gtk_builder_get_object(builder, "scale_midtones")));
 
 	g_signal_handlers_block_by_func(MidRange, on_scale_midtones_value_changed, NULL);
-	gtk_adjustment_set_value(Midtones, value);
+	gtk_range_set_value(MidRange, value);
 	g_signal_handlers_unblock_by_func(MidRange, on_scale_midtones_value_changed, NULL);
 	update_histo_mtf();
-	set_cursor_waiting(FALSE);
 }
 
 void on_histoShadEntry_changed(GtkEditable *editable, gpointer user_data) {
@@ -811,59 +872,6 @@ void on_histoHighEntry_changed(GtkEditable *editable, gpointer user_data) {
 	g_signal_handlers_unblock_by_func(HighRange, on_scale_highlights_value_changed, NULL);
 	update_histo_mtf();
 	set_cursor_waiting(FALSE);
-}
-
-void on_scale_midtones_value_changed(GtkRange *range, gpointer user_data) {
-	static GtkEntry *histoMidEntry = NULL;
-	char buffer[15];
-	double value;
-
-	if (histoMidEntry == NULL)
-		histoMidEntry = GTK_ENTRY(
-				gtk_builder_get_object(builder, "histoMidEntry"));
-
-	value = gtk_range_get_value(range);
-	g_snprintf(buffer, 15, "%.10lf", value);
-
-	g_signal_handlers_block_by_func(histoMidEntry, on_histoMidEntry_changed,
-			NULL);
-	gtk_entry_set_text(histoMidEntry, buffer);
-	g_signal_handlers_unblock_by_func(histoMidEntry, on_histoMidEntry_changed,
-			NULL);
-}
-
-void on_scale_shadows_value_changed(GtkRange *range, gpointer user_data) {
-	static GtkEntry *histoShadEntry = NULL;
-	char buffer[15];
-	double value;
-
-	if (histoShadEntry == NULL)
-		histoShadEntry = GTK_ENTRY(
-				gtk_builder_get_object(builder, "histoShadEntry"));
-
-	value = gtk_range_get_value(range);
-	g_snprintf(buffer, 15, "%.10lf", value);
-
-	g_signal_handlers_block_by_func(histoShadEntry, on_histoShadEntry_changed, NULL);
-	gtk_entry_set_text(histoShadEntry, buffer);
-	g_signal_handlers_unblock_by_func(histoShadEntry, on_histoShadEntry_changed, NULL);
-}
-
-void on_scale_highlights_value_changed(GtkRange *range, gpointer user_data) {
-	static GtkEntry *histoHighEntry = NULL;
-	char buffer[15];
-	double value;
-
-	if (histoHighEntry == NULL)
-		histoHighEntry = GTK_ENTRY(
-				gtk_builder_get_object(builder, "histoHighEntry"));
-
-	value = gtk_range_get_value(range);
-	g_snprintf(buffer, 15, "%.10lf", value);
-
-	g_signal_handlers_block_by_func(histoHighEntry, on_histoHighEntry_changed, NULL);
-	gtk_entry_set_text(histoHighEntry, buffer);
-	g_signal_handlers_unblock_by_func(histoHighEntry, on_histoHighEntry_changed, NULL);
 }
 
 void on_histoZoom100_clicked(GtkButton *button, gpointer user_data) {

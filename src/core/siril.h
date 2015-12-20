@@ -476,6 +476,8 @@ struct cominf {
 
 	int reg_settings;		// Use to save registration method in the init file
 	
+	gboolean dontShowConfirm;
+
 	stackconf stack;
 	
 	int filter;

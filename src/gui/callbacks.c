@@ -59,7 +59,7 @@
 #define CSS_FILE "gtk.css"                      /* CSS style sheet name */
 
 static enum {
-	CD_NULL, CD_INCALL, CD_EXCALL, CD_QUIT = -1
+	CD_NULL, CD_INCALL, CD_EXCALL, CD_QUIT
 } confirm;
 static gboolean is_shift_on = FALSE;
 
@@ -767,6 +767,12 @@ void set_GUI_CWD() {
 	GtkLabel *label = GTK_LABEL(lookup_widget("labelcwd"));
 	gtk_label_set_text(label, com.wd);
 	//set_label_text_from_main_thread("labelcwd", com.wd);
+}
+
+void set_GUI_misc() {
+	GtkToggleButton *ToggleButton = GTK_TOGGLE_BUTTON(lookup_widget("miscAskQuit"));
+
+	gtk_toggle_button_set_active(ToggleButton, com.dontShowConfirm);
 }
 
 /* size is in kiB */
@@ -2209,9 +2215,18 @@ void on_combobox_ext_changed(GtkComboBox *box, gpointer user_data) {
 
 void gtk_main_quit() {
 	GtkWidget *widget = lookup_widget("confirmlabel");
+	GtkWidget *dontShow = lookup_widget("confirmDontShowButton");
+
 	confirm = CD_QUIT;
-	gtk_label_set_text(GTK_LABEL(widget), "Are you sure you want to quit ?");
-	gtk_widget_show(lookup_widget("confirm_dialog"));
+	if (!com.dontShowConfirm) {
+		gtk_widget_set_visible(dontShow, TRUE);
+		gtk_label_set_text(GTK_LABEL(widget),
+				"Are you sure you want to quit ?");
+		gtk_widget_show(lookup_widget("confirm_dialog"));
+	} else {
+		undo_flush();
+		exit(EXIT_SUCCESS);
+	}
 }
 
 void on_exit_activate(GtkMenuItem *menuitem, gpointer user_data) {
@@ -3082,17 +3097,22 @@ gboolean on_imagenumberspin_key_release_event(GtkWidget *widget,
 
 void on_seqexcludeall_button_clicked(GtkButton *button, gpointer user_data) {
 	GtkWidget *widget = lookup_widget("confirmlabel");
+	GtkWidget *dontShow = lookup_widget("confirmDontShowButton");
+
 	confirm = CD_EXCALL;
 	gtk_label_set_text(GTK_LABEL(widget),
 			" Exclude all images ?\n (this erases previous image selection\n ... and there's no undo)");
+	gtk_widget_set_visible(dontShow, FALSE);
 	gtk_widget_show(lookup_widget("confirm_dialog"));
 }
 
 void on_seqselectall_button_clicked(GtkButton *button, gpointer user_data) {
 	GtkWidget *widget = lookup_widget("confirmlabel");
+	GtkWidget *dontShow = lookup_widget("confirmDontShowButton");
 	confirm = CD_INCALL;
 	gtk_label_set_text(GTK_LABEL(widget),
 			" Include all images ?\n (this erases previous image selection\n ... and there's no undo)");
+	gtk_widget_set_visible(dontShow, FALSE);
 	gtk_widget_show(lookup_widget("confirm_dialog"));
 }
 
@@ -3425,7 +3445,16 @@ void on_confirmok_clicked(GtkButton *button, gpointer user_data) {
 		exit(EXIT_SUCCESS);
 		break;
 	}
+
 	confirm = CD_NULL;
+}
+
+void on_confirmDontShowButton_toggled(GtkToggleButton *togglebutton,
+		gpointer user_data) {
+
+	com.dontShowConfirm = gtk_toggle_button_get_active(togglebutton);
+	set_GUI_misc();
+	writeinitfile();
 }
 
 void on_confirmcancel_clicked(GtkButton *button, gpointer user_data) {

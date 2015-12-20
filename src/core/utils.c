@@ -301,8 +301,10 @@ int readinitfile() {
 	/* Misc setting */
 	config_setting_t *misc_setting = config_lookup(&config, keywords[MISC]);
 	if (misc_setting) {
+		config_setting_lookup_bool(misc_setting, "confirm", &com.dontShowConfirm);
 		config_setting_lookup_string(misc_setting, "swap_directory", &swap_dir);
 		config_setting_lookup_string(misc_setting, "extension", &extension);
+		set_GUI_misc();
 	}
 	if (swap_dir && swap_dir[0] != '\0') {
 		if (com.swap_dir)
@@ -434,6 +436,9 @@ static void _save_misc(config_t *config, config_setting_t *root) {
 
 	misc_setting = config_setting_add(misc_group, "extension", CONFIG_TYPE_STRING);
 	config_setting_set_string(misc_setting, com.ext);
+
+	misc_setting = config_setting_add(misc_group, "confirm", CONFIG_TYPE_BOOL);
+	config_setting_set_bool(misc_setting, com.dontShowConfirm);
 }
 
 int writeinitfile() {
