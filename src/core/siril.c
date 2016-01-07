@@ -52,6 +52,8 @@
 
 #define SIGMA_PER_FWHM 2.35482
 #define AVGDEV_NORM 1.2533
+#define MAX_ITER 10
+#define EPSILON 1E-4
 
 /* this file contains all functions for image processing */
 
@@ -1124,7 +1126,6 @@ double background(fits* fit, int reqlayer, rectangle *selection) {
  * Royal Astronomical Society of the Pacific, vol. 110, pp. 193–199. */
 int backgroundnoise(fits* fit, double sigma[]) {
 	int layer, k;
-	unsigned int i, ndata;
 	fits *waveimage = calloc(1, sizeof(fits));
 
 	if (waveimage == NULL) {
@@ -1132,7 +1133,6 @@ int backgroundnoise(fits* fit, double sigma[]) {
 		return 1;
 	}
 
-	ndata = fit->rx * fit->ry;
 
 	copyfits(fit, waveimage, CP_ALLOC | CP_FORMAT | CP_COPYA, 0);
 #ifdef HAVE_OPENCV	// a bit faster
@@ -1148,9 +1148,11 @@ int backgroundnoise(fits* fit, double sigma[]) {
 	for (layer = 0; layer < fit->naxes[2]; layer++) {
 		imstats *stat = statistics(waveimage, layer, NULL);
 		double sigma0 = stat->sigma;
-		sigma[layer] = sigma0;
 		double mean = stat->mean;
+		double epsilon = 0.0;
 		WORD *buf = waveimage->pdata[layer];
+		unsigned int i;
+		unsigned int ndata = fit->rx * fit->ry;
 		assert(ndata > 0);
 		WORD *array1 = calloc(ndata, sizeof(WORD));
 		WORD *array2 = calloc(ndata, sizeof(WORD));
@@ -1164,32 +1166,32 @@ int backgroundnoise(fits* fit, double sigma[]) {
 			return 1;
 		}
 		WORD *set = array1, *subset = array2;
+		memcpy(set, buf, ndata * sizeof(WORD));
 
-		for (i = 0; i < ndata; i++)
-			set[i] = buf[i];
+		sigma[layer] = sigma0;
+
 		int n = 0;
 		do {
 			sigma0 = sigma[layer];
 			for (i = 0, k = 0; i < ndata; i++) {
 				if (fabs(set[i] - mean) < 3.0 * sigma0) {
-					subset[k] = set[i];
-					k++;
+					subset[k++] = set[i];
 				}
 			}
-			sigma[layer] = gsl_stats_ushort_sd(subset, 1, k);
+			ndata = k;
+			sigma[layer] = gsl_stats_ushort_sd(subset, 1, ndata);
 			set = subset;
 			(set == array1) ? (subset = array2) : (subset = array1);
-			ndata = k;
 			if (ndata == 0) {
 				free(array1);
 				free(array2);
 				free(stat);
-				siril_log_message(
-						"backgroundnoise : Error, no data computed\n");
+				siril_log_message("backgroundnoise : Error, no data computed\n");
 				return 1;
 			}
 			n++;
-		} while (fabs(sigma[layer] - sigma0) / sigma[layer] > 0.0001 && n < 10);
+			epsilon = fabs(sigma[layer] - sigma0) / sigma[layer];
+		} while (epsilon > EPSILON && n < MAX_ITER);
 		sigma[layer] *= SIGMA_PER_FWHM;
 		free(array1);
 		free(array2);

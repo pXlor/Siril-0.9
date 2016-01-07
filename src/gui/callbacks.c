@@ -1105,8 +1105,8 @@ int make_index_for_current_display(display_mode mode, WORD lo, WORD hi,
 	default:
 		return 1;
 	}
-	if (mode != HISTEQ_DISPLAY && mode != STF_DISPLAY
-			&& pente == last_pente[vport] && mode == last_mode[vport]) {
+	if (mode != HISTEQ_DISPLAY && pente == last_pente[vport]
+			&& mode == last_mode[vport]) {
 		fprintf(stdout, "Re-using previous remap_index\n");
 		return 0;
 	}
@@ -2402,26 +2402,29 @@ gboolean on_drawingarea_button_press_event(GtkWidget *widget,
 					com.grad_nb_boxes = 0;
 				}
 				int i = com.grad_nb_boxes;
-				int layer;
-				GtkSpinButton *size = GTK_SPIN_BUTTON(lookup_widget("spinbutton_bkg_sizebox"));
-				point pt;
-				int midbox;
+				if (i < NB_MAX_OF_SAMPLES) {
+					int layer;
+					GtkSpinButton *size = GTK_SPIN_BUTTON(
+							lookup_widget("spinbutton_bkg_sizebox"));
+					point pt;
+					int midbox;
 
-				midbox = (size_t) gtk_spin_button_get_value(size);
-				com.grad_size_boxes = midbox * 2;
-				pt.x = (event->x / zoom);
-				pt.y = (event->y / zoom);
+					midbox = (size_t) gtk_spin_button_get_value(size);
+					com.grad_size_boxes = midbox * 2;
+					pt.x = (event->x / zoom);
+					pt.y = (event->y / zoom);
 
-				if (pt.x + midbox <= gfit.rx && pt.y + midbox <= gfit.ry
-						&& pt.x - midbox >= 0 && pt.y - midbox >= 0) {
-					com.grad[i].centre.x = pt.x + midbox;
-					com.grad[i].centre.y = pt.y + midbox;
-					for (layer = 0; layer < gfit.naxes[2]; layer++)
-						com.grad[i].boxvalue[layer] = get_value_from_box(&gfit, pt,
-								com.grad_size_boxes, layer);
-					com.grad_nb_boxes++;
-					redraw(com.cvport, REMAP_NONE);
-					redraw_previews();
+					if (pt.x + midbox <= gfit.rx && pt.y + midbox <= gfit.ry
+							&& pt.x - midbox >= 0 && pt.y - midbox >= 0) {
+						com.grad[i].centre.x = pt.x + midbox;
+						com.grad[i].centre.y = pt.y + midbox;
+						for (layer = 0; layer < gfit.naxes[2]; layer++)
+							com.grad[i].boxvalue[layer] = get_value_from_box(
+									&gfit, pt, com.grad_size_boxes, layer);
+						com.grad_nb_boxes++;
+						redraw(com.cvport, REMAP_NONE);
+						redraw_previews();
+					}
 				}
 			}
 		} else if (event->button == 2) {	// middle click

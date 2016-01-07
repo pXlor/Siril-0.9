@@ -39,7 +39,5 @@ gpointer enhance_saturation(gpointer p);
 gpointer scnr(gpointer p);
 
 void initialize_calibration_interface();
-void background_neutralize(fits*, rectangle);
-void white_balance(fits *, gboolean, rectangle, rectangle);
 
 #endif

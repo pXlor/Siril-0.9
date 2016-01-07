@@ -296,21 +296,18 @@ void read_fits_header(fits *fit) {
 				"Loaded FITS file has a BSCALE different than 1 (%d)\n", zero);
 	status = 0;
 	fits_read_key(fit->fptr, TINT, "BZERO", &zero, NULL, &status);
-/*	if (!status && 32768 != zero)
-		siril_log_message(
-				"Loaded FITS file has a BZERO different than 2^16 (%d)\n",
-				zero);*/
+
 	if (fit->bitpix == SHORT_IMG && zero == 32768)
 		fit->bitpix = USHORT_IMG;
+
+	/*******************************************************************
+	 * ************* CAMERA AND INSTRUMENT KEYWORDS ********************
+	 * ****************************************************************/
 
 	tryToFindKeywordsFloat(fit, PixSizeX, &fit->pixel_size_x);
 	tryToFindKeywordsFloat(fit, PixSizeY, &fit->pixel_size_y);
 	tryToFindKeywordsUint(fit, BinX, &fit->binning_x);
 	tryToFindKeywordsUint(fit, BinY, &fit->binning_y);
-
-	/*******************************************************************
-	 * ************* CAMERA AND INSTRUMENT KEYWORDS ********************
-	 * ****************************************************************/
 
 	status = 0;
 	fits_read_key(fit->fptr, TSTRING, "INSTRUME", &(fit->instrume), NULL,

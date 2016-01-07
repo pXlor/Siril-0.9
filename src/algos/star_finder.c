@@ -33,7 +33,6 @@
 #include "gui/PSF_list.h"
 #include "algos/star_finder.h"
 
-#define ROUNDNESS_THRESHOLD  0.800
 #define RADIUS_THRESHOLD     20
 #define STAR_FINDER2         10
 
