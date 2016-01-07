@@ -1200,27 +1200,20 @@ int backgroundnoise(fits* fit, double sigma[]) {
 	return 0;
 }
 
-static void select_area(fits *fit, rectangle *bounds) {
-	int i, j, layer;
-	int newnbdata;
+static void select_area(fits *fit, WORD *data, int layer, rectangle *bounds) {
+	int i, j, k = 0;
 
-	newnbdata = bounds->w * bounds->h;
-	for (layer = 0; layer < fit->naxes[2]; ++layer) {
-		WORD *from = fit->pdata[layer]
-				+ (fit->ry - bounds->y - bounds->h) * fit->rx + bounds->x;
-		fit->pdata[layer] = fit->data + layer * newnbdata;
-		WORD *to = fit->pdata[layer];
-		int stridefrom = fit->rx - bounds->w;
+	WORD *from = fit->pdata[layer] + (fit->ry - bounds->y - bounds->h) * fit->rx
+			+ bounds->x;
+	int stridefrom = fit->rx - bounds->w;
 
-		for (i = 0; i < bounds->h; ++i) {
-			for (j = 0; j < bounds->w; ++j) {
-				*to++ = *from++;
-			}
-			from += stridefrom;
+	for (i = 0; i < bounds->h; ++i) {
+		for (j = 0; j < bounds->w; ++j) {
+			data[k] = from[j + i * bounds->w];
+			k++;
 		}
+		from += stridefrom;
 	}
-	fit->rx = fit->naxes[0] = bounds->w;
-	fit->ry = fit->naxes[1] = bounds->h;
 }
 
 /* computes statistics on the given layer of the given image. It creates the
@@ -1234,20 +1227,18 @@ imstats* statistics(fits *fit, int layer, rectangle *selection) {
 	gsl_histogram* histo;
 	size_t i, hist_size, count;
 	imstats* stat = malloc(sizeof(imstats));
-	fits sfit;
 
 	count = fit->rx * fit->ry;
 
 	if (selection && selection->h > 0 && selection->w > 0) {
-		histo = computeHisto_Selection(fit, layer, selection);
 		count = selection->h * selection->w;
-		memcpy(&sfit, fit, sizeof(fits));
-		select_area(&sfit, selection);
-		data = sfit.pdata[layer];
-
+		data = calloc(count, sizeof(WORD));
+		select_area(fit, data, layer, selection);
+		histo = computeHisto_Selection(fit, layer, selection);
 	} else {
+		data = calloc(count, sizeof(WORD));
 		histo = computeHisto(fit, layer);
-		data = fit->pdata[layer];
+		memcpy(data, fit->pdata[layer], count * sizeof(WORD));
 	}
 	hist_size = gsl_histogram_bins(histo);
 
@@ -1297,6 +1288,7 @@ imstats* statistics(fits *fit, int layer, rectangle *selection) {
 	stat->min = (double) min;
 	stat->max = (double) max;
 	stat->normValue = (double) hist_size - 1;
+	free(data);
 	return stat;
 }
 
