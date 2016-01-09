@@ -457,7 +457,7 @@ static void _print_result(TRANS *trans, float FWHMx, float FWHMy) {
 
 int register_star_alignment(struct registration_args *args) {
 	int frame, ref_image, ret, i;
-	int fitted_stars;
+	int fitted_stars, failed = 0;
 	float nb_frames, cur_nb;
 	float FWHMx, FWHMy;
 	fitted_PSF **stars;
@@ -548,6 +548,7 @@ int register_star_alignment(struct registration_args *args) {
 					siril_log_message("Not enough stars. Image %d skipped\n",
 							frame);
 					args->seq->new_total--;
+					failed++;
 					continue;
 				}
 
@@ -568,6 +569,7 @@ int register_star_alignment(struct registration_args *args) {
 							"Cannot perform star matching. Image %d skipped\n",
 							"red", frame);
 					args->seq->new_total--;
+					failed++;
 					i = 0;
 					while (i < MAX_STARS && stars[i])
 						free(stars[i++]);
@@ -598,6 +600,8 @@ int register_star_alignment(struct registration_args *args) {
 	args->seq->regparam[args->layer] = current_regdata;
 	update_used_memory();
 	siril_log_message("Registration finished.\n");
+	siril_log_message("%d images processed.\n", args->seq->number);
+	siril_log_message("Total: %d failed, %d registred.\n", failed, args->seq->new_total);
 
 	return 0;
 }

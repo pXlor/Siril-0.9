@@ -52,7 +52,7 @@
 
 #define SIGMA_PER_FWHM 2.35482
 #define AVGDEV_NORM 1.2533
-#define MAX_ITER 10
+#define MAX_ITER 15
 #define EPSILON 1E-4
 
 /* this file contains all functions for image processing */
@@ -1138,7 +1138,7 @@ int backgroundnoise(fits* fit, double sigma[]) {
 #ifdef HAVE_OPENCV	// a bit faster
 	cvComputeFinestScale(waveimage);
 #else
-	if (get_wavelet_layers(waveimage, 2, 0, TO_PAVE_BSPLINE, -1)) {
+	if (get_wavelet_layers(waveimage, 4, 0, TO_PAVE_BSPLINE, -1)) {
 		siril_log_message("Siril cannot evaluate the noise in the image\n");
 		clearfits(waveimage);
 		return 1;
@@ -1150,6 +1150,7 @@ int backgroundnoise(fits* fit, double sigma[]) {
 		double sigma0 = stat->sigma;
 		double mean = stat->mean;
 		double epsilon = 0.0;
+		WORD lo, hi;
 		WORD *buf = waveimage->pdata[layer];
 		unsigned int i;
 		unsigned int ndata = fit->rx * fit->ry;
@@ -1157,7 +1158,7 @@ int backgroundnoise(fits* fit, double sigma[]) {
 		WORD *array1 = calloc(ndata, sizeof(WORD));
 		WORD *array2 = calloc(ndata, sizeof(WORD));
 		if (array1 == NULL || array2 == NULL) {
-			siril_log_message("backgroundnoise : Error allocating data\n");
+			siril_log_message("backgroundnoise: Error allocating data\n");
 			if (array1)
 				free(array1);
 			if (array2)
@@ -1168,14 +1169,19 @@ int backgroundnoise(fits* fit, double sigma[]) {
 		WORD *set = array1, *subset = array2;
 		memcpy(set, buf, ndata * sizeof(WORD));
 
+		lo = round_to_WORD(LOW_BOUND * stat->normValue);
+		hi = round_to_WORD(HIGH_BOUND * stat->normValue);
+
 		sigma[layer] = sigma0;
 
 		int n = 0;
 		do {
 			sigma0 = sigma[layer];
 			for (i = 0, k = 0; i < ndata; i++) {
-				if (fabs(set[i] - mean) < 3.0 * sigma0) {
-					subset[k++] = set[i];
+				if (set[i] >= lo && set[i] <= hi) {
+					if (fabs(set[i] - mean) < 3.0 * sigma0) {
+						subset[k++] = set[i];
+					}
 				}
 			}
 			ndata = k;
@@ -1186,13 +1192,17 @@ int backgroundnoise(fits* fit, double sigma[]) {
 				free(array1);
 				free(array2);
 				free(stat);
-				siril_log_message("backgroundnoise : Error, no data computed\n");
+				siril_log_message("backgroundnoise: Error, no data computed\n");
+				sigma[layer] = 0.0;
 				return 1;
 			}
 			n++;
 			epsilon = fabs(sigma[layer] - sigma0) / sigma[layer];
 		} while (epsilon > EPSILON && n < MAX_ITER);
-		sigma[layer] *= SIGMA_PER_FWHM;
+		sigma[layer] *= SIGMA_PER_FWHM; // normalization
+		sigma[layer] /= 0.974; // correct for 2% systematic bias
+		if (n == MAX_ITER)
+			siril_log_message("backgroundnoise: does not converge\n");
 		free(array1);
 		free(array2);
 		free(stat);
@@ -1211,7 +1221,7 @@ static void select_area(fits *fit, WORD *data, int layer, rectangle *bounds) {
 
 	for (i = 0; i < bounds->h; ++i) {
 		for (j = 0; j < bounds->w; ++j) {
-			data[k] = from[j + i * bounds->w];
+			data[k] = *from++;
 			k++;
 		}
 		from += stridefrom;
@@ -1717,6 +1727,7 @@ gpointer noise(gpointer p) {
 
 	if (backgroundnoise(args->fit, args->bgnoise)) {
 		set_cursor_waiting(FALSE);
+		gdk_threads_add_idle(end_noise, args);
 		return GINT_TO_POINTER(1);
 	}
 

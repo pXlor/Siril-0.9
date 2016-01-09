@@ -28,46 +28,43 @@
 
 #include "core/siril.h"
 #include "core/proto.h"
+#include "algos/Def_Wavelet.h"
 #include "gui/callbacks.h"
 #include "algos/PSF.h"
 #include "gui/PSF_list.h"
 #include "algos/star_finder.h"
 
-#define RADIUS_THRESHOLD     20
-#define STAR_FINDER2         10
+#define WAVELET_SCALE 3
 
-static WORD Compute_threshold(fits *fit, double starfinder, int layer) {
+static WORD Compute_threshold(fits *fit, double starfinder, int layer, WORD *norm) {
 	WORD threshold;
-	double bgnoise[3];
+	imstats *stat;
 
 	assert(layer <= 3);
 
-	backgroundnoise(fit, bgnoise);
-	threshold = (WORD) (starfinder * bgnoise[layer]);
+	stat = statistics(fit, layer, NULL);
+	threshold = (WORD) stat->median + starfinder * (WORD) stat->sigma;
+	*norm = (WORD) stat->normValue;
+	printf("Threshold = %d\n", threshold);
+	free(stat);
 
 	return threshold;
 }
 
-static gboolean is_star(fitted_PSF *result, starFinder *sf, double thresh) {
+static gboolean is_star(fitted_PSF *result, starFinder *sf) {
 	if (isnan(result->fwhmx) || isnan(result->fwhmy))
 		return FALSE;
 	if (isnan(result->x0) || isnan(result->y0))
 		return FALSE;
 	if ((result->x0 <= 0.0) || (result->y0 <= 0.0))
 		return FALSE;
-	if (result->A <= (thresh * STAR_FINDER2))	// should be adjustable
-		return FALSE;
-	if (result->B < 0.0)
+	if (result->A > HIGH_BOUND)
 		return FALSE;
 	if (result->fwhmx <= 0.0 || result->fwhmy <= 0.0)
-		return FALSE;
-	if (result->sx > RADIUS_THRESHOLD * sf->radius
-			|| result->sy > RADIUS_THRESHOLD * sf->radius)
 		return FALSE;
 	if ((result->fwhmy / result->fwhmx) < sf->roundness
 			|| (result->fwhmy / result->fwhmx) > (2.0 - sf->roundness))
 		return FALSE;
-
 	return TRUE;
 }
 
@@ -99,7 +96,7 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
 	int ny = fit->ry;
 	int y, i, nbstars = 0;
 	double bg;
-	WORD threshold;
+	WORD threshold, norm;
 	WORD **wave_image, **real_image;
 	fits *wave_fit;
 	fitted_PSF **results;
@@ -125,13 +122,11 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
 
 	results[0] = NULL;
 	get_structure(sf);
-	threshold = Compute_threshold(fit, sf->sigma, layer);
-	WORD norm = get_normalized_value(fit);
-	double thresh = (double)threshold / (double)norm;
+	threshold = Compute_threshold(fit, sf->sigma, layer, &norm);
 
 	bg = background(fit, layer, NULL);
 	copyfits(fit, wave_fit, CP_ALLOC | CP_FORMAT | CP_COPYA, 0);
-	get_wavelet_layers(wave_fit, 4, 2, 2, layer);
+	get_wavelet_layers(wave_fit, WAVELET_SCALE, 2, TO_PAVE_BSPLINE, layer);
 
 	/* FILL wavelet image upside-down */
 	wave_image = malloc(ny * sizeof(WORD *));
@@ -161,7 +156,7 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
 		int x;
 		for (x = sf->radius; x < nx - sf->radius; x++) {
 			WORD pixel = wave_image[y][x];
-			if (pixel >= threshold && pixel <= fit->maxi) {
+			if (pixel > threshold && pixel < norm) {
 				int yy, xx;
 				gboolean bingo = TRUE;
 				WORD neighbor;
@@ -201,7 +196,7 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
 							FALSE);
 					if (cur_star) {
 						psf_update_units(fit, &cur_star);
-						if (is_star(cur_star, sf, thresh)) {
+						if (is_star(cur_star, sf)) {
 							cur_star->xpos = x + cur_star->x0 - sf->radius;
 							cur_star->ypos = y + cur_star->y0 - sf->radius;
 #pragma omp critical

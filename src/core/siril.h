@@ -39,6 +39,9 @@ typedef unsigned short WORD;		// default type for internal image data
 #define ZOOM_FIT	-1.0	// or any value < 0
 #define ZOOM_DEFAULT	ZOOM_FIT
 
+#define LOW_BOUND  0.00002
+#define HIGH_BOUND 0.99998
+
 /* when requesting an image redraw, it can be asked to remap its data before redrawing it.
  * REMAP_NONE	doesn't remaps the data,
  * REMAP_ONLY	remaps only the current viewport (color channel) and the mixed (RGB) image
