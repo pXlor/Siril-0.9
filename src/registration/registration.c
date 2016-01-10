@@ -600,8 +600,8 @@ int register_star_alignment(struct registration_args *args) {
 	args->seq->regparam[args->layer] = current_regdata;
 	update_used_memory();
 	siril_log_message("Registration finished.\n");
-	siril_log_message("%d images processed.\n", args->seq->number);
-	siril_log_message("Total: %d failed, %d registred.\n", failed, args->seq->new_total);
+	siril_log_color_message("%d images processed.\n", "green", args->seq->number);
+	siril_log_color_message("Total: %d failed, %d registred.\n", "green", failed, args->seq->new_total);
 
 	return 0;
 }

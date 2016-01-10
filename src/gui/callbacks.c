@@ -1105,7 +1105,7 @@ int make_index_for_current_display(display_mode mode, WORD lo, WORD hi,
 	default:
 		return 1;
 	}
-	if (mode != HISTEQ_DISPLAY && pente == last_pente[vport]
+	if ((mode != HISTEQ_DISPLAY && mode != STF_DISPLAY) && pente == last_pente[vport]
 			&& mode == last_mode[vport]) {
 		fprintf(stdout, "Re-using previous remap_index\n");
 		return 0;

@@ -199,13 +199,13 @@
     * this holds information on a single star (or object)
     */
 typedef struct s_star {
-   int id;                 /* used for internal debugging purposes only */
-   int index;              /* position of this star in its linked list */
-   double x;               /* star's "X" coordinate */
-   double y;               /* star's "Y" coordinate */
-   double mag;             /* some measure of star's brightness */
-   int match_id;           /* ID of star in other list which matches */
-   struct s_star *next;    /* we use linked lists internally */
+	int id;                 /* used for internal debugging purposes only */
+	int index;              /* position of this star in its linked list */
+	double x;               /* star's "X" coordinate */
+	double y;               /* star's "Y" coordinate */
+	double mag;             /* some measure of star's brightness */
+	int match_id;           /* ID of star in other list which matches */
+struct s_star *next;    /* we use linked lists internally */
 } s_star;
 
 
@@ -221,21 +221,21 @@ typedef struct s_star {
     *                                    the longest side, relative to x-axis
     */
 typedef struct s_triangle {
-   int id;                  /* used for internal debugging purposes only */
-   int index;               /* position of this triangle in its linked list */
-   double a_length;         /* length of side a (not normalized) */
-   double ba;               /* ratio of lengths b/a   ... must be 0.0-1.0 */
-   double ca;               /* ratio of lengths c/a   ... must be 0.0-1.0 */
-   double cb;               /* ratio of lengths c/b   ... must be 0.0-1.0 */
-   int a_index;             /* index of the star opposite side a */
-   int b_index;             /* index of the star opposite side b */
-   int c_index;             /* index of the star opposite side c */
-   int match_id;            /* ID of triangle in other list which matches */
-   double side_a_angle;     /* angle from one star to other in longest side */
+	int id;                  /* used for internal debugging purposes only */
+	int index;               /* position of this triangle in its linked list */
+	double a_length;         /* length of side a (not normalized) */
+	double ba;               /* ratio of lengths b/a   ... must be 0.0-1.0 */
+	double ca;               /* ratio of lengths c/a   ... must be 0.0-1.0 */
+	double cb;               /* ratio of lengths c/b   ... must be 0.0-1.0 */
+	int a_index;             /* index of the star opposite side a */
+	int b_index;             /* index of the star opposite side b */
+	int c_index;             /* index of the star opposite side c */
+	int match_id;            /* ID of triangle in other list which matches */
+	double side_a_angle;     /* angle from one star to other in longest side */
 	double xt;               /* dot product of two longest sides */
 	double yt;               /* ratio of longest to shortest side = 1 / ca */
 	double D;                /* product of xt and yt */
-   struct s_triangle *next; /* we use linked lists internally */
+	struct s_triangle *next; /* we use linked lists internally */
 } s_triangle;
 
 
