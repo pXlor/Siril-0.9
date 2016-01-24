@@ -40,8 +40,10 @@ char *statName[] = {
 		"count (px)",
 		"mean",
 		"median",
-		"avgDev",
 		"sigma",
+		"avgDev",
+		"MAD",
+		"sqrt(BWMV)",
 		"min",
 		"max",
 		"normalization"
@@ -72,7 +74,7 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 		normValue[RLAYER] = stat[RLAYER]->normValue;
 		normValue[GLAYER] = stat[RLAYER]->normValue;
 		normValue[BLAYER] = stat[RLAYER]->normValue;
-		sprintf(format, "%%.7lf");
+		sprintf(format, "%%.5e");
 	}
 	else
 		sprintf(format, "%%.1lf");
@@ -107,12 +109,12 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	gtk_list_store_append(list_store, &iter);
 	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[1],
 			COLUMN_RVALUE, rvalue,
-			COLUMN_GVALUE, bvalue,
-			COLUMN_BVALUE, gvalue,
+			COLUMN_GVALUE, gvalue,
+			COLUMN_BVALUE, bvalue,
 			COLUMN_COLOR, "Powder Blue",
 			-1);
 
-	/* AvgDev */
+	/* median */
 	sprintf(rvalue, format, stat[RLAYER]->median / normValue[RLAYER]);
 	if (nblayer > 1) {
 		sprintf(gvalue, format, stat[GLAYER]->median / normValue[GLAYER]);
@@ -125,27 +127,9 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	gtk_list_store_append(list_store, &iter);
 	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[2],
 			COLUMN_RVALUE, rvalue,
-			COLUMN_GVALUE, bvalue,
-			COLUMN_BVALUE, gvalue,
+			COLUMN_GVALUE, gvalue,
+			COLUMN_BVALUE, bvalue,
 			COLUMN_COLOR, "White Smoke",
-			-1);
-
-	/* median */
-	sprintf(rvalue, format, stat[RLAYER]->avgDev / normValue[RLAYER]);
-	if (nblayer > 1) {
-		sprintf(gvalue, format, stat[GLAYER]->avgDev / normValue[GLAYER]);
-		sprintf(bvalue, format, stat[BLAYER]->avgDev / normValue[BLAYER]);
-	} else {
-		sprintf(gvalue, "--");
-		sprintf(bvalue, "--");
-	}
-
-	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[3],
-			COLUMN_RVALUE, rvalue,
-			COLUMN_GVALUE, bvalue,
-			COLUMN_BVALUE, gvalue,
-			COLUMN_COLOR, "Powder Blue",
 			-1);
 
 	/* sigma */
@@ -159,10 +143,64 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	}
 
 	gtk_list_store_append(list_store, &iter);
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[3],
+			COLUMN_RVALUE, rvalue,
+			COLUMN_GVALUE, gvalue,
+			COLUMN_BVALUE, bvalue,
+			COLUMN_COLOR, "Powder Blue",
+			-1);
+
+	/* avgDev */
+	sprintf(rvalue, format, stat[RLAYER]->avgDev / normValue[RLAYER]);
+	if (nblayer > 1) {
+		sprintf(gvalue, format, stat[GLAYER]->avgDev / normValue[GLAYER]);
+		sprintf(bvalue, format, stat[BLAYER]->avgDev / normValue[BLAYER]);
+	} else {
+		sprintf(gvalue, "--");
+		sprintf(bvalue, "--");
+	}
+
+	gtk_list_store_append(list_store, &iter);
 	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[4],
 			COLUMN_RVALUE, rvalue,
-			COLUMN_GVALUE, bvalue,
-			COLUMN_BVALUE, gvalue,
+			COLUMN_GVALUE, gvalue,
+			COLUMN_BVALUE, bvalue,
+			COLUMN_COLOR, "White Smoke",
+			-1);
+
+	/* MAD */
+	sprintf(rvalue, format, stat[RLAYER]->mad / normValue[RLAYER]);
+	if (nblayer > 1) {
+		sprintf(gvalue, format, stat[GLAYER]->mad / normValue[GLAYER]);
+		sprintf(bvalue, format, stat[BLAYER]->mad / normValue[BLAYER]);
+	} else {
+		sprintf(gvalue, "--");
+		sprintf(bvalue, "--");
+	}
+
+	gtk_list_store_append(list_store, &iter);
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[5],
+			COLUMN_RVALUE, rvalue,
+			COLUMN_GVALUE, gvalue,
+			COLUMN_BVALUE, bvalue,
+			COLUMN_COLOR, "Powder Blue",
+			-1);
+
+	/* sqrt(BWMV) */
+	sprintf(rvalue, format, stat[RLAYER]->sqrtbwmv / normValue[RLAYER]);
+	if (nblayer > 1) {
+		sprintf(gvalue, format, stat[GLAYER]->sqrtbwmv / normValue[GLAYER]);
+		sprintf(bvalue, format, stat[BLAYER]->sqrtbwmv / normValue[BLAYER]);
+	} else {
+		sprintf(gvalue, "--");
+		sprintf(bvalue, "--");
+	}
+
+	gtk_list_store_append(list_store, &iter);
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[6],
+			COLUMN_RVALUE, rvalue,
+			COLUMN_GVALUE, gvalue,
+			COLUMN_BVALUE, bvalue,
 			COLUMN_COLOR, "White Smoke",
 			-1);
 
@@ -177,10 +215,10 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	}
 
 	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[5],
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[7],
 			COLUMN_RVALUE, rvalue,
-			COLUMN_GVALUE, bvalue,
-			COLUMN_BVALUE, gvalue,
+			COLUMN_GVALUE, gvalue,
+			COLUMN_BVALUE, bvalue,
 			COLUMN_COLOR, "Powder Blue",
 			-1);
 
@@ -195,10 +233,10 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	}
 
 	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[6],
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[8],
 			COLUMN_RVALUE, rvalue,
-			COLUMN_GVALUE, bvalue,
-			COLUMN_BVALUE, gvalue,
+			COLUMN_GVALUE, gvalue,
+			COLUMN_BVALUE, bvalue,
 			COLUMN_COLOR, "White Smoke",
 			-1);
 
@@ -242,7 +280,7 @@ void computeStat() {
 	gtk_label_set_text(statSelecLabel, selection);
 
 	for (channel = 0; channel < gfit.naxes[2]; channel++)
-		stat[channel] = statistics(&gfit, channel, &com.selection);
+		stat[channel] = statistics(&gfit, channel, &com.selection, STATS_MAIN);
 	add_stats_to_list(stat, gfit.naxes[2], normalized);
 	for (channel = 0; channel < gfit.naxes[2]; channel++)
 		free(stat[channel]);

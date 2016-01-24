@@ -201,6 +201,7 @@ read_star_file(char *filename, int xcolumn, int ycolumn, int magcolumn,
 int
 get_stars(fitted_PSF **s, int n, int *num_stars, struct s_star **list);
 
+
 int
 read_matched_file(char *filename, int *num_stars, struct s_star **list);
 

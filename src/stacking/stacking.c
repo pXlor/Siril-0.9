@@ -73,44 +73,43 @@ void initialize_stacking_methods() {
 	gtk_combo_box_set_active(GTK_COMBO_BOX(rejectioncombo), com.stack.rej_method);
 }
 
-
 static int _compute_normalization_for_image(struct stacking_args *args, int i,
 		double *offset, double *mul, double *scale, int mode, double *scale0,
 		double *mul0, double *offset0) {
 	imstats *stat = NULL;
 
-	if (args->force_norm || !(stat = seq_get_imstats(args->seq, args->image_indices[i], NULL))) {
+	if (args->force_norm || !(stat = seq_get_imstats(args->seq, args->image_indices[i], NULL, STATS_EXTRA))) {
 		fits fit;
 		memset(&fit, 0, sizeof(fits));
 		if (seq_read_frame(args->seq, args->image_indices[i], &fit)) {
 			return 1;
 		}
-		stat = seq_get_imstats(args->seq, args->image_indices[i], &fit);
+		stat = seq_get_imstats(args->seq, args->image_indices[i], &fit, STATS_EXTRA);
 		clearfits(&fit);
 	}
 
 	switch (mode) {
 	default:
 	case ADDITIVE_SCALING:
-		scale[i] = stat->avgDev;
+		scale[i] = stat->scale;
 		if (i == 0)
 			*scale0 = scale[0];
 		scale[i] = *scale0 / scale[i];
 		/* no break */
 	case ADDITIVE:
-		offset[i] = stat->median;
+		offset[i] = stat->location;
 		if (i == 0)
 			*offset0 = offset[0];
 		offset[i] = scale[i] * offset[i] - *offset0;
 		break;
 	case MULTIPLICATIVE_SCALING:
-		scale[i] = stat->avgDev;
+		scale[i] = stat->scale;
 		if (i == 0)
 			*scale0 = scale[0];
 		scale[i] = *scale0 / scale[i];
 		/* no break */
 	case MULTIPLICATIVE:
-		mul[i] = stat->median;
+		mul[i] = stat->location;
 		if (i == 0)
 			*mul0 = mul[0];
 		mul[i] = *mul0 / mul[i];
@@ -625,7 +624,7 @@ int stack_median(struct stacking_args *args) {
 	assert(pool_size > 0);
 #endif
 	npixels_in_block = largest_block_height * naxes[0];
-	fprintf(stdout, "allocating data for %d threads (each %'ld MB)\n", pool_size,
+	fprintf(stdout, "allocating data for %d threads (each %'zu MB)\n", pool_size,
 			nb_frames * npixels_in_block * sizeof(WORD) / 1048576L);
 	data_pool = malloc(pool_size * sizeof(struct _data_block));
 	for (i = 0; i < pool_size; i++) {
@@ -1459,7 +1458,7 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 	assert(pool_size > 0);
 #endif
 	npixels_in_block = largest_block_height * naxes[0];
-	fprintf(stdout, "allocating data for %d threads (each %'ld MB)\n", pool_size,
+	fprintf(stdout, "allocating data for %d threads (each %'zu MB)\n", pool_size,
 			nb_frames * npixels_in_block * sizeof(WORD) / 1048576L);
 	data_pool = malloc(pool_size * sizeof(struct _data_block));
 	for (i = 0; i < pool_size; i++) {

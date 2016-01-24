@@ -44,7 +44,7 @@
     * default value assumes that the second list has units which are
     * close to the size of a star (i.e. arcseconds, or pixels).
     */
-#define AT_MATCH_RADIUS    7.0
+#define AT_MATCH_RADIUS    5.0
 
    /*
     * This is the largest permitted distance between the coords of
@@ -65,7 +65,7 @@
     * This is the default value.  The user can override it with an optional
     * command-line argument.
     */
-#define AT_MATCH_NBRIGHT   30
+#define AT_MATCH_NBRIGHT   20
 
    /*
     * ignore all triangles which have (b/a) > AT_MATCH_RATIO when
@@ -192,7 +192,7 @@
 	 *    to define it), he must be sure to specify that the
 	 *    minimum number of pairs is at least 10.
 	 */
-#define AT_MATCH_MINPAIRS    15
+#define AT_MATCH_MINPAIRS    10
 
 
    /*
@@ -242,6 +242,7 @@ typedef struct s_triangle {
    /*
     * these functions are PUBLIC, and may be called by users
     */
+void free_star_array(s_star *array);
 
 int atFindTrans(int numA, s_star *listA, int numB, s_star *listB,
                 double star_match_radius,

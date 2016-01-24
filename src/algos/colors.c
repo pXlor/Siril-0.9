@@ -440,7 +440,7 @@ gpointer enhance_saturation(gpointer p) {
 	args->h_min /= 360.0;
 	args->h_max /= 360.0;
 	if (args->preserve) {
-		imstats *stat = statistics(args->fit, GLAYER, NULL);
+		imstats *stat = statistics(args->fit, GLAYER, NULL, STATS_SIGMA);
 		bg = stat->median + stat->sigma;
 		bg /= stat->normValue;
 		free(stat);
@@ -638,7 +638,7 @@ static void background_neutralize(fits* fit, rectangle black_selection) {
 
 	stats = malloc(3 * sizeof(imstats *));
 	for (chan = 0; chan < 3; chan++) {
-		stats[chan] = statistics(fit, chan, &black_selection);
+		stats[chan] = statistics(fit, chan, &black_selection, STATS_BASIC);
 		ref += stats[chan]->median;
 	}
 	ref /= 3;
@@ -757,7 +757,7 @@ static void get_coeff_for_wb(fits *fit, rectangle white, rectangle black,
 
 	siril_log_message("Background reference:\n");
 	for (chan = 0; chan < 3; chan++) {
-		imstats *stat = statistics(fit, chan, &black);
+		imstats *stat = statistics(fit, chan, &black, STATS_BASIC);
 		bg[chan] = stat->median / stat->normValue;
 		siril_log_message("B%d : %.5e\n", chan, bg[chan]);
 		free(stat);

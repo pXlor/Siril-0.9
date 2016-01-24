@@ -183,7 +183,7 @@ gpointer seqpreprocess(gpointer empty);
 void	initialize_preprocessing();
 double	background(fits* fit, int reqlayer, rectangle *selection);
 int backgroundnoise(fits* fit, double sigma[]);
-imstats* statistics(fits *, int, rectangle *);
+imstats* statistics(fits *, int, rectangle *, int);
 void	show_FITS_header(fits *);
 #ifdef HAVE_OPENCV
 int	verbose_resize_gaussian(fits *, int, int, int);
@@ -228,7 +228,7 @@ void	internal_sequence_set(sequence *seq, int index, fits *fit);
 int	internal_sequence_find_index(sequence *seq, fits *fit);
 gpointer crop_sequence(gpointer p);
 gboolean sequence_is_rgb(sequence *seq);
-imstats* seq_get_imstats(sequence *seq, int index, fits *the_image);
+imstats* seq_get_imstats(sequence *seq, int index, fits *the_image, int option);
 
 /****************** seqfile.h ******************/
 sequence * readseqfile(const char *name);

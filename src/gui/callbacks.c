@@ -1148,7 +1148,9 @@ int make_index_for_current_display(display_mode mode, WORD lo, WORD hi,
 			index[i] = round_to_BYTE((float) i * pente);
 			break;
 		case STF_DISPLAY:
-			pxl = (double) i / USHRT_MAX_DOUBLE;
+			pxl = (gfit.bitpix == BYTE_IMG ?
+					(double) i / UCHAR_MAX_DOUBLE :
+					(double) i / USHRT_MAX_DOUBLE);
 			pxl = (pxl - shadows < 0.0) ? 0.0 : pxl - shadows;
 			pxl /= (highlights - shadows);
 			index[i] = round_to_BYTE((float) (MTF(pxl, m)) * pente);
@@ -1227,7 +1229,7 @@ void test_and_allocate_reference_image(int vport) {
 				cairo_surface_destroy(com.refimage_surface);
 				com.refimage_surface = NULL;
 			} else {
-				siril_log_message(
+				fprintf(stdout,
 						"Saved the reference frame buffer for alignment preview.\n");
 				enable_view_reference_checkbox(TRUE);
 			}
@@ -1240,7 +1242,7 @@ void test_and_allocate_reference_image(int vport) {
 }
 
 void free_reference_image() {
-	siril_log_message("Purging previously saved reference frame data.\n");
+	fprintf(stdout, "Purging previously saved reference frame data.\n");
 	if (com.refimage_regbuffer) {
 		free(com.refimage_regbuffer);
 		com.refimage_regbuffer = NULL;
@@ -1779,10 +1781,7 @@ void on_settings_activate(GtkMenuItem *menuitem, gpointer user_data) {
 void on_file1_activate(GtkMenuItem *menuitem, gpointer user_data) {
 	if (single_image_is_loaded() || sequence_is_loaded()) {
 		gtk_widget_set_sensitive(lookup_widget("save1"), TRUE);
-		if (gfit.header && !sequence_is_loaded())
-			gtk_widget_set_sensitive(lookup_widget("menu_FITS_header"), TRUE);
-		else
-			gtk_widget_set_sensitive(lookup_widget("menu_FITS_header"), FALSE);
+		gtk_widget_set_sensitive(lookup_widget("menu_FITS_header"), gfit.header != NULL);
 	} else {
 		gtk_widget_set_sensitive(lookup_widget("save1"), FALSE);
 		gtk_widget_set_sensitive(lookup_widget("menu_FITS_header"), FALSE);
@@ -1801,8 +1800,7 @@ void on_edit_activate(GtkMenuItem *menuitem, gpointer user_data) {
 }
 
 void on_menu_FITS_header_activate(GtkMenuItem *menuitem, gpointer user_data) {
-	if (single_image_is_loaded(BW_VPORT))
-		show_FITS_header(&gfit);
+	show_FITS_header(&gfit);
 }
 
 void on_close_settings_button_clicked(GtkButton *button, gpointer user_data) {

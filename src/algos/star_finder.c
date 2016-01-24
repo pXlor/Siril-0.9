@@ -42,7 +42,7 @@ static WORD Compute_threshold(fits *fit, double starfinder, int layer, WORD *nor
 
 	assert(layer <= 3);
 
-	stat = statistics(fit, layer, NULL);
+	stat = statistics(fit, layer, NULL, STATS_SIGMA);
 	threshold = (WORD) stat->median + starfinder * (WORD) stat->sigma;
 	*norm = (WORD) stat->normValue;
 	printf("Threshold = %d\n", threshold);
@@ -234,7 +234,7 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
 }
 
 /* Function to add star one by one, from the selection rectangle, the
- * minimisation is run and the star is detected and added to the list of stars.
+ * minimization is run and the star is detected and added to the list of stars.
  *
  * IF A STAR IS FOUND and not already present in com.stars, the return value is
  * the new star and index is set to the index of the new star in com.stars.

@@ -133,8 +133,8 @@ int star_match(fitted_PSF **s1, fitted_PSF **s2, int n, TRANS *t) {
 	double triangle_radius = AT_TRIANGLE_RADIUS; /* in triangle-space coords */
 	double match_radius = AT_MATCH_RADIUS; /* in units of list B */
 	double scale = -1.0;
-	double min_scale = 0.9;
-	double max_scale = 1.1;
+	double min_scale = 0.99;
+	double max_scale = 1.01;
 	double rot_angle = AT_MATCH_NOANGLE; /* by default, any angle is okay */
 	double rot_tol = AT_MATCH_NOANGLE;
 	double halt_sigma = AT_MATCH_HALTSIGMA;
@@ -207,10 +207,12 @@ int star_match(fitted_PSF **s1, fitted_PSF **s2, int n, TRANS *t) {
 		/* okay */
 		if (min_scale > max_scale) {
 			shFatal("min_scale must be smaller than max_scale");
+			return (SH_GENERIC_ERROR);
 		}
 	} else {
 		/* not okay */
 		shFatal("invalid combination of 'scale', 'min_scale', 'max_scale'");
+		return (SH_GENERIC_ERROR);
 	}
 #ifdef DEBUG
 	if ((scale == -1) && (min_scale == -1) && (max_scale == -1)) {
@@ -235,16 +237,19 @@ int star_match(fitted_PSF **s1, fitted_PSF **s2, int n, TRANS *t) {
 	} else {
 		/* this is NOT okay */
 		shFatal("Must specify both 'rotangle' and 'rottol', or neither ");
+		return (SH_GENERIC_ERROR);
 	}
 
 	/* Can only specify one of 'identity' and 'intrans' */
 	if ((intrans != 0) && (identity != 0)) {
 		shFatal("Cannot specify both 'identity' and an input TRANS file");
+		return (SH_GENERIC_ERROR);
 	}
 
 	/* Makes no sense to specify 'identity' and 'quadratic' or 'cubic' */
 	if ((identity != 0) && (trans_order != AT_TRANS_LINEAR)) {
 		shFatal("Cannot specify both 'identity' and any order beyond linear");
+		return (SH_GENERIC_ERROR);
 	}
 	/*
 	 * Likewise, makes no sense to specify 'intrans=' and
@@ -253,6 +258,7 @@ int star_match(fitted_PSF **s1, fitted_PSF **s2, int n, TRANS *t) {
 	 */
 	if ((intrans != 0) && (trans_order != AT_TRANS_LINEAR)) {
 		shFatal("Cannot specify both 'intrans' and any order ");
+		return (SH_GENERIC_ERROR);
 	}
 
 	/*
@@ -264,12 +270,15 @@ int star_match(fitted_PSF **s1, fitted_PSF **s2, int n, TRANS *t) {
 	 */
 	if ((trans_order == AT_TRANS_LINEAR) && (min_req_pairs < 3)) {
 		shFatal("linear trans requires at least 3 matched pairs ");
+		return (SH_GENERIC_ERROR);
 	}
 	if ((trans_order == AT_TRANS_QUADRATIC) && (min_req_pairs < 6)) {
 		shFatal("quadratic trans requires at least 6 matched pairs ");
+		return (SH_GENERIC_ERROR);
 	}
 	if ((trans_order == AT_TRANS_CUBIC) && (min_req_pairs < 10)) {
 		shFatal("cubic trans requires at least 10 matched pairs ");
+		return (SH_GENERIC_ERROR);
 	}
 
 	/*
@@ -306,6 +315,7 @@ int star_match(fitted_PSF **s1, fitted_PSF **s2, int n, TRANS *t) {
 	} else if (intrans == 1) {
 		if ((trans = getGuessTrans(intransfile)) == NULL) {
 			shFatal("GetGuessTrans fails -- must give up");
+			return (SH_GENERIC_ERROR);
 		}
 		trans_order = trans->order;
 	} else {
@@ -377,6 +387,12 @@ int star_match(fitted_PSF **s1, fitted_PSF **s2, int n, TRANS *t) {
 				max_iter, halt_sigma, min_req_pairs, trans);
 		if (ret != SH_SUCCESS) {
 			shFatal("initial call to atFindTrans fails");
+			/** */
+			atTransDel(trans);
+			free_star_array(star_list_A);
+			free_star_array(star_list_A_copy);
+			free_star_array(star_list_B);
+			/** */
 			return (SH_GENERIC_ERROR);
 		}
 	}
@@ -443,11 +459,25 @@ int star_match(fitted_PSF **s1, fitted_PSF **s2, int n, TRANS *t) {
 	if (prepare_to_recalc(outfile, &num_matched_A, &matched_list_A,
 			&num_matched_B, &matched_list_B, star_list_A_copy, trans) != 0) {
 		shFatal("prepare_to_recalc fails");
+		/** */
+		atTransDel(trans);
+		free_star_array(matched_list_A);
+		free_star_array(matched_list_B);
+		free_star_array(star_list_A_copy);
+		/** */
+		return (SH_GENERIC_ERROR);
 	}
 	/* okay, now we're ready to call atRecalcTrans, on matched items only */
 	if (atRecalcTrans(num_matched_A, matched_list_A, num_matched_B,
 			matched_list_B, max_iter, halt_sigma, trans) != SH_SUCCESS) {
 		shFatal("atRecalcTrans fails on matched pairs only");
+		/** */
+		atTransDel(trans);
+		free_star_array(matched_list_A);
+		free_star_array(matched_list_B);
+		free_star_array(star_list_A_copy);
+		/** */
+		return (SH_GENERIC_ERROR);
 	}
 #ifdef DEBUG
 	printf("TRANS based on matches only :\n");
@@ -469,6 +499,13 @@ int star_match(fitted_PSF **s1, fitted_PSF **s2, int n, TRANS *t) {
 		/* re-set coords of all items in star A */
 		if (reset_A_coords(numA, star_list_A, star_list_A_copy) != 0) {
 			shFatal("reset_A_coords returns with error before recalc");
+			/** */
+			atTransDel(trans);
+			free_star_array(matched_list_A);
+			free_star_array(matched_list_B);
+			free_star_array(star_list_A_copy);
+			/** */
+			return (SH_GENERIC_ERROR);
 		}
 
 		/*
@@ -494,12 +531,26 @@ int star_match(fitted_PSF **s1, fitted_PSF **s2, int n, TRANS *t) {
 				&num_matched_B, &matched_list_B, star_list_A_copy, trans)
 				!= 0) {
 			shFatal("prepare_to_recalc fails");
+			/** */
+			atTransDel(trans);
+			free_star_array(matched_list_A);
+			free_star_array(matched_list_B);
+			free_star_array(star_list_A_copy);
+			/** */
+			return (SH_GENERIC_ERROR);
 		}
 
 		/* final call atRecalcTrans, on matched items only */
 		if (atRecalcTrans(num_matched_A, matched_list_A, num_matched_B,
 				matched_list_B, max_iter, halt_sigma, trans) != SH_SUCCESS) {
 			shFatal("atRecalcTrans fails on matched pairs only");
+			/** */
+			atTransDel(trans);
+			free_star_array(matched_list_A);
+			free_star_array(matched_list_B);
+			free_star_array(star_list_A_copy);
+			/** */
+			return (SH_GENERIC_ERROR);
 		}
 
 #ifdef DEBUG
@@ -521,6 +572,13 @@ int star_match(fitted_PSF **s1, fitted_PSF **s2, int n, TRANS *t) {
 		if (reset_A_coords(num_matched_A, matched_list_A, star_list_A_copy)
 				!= 0) {
 			shFatal("second call to reset_A_coords returns with error");
+			/** */
+			atTransDel(trans);
+			free_star_array(matched_list_A);
+			free_star_array(matched_list_B);
+			free_star_array(star_list_A_copy);
+			/** */
+			return (SH_GENERIC_ERROR);
 		}
 
 		medtf = atMedtfNew();

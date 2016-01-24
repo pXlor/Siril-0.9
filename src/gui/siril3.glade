@@ -7749,7 +7749,7 @@ WARNING: Reducing the ratio of memory allocated to computation will degrade perf
         <child>
           <object class="GtkScrolledWindow" id="scrolledwindow2">
             <property name="width_request">430</property>
-            <property name="height_request">200</property>
+            <property name="height_request">250</property>
             <property name="visible">True</property>
             <property name="can_focus">True</property>
             <property name="hexpand">True</property>
@@ -9640,6 +9640,22 @@ Warning: ensure you have a good reason to change this value because it may degra
                             <property name="position">1</property>
                           </packing>
                         </child>
+                      </object>
+                      <packing>
+                        <property name="left_attach">3</property>
+                        <property name="top_attach">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkEntry" id="startIndiceEntry">
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="tooltip_text" translatable="yes">Indicates the start indice of your converted files. This value must be included in the [1, 65535] range.</property>
+                        <property name="max_length">5</property>
+                        <property name="width_chars">5</property>
+                        <property name="max_width_chars">5</property>
+                        <property name="text" translatable="yes">1</property>
+                        <property name="input_purpose">digits</property>
                       </object>
                       <packing>
                         <property name="left_attach">2</property>

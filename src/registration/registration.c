@@ -31,6 +31,7 @@
 #include "registration/registration.h"
 #include "registration/matching/misc.h"
 #include "registration/matching/match.h"
+#include "registration/matching/atpmatch.h"
 #include "algos/star_finder.h"
 #include "stacking/stacking.h"
 #include "core/siril.h"
@@ -44,7 +45,7 @@
 #include "opencv/ecc/ecc.h"
 #endif
 
-#define MAX_STARS_FITTED 100
+#define MAX_STARS_FITTED 2000
 #undef DEBUG
 
 static char *tooltip_text[] = { "One Star Registration: This is the simplest method to register deep-sky images. "
@@ -436,7 +437,7 @@ static void _print_result(TRANS *trans, float FWHMx, float FWHMy) {
 	point shift;
 
 	switch (trans->order) {
-	case 1:
+	case AT_TRANS_LINEAR:
 		rotation = atan2(trans->c, trans->b);
 		shift.x = trans->a;
 		shift.y = -trans->d;
@@ -507,7 +508,7 @@ int register_star_alignment(struct registration_args *args) {
 	}
 	siril_log_color_message("Reference Image:\n", "green");
 	com.stars = peaker(&fit, args->layer, &sf);
-	if (sf.nb_stars < 4) {
+	if (sf.nb_stars < AT_MATCH_MINPAIRS) {
 		siril_log_message(
 				"There are not enough stars in reference image to perform alignment\n");
 		if (current_regdata == args->seq->regparam[args->layer])
@@ -517,20 +518,27 @@ int register_star_alignment(struct registration_args *args) {
 	}
 	redraw(com.cvport, REMAP_NONE); // draw stars
 #ifdef DEBUG
-	printf("REFERENCE IMAGE\n");
-	for (i = 0; i < MAX_STARS_FITTED; i++) {
-		printf("%.3lf\t%.3lf\t%.3lf\n",
-				com.stars[i]->xpos, com.stars[i]->ypos, com.stars[i]->mag);
-	}
+		FILE *pfile;
+
+		pfile = fopen("ref.txt", "w+");
+		fprintf(pfile, "REFERENCE IMAGE\n");
+		for (i = 0; i < MAX_STARS_FITTED; i++) {
+			fprintf(pfile, "%.3lf\t%.3lf\t%.3lf\n",
+					com.stars[i]->xpos, com.stars[i]->ypos, com.stars[i]->mag);
+		}
+		fclose(pfile);
 #endif
-	fitted_stars = (sf.nb_stars > MAX_STARS_FITTED) ? MAX_STARS_FITTED : sf.nb_stars;
+	fitted_stars =
+			(sf.nb_stars > MAX_STARS_FITTED) ? MAX_STARS_FITTED : sf.nb_stars;
 	FWHM_average(com.stars, &FWHMx, &FWHMy, fitted_stars);
 	siril_log_message("FWHMx:\t%*.2f px\n", 8, FWHMx);
 	siril_log_message("FWHMy:\t%*.2f px\n", 8, FWHMy);
 	current_regdata[ref_image].fwhm = FWHMx;
 
 	/* then we compare to other frames */
-	args->seq->new_total = args->seq->number;
+	if (args->process_all_frames)
+		args->seq->new_total = args->seq->number;
+	else args->seq->new_total = args->seq->selnum;
 	for (frame = 0, cur_nb = 0.f; frame < args->seq->number; frame++) {
 		if (args->run_in_thread && !get_thread_run())
 			break;
@@ -544,7 +552,7 @@ int register_star_alignment(struct registration_args *args) {
 
 			if (frame != ref_image) {
 				stars = peaker(&fit, args->layer, &sf);
-				if (sf.nb_stars < 4) {
+				if (sf.nb_stars < AT_MATCH_MINPAIRS) {
 					siril_log_message("Not enough stars. Image %d skipped\n",
 							frame);
 					args->seq->new_total--;
@@ -553,12 +561,17 @@ int register_star_alignment(struct registration_args *args) {
 				}
 
 #ifdef DEBUG
-				printf("IMAGE %d\n", frame);
+				FILE *pfile2;
+
+				pfile2 = fopen("im.txt", "w+");
+				fprintf(pfile2, "IMAGE %d\n", frame);
 				for (i = 0; i < MAX_STARS_FITTED; i++) {
-					printf("%.3lf\t%.3lf\t%.3lf\n", stars[i]->xpos,
+					fprintf(pfile2, "%.3lf\t%.3lf\t%.3lf\n", stars[i]->xpos,
 							stars[i]->ypos, stars[i]->mag);
 				}
-				printf("\n\n", frame);
+				fprintf(pfile2, "\n\n", frame);
+				fclose(pfile2);
+
 #endif
 
 				nbpoints = (sf.nb_stars < fitted_stars) ?
@@ -600,10 +613,10 @@ int register_star_alignment(struct registration_args *args) {
 	args->seq->regparam[args->layer] = current_regdata;
 	update_used_memory();
 	siril_log_message("Registration finished.\n");
-	siril_log_color_message("%d images processed.\n", "green", args->seq->number);
+	siril_log_color_message("%d images processed.\n", "green", args->seq->new_total + failed);
 	siril_log_color_message("Total: %d failed, %d registred.\n", "green", failed, args->seq->new_total);
 
-	return 0;
+	return args->seq->new_total == 0;
 }
 
 int register_ecc(struct registration_args *args) {
@@ -658,7 +671,9 @@ int register_ecc(struct registration_args *args) {
 	q_index = ref_image;
 
 	/* then we compare to other frames */
-	args->seq->new_total = args->seq->number;
+	if (args->process_all_frames)
+		args->seq->new_total = args->seq->number;
+	else args->seq->new_total = args->seq->selnum;
 	for (frame = 0, cur_nb = 0.f; frame < args->seq->number; frame++) {
 		if (args->run_in_thread && !get_thread_run())
 			break;

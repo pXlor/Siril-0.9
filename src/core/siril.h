@@ -21,6 +21,7 @@
 #endif
 
 #define USHRT_MAX_DOUBLE ((double)USHRT_MAX)
+#define USHRT_MAX_SINGLE ((float)USHRT_MAX)
 #define UCHAR_MAX_DOUBLE ((double)UCHAR_MAX)
 #define UCHAR_MAX_SINGLE ((float)UCHAR_MAX)
 
@@ -41,6 +42,25 @@ typedef unsigned short WORD;		// default type for internal image data
 
 #define LOW_BOUND  0.00002
 #define HIGH_BOUND 0.99998
+
+/* Some statistic constants */
+#define SIGMA_PER_FWHM 2.35482
+#define AVGDEV_NORM 1.2533
+#define MAD_NORM 1.4826
+#define BWMV_NORM 0.9901
+#define PBMV_NORM 0.9709
+#define SN_NORM 1.1926
+#define QN_NORM 2.2191
+
+#define STATS_BASIC		(1 << 0)
+#define STATS_SIGMA		(1 << 1)
+#define STATS_AVGDEV	(1 << 2)
+#define STATS_MAD		(1 << 3)
+#define STATS_MINMAX	(1 << 4)
+#define STATS_BWMV		(1 << 5)
+#define STATS_MAIN		STATS_SIGMA | STATS_AVGDEV | STATS_MAD | STATS_MINMAX | STATS_BWMV
+#define STATS_IKSS		(1 << 6) /* take time, needed only for stacking */
+#define STATS_EXTRA		STATS_MAIN | STATS_IKSS
 
 /* when requesting an image redraw, it can be asked to remap its data before redrawing it.
  * REMAP_NONE	doesn't remaps the data,
@@ -501,6 +521,7 @@ struct cominf {
 	int hist_display;		// displayed index
 	char *swap_dir;
 
+	gboolean is_cfa;		// in order to know which conversion it is
 	libraw raw_set;			// the libraw setting
 
 	sequence seq;			// currently loaded sequence	TODO: *seq
@@ -525,7 +546,8 @@ struct cominf {
 /* this structure is used to characterize the statistics of the image */
 struct image_stats {
 	size_t count;
-	double mean, avgDev, median, sigma, min, max, normValue;
+	double mean, avgDev, median, sigma, min, max, normValue, mad, sqrtbwmv,
+			location, scale;
 	char layername[6];
 };
 

@@ -29,7 +29,7 @@
 #include "gui/callbacks.h"	// for lookup_widget()
 #include "core/undo.h"
 
-#define shadowsClipping -1.25 /* Shadows clipping point measured in sigma units from the main histogram peak. */
+#define shadowsClipping -2.80 /* Shadows clipping point measured in sigma units from the main histogram peak. */
 #define targetBackground 0.25 /* final "luminance" of the image for autostretch in the [0,1] range */
 #undef HISTO_DEBUG
 
@@ -689,7 +689,7 @@ double findMidtonesBalance(fits *fit, double *shadows, double *highlights) {
 	n = fit->naxes[2];
 
 	for (i = 0; i < n; ++i) {
-		stat[i] = statistics(fit, i, NULL);
+		stat[i] = statistics(fit, i, NULL, STATS_MAD);
 
 		if (stat[i]->median / stat[i]->normValue > 0.5)
 			++invertedChannels;
@@ -697,13 +697,13 @@ double findMidtonesBalance(fits *fit, double *shadows, double *highlights) {
 
 	if (invertedChannels < n) {
 		for (i = 0; i < n; ++i) {
-			double median, avgDev, normValue;
+			double median, mad, normValue;
 
 			normValue = stat[i]->normValue;
 			median = stat[i]->median / normValue;
-			avgDev = stat[i]->avgDev / normValue;
+			mad = stat[i]->mad / normValue * MAD_NORM;
 
-			c0 += median + shadowsClipping * avgDev;
+			c0 += median + shadowsClipping * mad;
 			m += median;
 		}
 		c0 /= n;
@@ -713,14 +713,14 @@ double findMidtonesBalance(fits *fit, double *shadows, double *highlights) {
 		*highlights = 1.0;
 	} else {
 		for (i = 0; i < n; ++i) {
-			double median, avgDev, normValue;
+			double median, mad, normValue;
 
 			normValue = stat[i]->normValue;
 			median = stat[i]->median / normValue;
-			avgDev = stat[i]->avgDev / normValue;
+			mad = stat[i]->mad / normValue * MAD_NORM;
 
 			m += median;
-			c1 += median - shadowsClipping * avgDev;
+			c1 += median - shadowsClipping * mad;
 		}
 		c1 /= n;
 		double m2 = c1 - m / n;
