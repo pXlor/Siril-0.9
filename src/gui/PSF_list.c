@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -119,7 +119,7 @@ void clear_stars_list() {
 			/* freeing found stars. It must not be done when the only star in
 			 * com.stars is the same as com.seq.imgparam[xxx].fwhm, as set in
 			 * set_fwhm_star_as_star_list(), because it will be reused */
-			if (com.stars[1] || !sequence_is_loaded() || !com.star_is_seqdata) {
+			if (com.stars[1] || !com.star_is_seqdata) {
 				int i = 0;
 				while (i < MAX_STARS && com.stars[i])
 					free(com.stars[i++]);

@@ -1,10 +1,10 @@
 SIRIL is an astronomical image processing tool.
 
 SIRIL is aimed at providing an easy to use processing tool for astronomical
-images. The intent is to provide linux users with an equivalent of Christian
+images. The intent is to provide free OS users with an equivalent of Christian
 Buil's IRIS, only easier to use.
 
-Contributors are welcome. Coding language is C.
+Contributors are welcome. Programming language is C.
 Main development is done with most recent versions of libraries.
 
 Adding new commands and features is basically independent from the GUI. You just
@@ -35,10 +35,11 @@ compilation time, or their support won't be compiled.
 	* libjpeg or compatible libraries like libjpeg-turbo
 	* libpng
 	* opencv and g++ for image rotation support and binned image resizing
+	* giflib for GIF images export
 
-All these programs or libraries are available in most Linux distributions and
-free systems, maybe with the exception of ffms2 that may need to be compiled on
-some systems.
+All these libraries are available in most Linux distributions and free systems,
+maybe with the exception of ffms2 that is not as popular as others and may need
+to be compiled on some systems.
 
 
 The install is similar to the usual GNU/Linux package build, except that the
@@ -57,7 +58,7 @@ Note that a binary package for Siril is maintained for Debian. See the download
 page for other packages that could be available.
 
 
-NOTES ON SIRIL FITS IMAGE FORMAT.
+NOTES ON SIRIL FITS IMAGE FORMAT
 
 Since FITS doesn't specify the order and size of data, it's useful to fix it at
 some point. Currently, Siril uses unsigned 16-bit per channel values (TUSHORT),
@@ -68,3 +69,13 @@ All files imported and converted in Siril or files exported by Siril are in this
 FITS format, except sequence files like SER and films, which are read from the
 file and converted on-the-fly.
 
+
+NOTES ON IMAGE SEQUENCES FILES
+
+Siril makes a strong case for the use SER sequences against the generic film
+containers that are not well suited for astronomy data and that may not be read
+the same way by different players. Siril can convert any film format supported
+by FFMS2 (probably all ffmpeg formats, which is a lot) to SER, and even any
+image sequence to SER.
+Siril supports SER v3.
+See https://free-astro.org/index.php/SER for more details.

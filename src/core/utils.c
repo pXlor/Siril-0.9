@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -53,22 +53,22 @@
 #include "io/single_image.h"
 
 static const char *keywords[] = { "working-directory", "libraw-settings",
-		"ser-settings", "preprocessing-settings", "registration-settings",
-		"stacking-settings", "misc-settings" };
+		"debayer-settings", "registration-settings", "stacking-settings",
+		"misc-settings" };
 enum token_index {
-	WD = 0, RAW = 1, SER = 2, PRE = 3, REG = 4, STK = 5, MISC = 6, NOTOK
+	WD = 0, RAW = 1, BAY = 2, REG = 3, STK = 4, MISC = 5, NOTOK
 };
 
 int round_to_int(double x) {
 	assert(x >= INT_MIN-0.5);
 	assert(x <= INT_MAX+0.5);
-	if (x >= 0)
+	if (x >= 0.0)
 		return (int) (x + 0.5);
 	return (int) (x - 0.5);
 }
 
 WORD round_to_WORD(double x) {
-	if (x <= 0)
+	if (x <= 0.0)
 		return (WORD) 0;
 	if (x > USHRT_MAX_DOUBLE)
 		return USHRT_MAX;
@@ -76,7 +76,7 @@ WORD round_to_WORD(double x) {
 }
 
 BYTE round_to_BYTE(double x) {
-	if (x <= 0)
+	if (x <= 0.0)
 		return (BYTE) 0;
 	if (x > UCHAR_MAX_DOUBLE)
 		return UCHAR_MAX;
@@ -84,7 +84,7 @@ BYTE round_to_BYTE(double x) {
 }
 
 BYTE conv_to_BYTE(double x) {
-	if (x == 0)
+	if (x == 0.0)
 		return (BYTE) 0;
 	if (x == USHRT_MAX_DOUBLE)
 		return UCHAR_MAX;
@@ -125,10 +125,12 @@ int get_extension_index(const char *filename) {
 	return -1;
 }
 
+/* Get the extension of a file, without the dot.
+ * The returned pointed is from the filename itself or NULL. */
 const char *get_filename_ext(const char *filename) {
 	const char *dot = strrchr(filename, '.');
 	if (!dot || dot == filename)
-		return "";
+		return NULL;
 	return dot + 1;
 }
 
@@ -147,60 +149,45 @@ int is_readable_file(const char *filename) {
  * `type' is set according to the result of the test,
  * `realname' (optionnal) is set according to the found file name.
  * If filename contains an extension, only this file name is tested, else all
- * extensions are tested for the file name. */
-int stat_file(const char *filename2, image_type *type, char *realname) {
-	/* FIXME: these variables should not be size-limiter, and realname
-	 * should be a char ** to be allocated in the function */
-	char basename[256], filename[256], extension[6];
-	int separator_index, len, extension_len;
+ * extensions are tested for the file name until one is found. */
+int stat_file(const char *filename, image_type *type, char *realname) {
+	// FIXME: realname should be a char ** to be allocated in the function
+	char *test_name;
+	int k;
+	const char *ext = get_filename_ext(filename);
 	*type = TYPEUNDEF;	// default value
 
 	/* check for an extension in filename and isolate it, including the . */
-	if (!filename2 || filename2[0] == '\0')
+	if (!filename || filename[0] == '\0')
 		return 1;
-	len = strlen(filename2);
-	separator_index = get_extension_index(filename2);
-	extension_len = len - separator_index;
-	if (separator_index == -1 || extension_len < 4 || extension_len > 5) {
-		strncpy(basename, filename2, 255);
-		basename[255] = '\0';
-		extension[0] = '\0';
-	} else {
-		strncpy(basename, filename2, separator_index);
-		basename[separator_index] = '\0';
-		strncpy(extension, filename2 + separator_index, extension_len);
-		extension[extension_len] = '\0';
-	}
-	/* if filename2 had an extension, we only test for it */
-	if (extension[0] != '\0') {
-		if (is_readable_file(filename2)) {
+	/* if filename has an extension, we only test for it */
+	if (ext) {
+		if (is_readable_file(filename)) {
 			if (realname)
-				strcpy(realname, filename2);
-			*type = get_type_for_extension_name(extension);
+				strcpy(realname, filename);
+			*type = get_type_for_extension(ext);
 			return 0;
 		}
 		return 1;
 	}
 
+	test_name = malloc(strlen(filename) + 10);
 	/* else, we can test various file extensions */
 	/* first we test lowercase, then uppercase */
-	int k;
 	for (k = 0; k < 2; k++) {
 		int i = 0;
 		while (supported_extensions[i]) {
-			char *str = strdup(supported_extensions[i]);
-			if (k == 1) {
-				char *newstr = convtoupper(str);
-				free(str);
-				str = newstr;
-			}
-			snprintf(filename, 255, "%s%s", basename, str);
-			if (str)
-				free(str);
-			if (is_readable_file(filename)) {
-				*type = get_type_for_extension_name(supported_extensions[i]);
+			char *str;
+			if (k == 0)
+				str = strdup(supported_extensions[i]);
+			else str = convtoupper(supported_extensions[i]);
+			snprintf(test_name, 255, "%s%s", filename, str);
+			free(str);
+			if (is_readable_file(test_name)) {
+				*type = get_type_for_extension(supported_extensions[i]+1);
+				assert(*type != TYPEUNDEF);
 				if (realname)
-					strcpy(realname, filename);
+					strcpy(realname, test_name);
 				return 0;
 			}
 			i++;
@@ -239,12 +226,6 @@ int readinitfile() {
 	/* Libraw setting */
 	config_setting_t *raw_setting = config_lookup(&config, keywords[RAW]);
 	if (raw_setting) {
-		config_setting_lookup_bool(raw_setting, "cfa", &com.raw_set.cfa);
-		int pattern, inter;
-		config_setting_lookup_int(raw_setting, "pattern", &pattern);
-		com.raw_set.bayer_pattern = pattern;
-		config_setting_lookup_int(raw_setting, "inter", &inter);
-		com.raw_set.bayer_inter = inter;
 		config_setting_lookup_float(raw_setting, "mul_0", &com.raw_set.mul[0]);
 		config_setting_lookup_float(raw_setting, "mul_2", &com.raw_set.mul[2]);
 		config_setting_lookup_float(raw_setting, "bright", &com.raw_set.bright);
@@ -263,19 +244,16 @@ int readinitfile() {
 				&com.raw_set.user_black);
 	}
 
-	/* SER setting */
-	config_setting_t *ser_setting = config_lookup(&config, keywords[SER]);
-	if (ser_setting) {
-		config_setting_lookup_bool(ser_setting, "ser_cfa",
-				&com.raw_set.ser_cfa);
-		config_setting_lookup_bool(ser_setting, "ser_force_bayer",
-				&com.raw_set.ser_force_bayer);
-	}
-
-	/* Prepro setting */
-	config_setting_t *pre_setting = config_lookup(&config, keywords[PRE]);
-	if (pre_setting) {
-		config_setting_lookup_int(pre_setting, "formula", &com.preproformula);
+	/* Debayer setting */
+	config_setting_t *debayer_setting = config_lookup(&config, keywords[BAY]);
+	if (debayer_setting) {
+		config_setting_lookup_bool(debayer_setting, "ser_use_bayer_header",
+				&com.debayer.ser_use_bayer_header);
+		config_setting_lookup_int(debayer_setting, "pattern",
+				&com.debayer.bayer_pattern);
+		int inter;
+		config_setting_lookup_int(debayer_setting, "inter", &inter);
+		com.debayer.bayer_inter = inter;
 	}
 
 	/* Registration setting */
@@ -338,15 +316,6 @@ static void _save_libraw(config_t *config, config_setting_t *root) {
 
 	libraw_group = config_setting_add(root, keywords[RAW], CONFIG_TYPE_GROUP);
 
-	raw_setting = config_setting_add(libraw_group, "cfa", CONFIG_TYPE_BOOL);
-	config_setting_set_bool(raw_setting, com.raw_set.cfa);
-
-	raw_setting = config_setting_add(libraw_group, "pattern", CONFIG_TYPE_INT);
-	config_setting_set_int(raw_setting, com.raw_set.bayer_pattern);
-
-	raw_setting = config_setting_add(libraw_group, "inter", CONFIG_TYPE_INT);
-	config_setting_set_int(raw_setting, com.raw_set.bayer_inter);
-
 	raw_setting = config_setting_add(libraw_group, "mul_0", CONFIG_TYPE_FLOAT);
 	config_setting_set_float(raw_setting, com.raw_set.mul[0]);
 
@@ -380,26 +349,20 @@ static void _save_libraw(config_t *config, config_setting_t *root) {
 	config_setting_set_int(raw_setting, com.raw_set.user_black);
 }
 
-static void _save_ser(config_t *config, config_setting_t *root) {
-	config_setting_t *ser_group, *ser_setting;
+static void _save_debayer(config_t *config, config_setting_t *root) {
+	config_setting_t *debayer_group, *debayer_setting;
 
-	ser_group = config_setting_add(root, keywords[SER], CONFIG_TYPE_GROUP);
+	debayer_group = config_setting_add(root, keywords[BAY], CONFIG_TYPE_GROUP);
 
-	ser_setting = config_setting_add(ser_group, "ser_cfa", CONFIG_TYPE_BOOL);
-	config_setting_set_bool(ser_setting, com.raw_set.ser_cfa);
-
-	ser_setting = config_setting_add(ser_group, "ser_force_bayer",
+	debayer_setting = config_setting_add(debayer_group, "ser_use_bayer_header",
 			CONFIG_TYPE_BOOL);
-	config_setting_set_bool(ser_setting, com.raw_set.ser_force_bayer);
-}
+	config_setting_set_bool(debayer_setting, com.debayer.ser_use_bayer_header);
 
-static void _save_preprocess(config_t *config, config_setting_t *root) {
-	config_setting_t *pre_group, *pre_setting;
+	debayer_setting = config_setting_add(debayer_group, "pattern", CONFIG_TYPE_INT);
+	config_setting_set_int(debayer_setting, com.debayer.bayer_pattern);
 
-	pre_group = config_setting_add(root, keywords[PRE], CONFIG_TYPE_GROUP);
-
-	pre_setting = config_setting_add(pre_group, "formula", CONFIG_TYPE_INT);
-	config_setting_set_int(pre_setting, com.preproformula);
+	debayer_setting = config_setting_add(debayer_group, "inter", CONFIG_TYPE_INT);
+	config_setting_set_int(debayer_setting, com.debayer.bayer_inter);
 }
 
 static void _save_registration(config_t *config, config_setting_t *root) {
@@ -450,8 +413,7 @@ int writeinitfile() {
 
 	_save_wd(&config, root);
 	_save_libraw(&config, root);
-	_save_ser(&config, root);
-	_save_preprocess(&config, root);
+	_save_debayer(&config, root);
 	_save_registration(&config, root);
 	_save_stacking(&config, root);
 	_save_misc(&config, root);
@@ -749,7 +711,7 @@ void expand_home_in_filename(char *filename, int size) {
 }
 
 WORD get_normalized_value(fits *fit) {
-	image_find_minmax(fit, 0);// recomputing is needed for dark, flat & offset fits
+	image_find_minmax(fit, 0);
 	if (fit->maxi <= UCHAR_MAX)
 		return UCHAR_MAX;
 	return USHRT_MAX;
@@ -946,4 +908,22 @@ char* str_append(char** data, const char* newdata) {
 	*data = p;
 	strcpy(*data + len, newdata);
 	return *data;
+}
+
+/* cut a base name to 120 characters and add a trailing underscore if needed.
+ * WARNING: may return a newly allocated string and free the argument */
+char *format_basename(char *root) {
+	int len = strlen(root);
+	if (len > 120) {
+		root[120] = '\0';
+		len = 120;
+	}
+	if (root[len-1] == '-' || root[len-1] == '_') {
+		return root;
+	}
+
+	char *appended = malloc(len+2);
+	sprintf(appended, "%s_", root);
+	free(root);
+	return appended;
 }

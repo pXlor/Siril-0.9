@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT(siril, 0.9.2 alpha)
+AC_INIT(siril, 0.9.2)
 AM_INIT_AUTOMAKE([subdir-objects])
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_SRCDIR([src/main.c])
@@ -90,11 +90,19 @@ dnl check png lib
 PKG_CHECK_MODULES(LIBPNG, [libpng],
 		  [AC_DEFINE([HAVE_LIBPNG], [1], [Using PNG images])],
 		  AC_MSG_WARN([libpng not found. Not using PNG importer and exporter.]))
+		  
+dnl check gif lib
+AC_CHECK_LIB(gif, DGifOpenFileHandle, [])
+AS_IF([test "$ac_cv_lib_gif_DGifOpenFileHandle" != yes],
+      AC_MSG_WARN([giflib not found. Not using GIF exporter.]))
 
-dnl check ffms2
-PKG_CHECK_MODULES(FFMS2, [ffms2], [AC_DEFINE([HAVE_FFMS2], [1],
-		  [Using libffms2 for films])],
-		  AC_MSG_WARN([libffms2 not found. Not using films.]))
+dnl check ffms2		  
+PKG_CHECK_MODULES(FFMS2, [ffms2 < 2.21],
+		  [AC_DEFINE([HAVE_FFMS2_1], [1], [Use FFMS2 < 2.21])],
+		  [PKG_CHECK_MODULES(FFMS2, [ffms2 >= 2.21],
+				     [AC_DEFINE([HAVE_FFMS2_2], [1], [Use FFMS2 > 2.21])
+				     ])
+		  ])
 
 dnl check opencv
 AC_PROG_CXX

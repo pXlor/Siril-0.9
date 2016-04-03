@@ -8,17 +8,17 @@ typedef struct {
 } supported_raw_list;
 
 extern supported_raw_list supported_raw[];	//supported raw extensions
-extern int get_nb_raw_supported();
+int get_nb_raw_supported();
 
-void initialize_combocamera();
 void list_format_available();
-image_type get_type_for_extension_name(const char *extension);
-void initialize_default_extension();
 void check_for_conversion_form_completeness();
-void initialize_converters();
-int tofits(char *source, char *dest);
+image_type get_type_for_extension(const char *extension);
 void update_raw_cfa_tooltip();
-void update_statusbar_convert();
+void initialize_converters();
 int count_selected_files();
+int save_to_target_fits(fits *fit, const char *dest_filename);
+int debayer_if_needed(image_type imagetype, fits *fit);
+fits *any_to_new_fits(image_type imagetype, const char *source);
+int any_to_fits(image_type imagetype, const char *source, fits *dest);
 
 #endif

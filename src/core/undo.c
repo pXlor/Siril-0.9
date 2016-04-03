@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -59,6 +59,7 @@ static int undo_build_swapfile(fits *fit, char **filename) {
 		siril_log_message("File I/O Error: Unable to write swap file in %s: [%s]\n",
 				tmpdir, strerror(errno));
 		free(nameBuff);
+		close(fd);
 		return 1;
 	}
 	*filename = nameBuff;
@@ -129,12 +130,14 @@ static int undo_get_data(fits *fit, historic hist) {
 	if ((read(fd, buf, size * sizeof(WORD)) < size * sizeof(WORD))) {
 		printf("Read failed with error [%s]\n", strerror(errno));
 		free(buf);
+		close(fd);
 		return 1;
 	}
 	WORD *newdata = (WORD*) realloc(fit->data, size * sizeof(WORD));
 	if (!newdata) {
 		free(newdata);
 		free(buf);
+		close(fd);
 		return 1;
 	}
 	fit->data = newdata;

@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #ifdef HAVE_LIBTIFF
 #include <tiffio.h>
@@ -37,10 +38,14 @@
 #ifdef HAVE_LIBRAW
 #include <libraw/libraw.h>
 #endif
+#ifdef HAVE_LIBGIF
+#include <gif_lib.h>
+#endif
 
 #include "core/siril.h"
 #include "core/proto.h"
 #include "gui/callbacks.h"
+#include "single_image.h"
 
 /********************* TIFF IMPORT AND EXPORT *********************/
 
@@ -893,3 +898,264 @@ int open_raw_files(const char *name, fits *fit, int type) {
 	return retvalue;
 }
 #endif
+
+
+/********************* GIF EXPORT *********************/
+#ifdef HAVE_LIBGIF
+
+/* save a fit as gif.
+ * If anim is true, if gif is nul, it is set to the created GIF handle. If it's
+ * not nul it's used as is and a new image is added to the GIF.
+ * If an error occurs, everything is freed and the file may be closed, in that
+ * case, gif is set to NULL.
+ * No check is done on filename actually corresponding to gif.
+ * if anim, gif must be finalized with gifclose(gif).
+ * if positive, delay and loop_count are used for animation. Delay is in centiseconds.
+ *
+ * palette code inspired by https://github.com/schani/animatedgif/blob/master/writegif.c
+ */
+int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int delay, int loop_count) {
+	/* convert the fits to RGB 8-bit buffers, using the min/max scale */
+	BYTE *rgb[3];
+	BYTE map[USHRT_MAX + 1];
+	GifByteType *gif_buffer;
+	WORD tmp_pixel_value, hi, lo;
+	int i, nb_pixels;
+	float pente;
+
+	if (anim && gif == NULL) {
+		siril_log_message("gif should not be NULL in anim mode\n");
+		return 1;
+	}
+
+	nb_pixels = fit->rx * fit->ry;
+	if (fit->naxes[2] == 1) {
+		/*  gif_buffer contains values of the palette, which in our case of
+		 *  linear grey palette are the same as the pixel values */
+		gif_buffer = malloc(nb_pixels);
+		if (!gif_buffer) {
+			siril_log_message("Failed to allocate memory required, aborted.\n");
+			return 1;
+		}
+	} else {
+		assert(fit->naxes[2] == 3);
+		gif_buffer = NULL;
+
+		rgb[0] = malloc(nb_pixels);
+		if (rgb[0] == NULL) {
+			siril_log_message("Failed to allocate memory required, aborted.\n");
+			if (anim) *gif = NULL;
+			return 1;
+		}
+		rgb[1] = malloc(nb_pixels);
+		if (rgb[1] == NULL) {
+			siril_log_message("Failed to allocate memory required, aborted.\n");
+			if (anim) *gif = NULL;
+			return 1;
+		}
+		rgb[2] = malloc(nb_pixels);
+		if (rgb[2] == NULL) {
+			siril_log_message("Failed to allocate memory required, aborted.\n");
+			if (anim) *gif = NULL;
+			return 1;
+		}
+	}
+
+	if (sequence_is_loaded() && !single_image_is_loaded()) {
+		hi = com.seq.layers[RLAYER].hi;
+		lo = com.seq.layers[RLAYER].lo;
+	}
+	else {
+		hi = com.uniq->layers[RLAYER].hi;
+		lo = com.uniq->layers[RLAYER].lo;
+	}
+
+	pente = UCHAR_MAX_SINGLE / (float) (hi - lo);
+	
+	for (i = 0; i <= USHRT_MAX; i++) {
+		map[i] = round_to_BYTE((float) i * pente);
+		if (map[i] == UCHAR_MAX)
+			break;
+	}
+	if (i != USHRT_MAX + 1) {
+		/* no more computation needed, just fill with max value */
+		for (++i; i <= USHRT_MAX; i++)
+			map[i] = UCHAR_MAX;
+	}
+	
+	/* doing the WORD to BYTE conversion, bottom-up */
+	if (fit->naxes[2] == 1) {
+		int x, y;
+		WORD *src = fit->data;
+		BYTE *dst = gif_buffer;
+		for (y = 0; y < fit->ry; y++) {
+			int desty = fit->ry - y - 1;
+			int srcpixel = y * fit->rx;
+			int dstpixel = desty * fit->rx;
+			for (x = 0; x < fit->rx; x++, srcpixel++, dstpixel++) {
+				// linear scaling
+				tmp_pixel_value = src[srcpixel] - lo;
+				dst[dstpixel] = map[tmp_pixel_value];
+			}
+		}
+	} else {
+		int channel;
+		for (channel = 0; channel < 3; channel++) {
+			int x, y;
+			WORD *src = fit->pdata[channel];
+			BYTE *dst = rgb[channel];
+			for (y = 0; y < fit->ry; y++) {
+				int desty = fit->ry-y-1;
+				int srcpixel = y * fit->rx;
+				int dstpixel = desty * fit->rx;
+				for (x = 0; x < fit->rx; x++, srcpixel++, dstpixel++) {
+					// linear scaling
+					if (src[srcpixel] - lo < 0)
+						tmp_pixel_value = 0;
+					else 	tmp_pixel_value = src[srcpixel] - lo;
+					dst[dstpixel] = map[tmp_pixel_value];
+				}
+			}
+		}
+	}
+
+	/* transform to GIF data */
+	ColorMapObject *OutputColorMap = NULL;
+	int ColorMapSize = 256;
+
+	if (fit->naxes[2] == 1) {
+		GifColorType gif_colors[256];	// the palette (a.k.a. color map)
+		for (i = 0; i < 256; i++) {
+			gif_colors[i].Red = gif_colors[i].Green = gif_colors[i].Blue = i;
+		}
+
+		if ((OutputColorMap = GifMakeMapObject(ColorMapSize, gif_colors)) == NULL) {
+			free(gif_buffer);
+			siril_log_message("Failed to allocate memory required, aborted.\n");
+			if (anim) *gif = NULL;
+			return 1;
+		}
+	} else {
+
+		if ((OutputColorMap = GifMakeMapObject(ColorMapSize, NULL)) == NULL ||
+				(gif_buffer = malloc(nb_pixels * sizeof(GifByteType))) == NULL) {
+			free(rgb[0]); free(rgb[1]); free(rgb[2]);
+			siril_log_message("Failed to allocate memory required, aborted.\n");
+			if (anim) *gif = NULL;
+			return 1;
+		}
+
+		if (GifQuantizeBuffer(fit->rx, fit->ry, &ColorMapSize,
+					rgb[0], rgb[1], rgb[2],
+					gif_buffer, OutputColorMap->Colors) == GIF_ERROR) {
+			free(rgb[0]); free(rgb[1]); free(rgb[2]); free(gif_buffer);
+			siril_log_message("Failed to convert data into GIF data format\n");
+			if (anim) *gif = NULL;
+			GifFreeMapObject(OutputColorMap);
+			return 1;
+		}
+
+		free(rgb[0]); free(rgb[1]); free(rgb[2]);
+	}
+
+	/*********** code from SaveGif function **********/
+	int error;
+	GifFileType *GifFile;
+	if (!anim || *gif == NULL) {
+		if ((GifFile = EGifOpenFileName(filename, FALSE, &error)) == NULL) {
+			siril_log_message("Error opening GIF file: %s\n", GifErrorString(error));
+			free(gif_buffer);
+			GifFreeMapObject(OutputColorMap);
+			return 1;
+		}
+
+		if (EGifPutScreenDesc(GifFile, fit->rx, fit->ry, 256, 0, OutputColorMap) == GIF_ERROR) {
+			siril_log_message("Error describing GIF file: %s\n", GifErrorString(error));
+			EGifCloseFile(GifFile, NULL);
+			free(gif_buffer);
+			GifFreeMapObject(OutputColorMap);
+			return 1;
+		}
+
+		if (EGifPutComment(GifFile, "Made with Siril, for free astronomy") == GIF_ERROR) {
+			siril_log_message("Error adding comment in GIF file\n");
+		}
+
+		/* add loop, optional */
+		if (anim && loop_count > 0) {
+			char nsle[12] = "NETSCAPE2.0";
+			char subblock[3];
+			subblock[0] = 1;
+			subblock[1] = loop_count / 256;
+			subblock[2] = loop_count % 256;
+			if (EGifPutExtensionLeader(GifFile, APPLICATION_EXT_FUNC_CODE) == GIF_ERROR ||
+					EGifPutExtensionBlock(GifFile, 11, nsle) == GIF_ERROR ||
+					EGifPutExtensionBlock(GifFile, 3, subblock) == GIF_ERROR ||
+					EGifPutExtensionTrailer(GifFile) == GIF_ERROR) {
+				siril_log_message("Error adding the loop in GIF file\n");
+			}
+		}
+	} else {
+		GifFile = *gif;
+	}
+
+	/* for each image */
+
+	/* add delay, optional */
+	if (anim && delay > 0) {
+		unsigned char ExtStr[4] = { 0x04, 0x00, 0x00, 0xff };
+		ExtStr[1] = delay % 256;
+		ExtStr[2] = delay / 256;
+		if (EGifPutExtension(GifFile, GRAPHICS_EXT_FUNC_CODE, 4, ExtStr) == GIF_ERROR) {
+			siril_log_message("Error adding the delay in GIF file\n");
+		}
+	}
+
+	if (EGifPutImageDesc(GifFile, 0, 0, fit->rx, fit->ry, FALSE, OutputColorMap) == GIF_ERROR) {
+		siril_log_message("Error describing GIF file: %s\n", GifErrorString(error));
+		EGifCloseFile(GifFile, NULL);
+		free(gif_buffer);
+		if (anim) *gif = NULL;
+		GifFreeMapObject(OutputColorMap);
+		return 1;
+	}
+
+	GifByteType *ptr = gif_buffer;
+	for (i = 0; i < fit->ry; i++) {
+		if (EGifPutLine(GifFile, ptr, fit->rx) == GIF_ERROR) {
+			EGifCloseFile(GifFile, NULL);
+			free(gif_buffer);
+			if (anim) *gif = NULL;
+			GifFreeMapObject(OutputColorMap);
+			return 1;
+		}
+		ptr += fit->rx;
+	}
+	/* end of for each image */
+
+	free(gif_buffer);
+	GifFreeMapObject(OutputColorMap);
+
+	if (!anim) {
+		if (EGifCloseFile(GifFile, &error) == GIF_ERROR) {
+			siril_log_message("Error closing GIF file: %s\n", GifErrorString(error));
+			return 1;
+		}
+	} else {
+		*gif = GifFile;
+	}
+	return 0;
+}
+
+void closegif(GifFileType **gif) {
+	int error;
+	if (gif == NULL || *gif == NULL)
+		return;
+
+	if (EGifCloseFile(*gif, &error) == GIF_ERROR) {
+		siril_log_message("Error closing GIF file: %s\n", GifErrorString(error));
+	}
+	*gif = NULL;
+}
+#endif
+

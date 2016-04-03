@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -597,6 +597,11 @@ fitted_PSF *psf_global_minimisation(gsl_matrix* z, double bg, int layer,
 
 void psf_display_result(fitted_PSF *result, rectangle *area) {
 	char buffer[256];
+	char *str;
+	if (com.magOffset > 0.0)
+		str = "true reduced";
+	else
+		str = "relative";
 
 	g_snprintf(buffer, sizeof(buffer), "PSF fit Result:\n"
 			"x0=%0.2f px, y0=%0.2f px\n"
@@ -604,10 +609,10 @@ void psf_display_result(fitted_PSF *result, rectangle *area) {
 			"Angle=%0.2f deg\n"
 			"Background value=%0.6f\n"
 			"Maximal intensity=%0.6f\n"
-			"Magnitude=%0.2f\n"
+			"Magnitude (%s)=%0.2f\n"
 			"RMSE=%.3e\n", result->x0 + area->x, area->y + area->h - result->y0,
 			result->fwhmx, result->units, result->fwhmy, result->units,
-			result->angle, result->B, result->A, result->mag, result->rmse);
+			result->angle, result->B, result->A, str, result->mag + com.magOffset, result->rmse);
 
 	siril_log_message(buffer);
 }

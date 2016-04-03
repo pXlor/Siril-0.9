@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -28,13 +28,18 @@ mouse_status_enum mouse_status;
 gboolean redraw_preview(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	int current_preview, shiftx = 0, shifty = 0;
 	static GtkToggleButton *check_display_ref = NULL;
+	static GtkWidget *labelRegRef = NULL;
 	guint area_width = gtk_widget_get_allocated_width (widget);
 	guint area_height = gtk_widget_get_allocated_height (widget);
 	gboolean display_ref_image;
-	if (check_display_ref == NULL)
+
+	if (check_display_ref == NULL) {
 		check_display_ref = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder, "checkbutton_displayref"));
-	display_ref_image = com.refimage_regbuffer && com.refimage_surface &&
-		gtk_toggle_button_get_active(check_display_ref);
+		labelRegRef = lookup_widget("labelRegRef");
+	}
+	display_ref_image = com.refimage_regbuffer && com.refimage_surface
+			&& gtk_toggle_button_get_active(check_display_ref)
+							&& !gtk_widget_get_visible(labelRegRef);
 
 	if (widget == com.preview_area[0]) current_preview = 0;
 	else if (widget == com.preview_area[1]) current_preview = 1;
@@ -47,8 +52,21 @@ gboolean redraw_preview(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	com.seq.previewH[current_preview] = area_height;
 
 	/* display current image with shifts */
-	if (!com.preview_surface[current_preview]) return TRUE;
-	cairo_translate(cr, area_width/2.0-com.seq.previewX[current_preview],
+	if (!com.preview_surface[current_preview]) {
+		gchar text[10];
+		cairo_set_source_rgba(cr, 0.5, 0.5, 0.5, 0.5);
+		cairo_rectangle(cr, 0, 0, area_width, area_height);
+		cairo_fill(cr);
+		cairo_select_font_face(cr, "Arial", CAIRO_FONT_SLANT_NORMAL,
+				CAIRO_FONT_WEIGHT_BOLD);
+		cairo_set_font_size(cr, 15);
+		cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+		cairo_move_to(cr, area_width / 2.0 - 30, area_height / 2.0);
+		g_snprintf(text, sizeof(text), "Preview %d", current_preview + 1);
+		cairo_show_text(cr, text);
+		return TRUE;
+	}
+	cairo_translate(cr, area_width / 2.0 - com.seq.previewX[current_preview],
 			area_height/2.0-com.seq.previewY[current_preview]);
 	if (com.seq.regparam && com.seq.regparam[com.cvport]) {
 		shiftx = com.seq.regparam[com.cvport][com.seq.current].shiftx;
@@ -196,6 +214,10 @@ void on_spinbut_shift_value_change(GtkSpinButton *spinbutton, gpointer user_data
 
 	/* current layer: com.cvport or selected reg layer? */
 	current_layer = gtk_combo_box_get_active(cbbt_layers);
+	if (current_layer != com.cvport) {
+		siril_log_message("Switching to the registration layer\n");
+		activate_tab(current_layer);
+	}
 	if (com.seq.regparam[current_layer] == NULL) {
 		siril_log_message("Allocating registration data for this layer\n");
 		com.seq.regparam[current_layer] = calloc(com.seq.number, sizeof(regdata));
@@ -209,7 +231,8 @@ void on_spinbut_shift_value_change(GtkSpinButton *spinbutton, gpointer user_data
 	if (spinbutton == spin_shiftx)
 		com.seq.regparam[current_layer][com.seq.current].shiftx = new_value;
 	else com.seq.regparam[current_layer][com.seq.current].shifty = new_value;
-	writeseqfile(&com.seq);	
+	writeseqfile(&com.seq);
+	fill_sequence_list(&com.seq, current_layer);	// update list with new regparam
 	redraw_previews();
 }
 

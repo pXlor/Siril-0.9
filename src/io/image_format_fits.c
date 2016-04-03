@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -38,6 +38,17 @@ static char *BinX[] = { "XBINNING", "BINX", NULL };
 static char *BinY[] = { "YBINNING", "BINY", NULL };
 static char *Focal[] = { "FOCAL", "FOCALLEN", NULL };
 static char *Exposure[] = { "EXPTIME", "EXPOSURE", NULL };
+
+#define __tryToFindKeywords(fptr, type, keyword, value) \
+{ \
+	int __iter__ = 0; \
+	int __status__; \
+	do { \
+		__status__ = 0; \
+		fits_read_key(fptr, type, keyword[__iter__], value, NULL, &__status__); \
+		__iter__++; \
+	} while ((keyword[__iter__]) && (__status__ > 0)); \
+}
 
 // return 0 on success, fills realname if not NULL with the opened file's name
 int readfits(const char *filename, fits *fit, char *realname) {
@@ -236,58 +247,14 @@ int readfits(const char *filename, fits *fit, char *realname) {
 	return 0;
 }
 
-static void tryToFindKeywordsFloat(fits *fit, char **keyword, float *value) {
-	int i = 0;
-	int status;
-
-	do {
-		status = 0;
-		fits_read_key(fit->fptr, TFLOAT, keyword[i], value, NULL, &status);
-		i++;
-	} while (keyword[i] && status);
-}
-
-static void tryToFindKeywordsDouble(fits *fit, char **keyword, double *value) {
-	int i = 0;
-	int status;
-
-	do {
-		status = 0;
-		fits_read_key(fit->fptr, TDOUBLE, keyword[i], value, NULL, &status);
-		i++;
-	} while (keyword[i] && status);
-}
-
-static void tryToFindKeywordsUint(fits *fit, char **keyword, unsigned int *value) {
-	int i = 0;
-	int status;
-
-	do {
-		status = 0;
-		fits_read_key(fit->fptr, TUINT, keyword[i], value, NULL, &status);
-		i++;
-	} while (keyword[i] && status);
-}
-
-static void tryToFindKeywordsUshort(fits *fit, char **keyword, unsigned short *value) {
-	int i = 0;
-	int status;
-
-	do {
-		status = 0;
-		fits_read_key(fit->fptr, TUSHORT, keyword[i], value, NULL, &status);
-		i++;
-	} while (keyword[i] && status);
-}
-
 /* reading the FITS header to get useful information */
 void read_fits_header(fits *fit) {
 	/* about the status argument: http://heasarc.gsfc.nasa.gov/fitsio/c/c_user/node28.html */
 	int status = 0;
 	int zero;
 
-	tryToFindKeywordsUshort(fit, MIPSHI, &fit->hi);
-	tryToFindKeywordsUshort(fit, MIPSLO, &fit->lo);
+	__tryToFindKeywords(fit->fptr, TUSHORT, MIPSHI, &fit->hi);
+	__tryToFindKeywords(fit->fptr, TUSHORT, MIPSLO, &fit->lo);
 
 	status = 0;
 	fits_read_key(fit->fptr, TINT, "BSCALE", &zero, NULL, &status);
@@ -304,10 +271,10 @@ void read_fits_header(fits *fit) {
 	 * ************* CAMERA AND INSTRUMENT KEYWORDS ********************
 	 * ****************************************************************/
 
-	tryToFindKeywordsFloat(fit, PixSizeX, &fit->pixel_size_x);
-	tryToFindKeywordsFloat(fit, PixSizeY, &fit->pixel_size_y);
-	tryToFindKeywordsUint(fit, BinX, &fit->binning_x);
-	tryToFindKeywordsUint(fit, BinY, &fit->binning_y);
+	__tryToFindKeywords(fit->fptr, TFLOAT, PixSizeX, &fit->pixel_size_x);
+	__tryToFindKeywords(fit->fptr, TFLOAT, PixSizeY, &fit->pixel_size_y);
+	__tryToFindKeywords(fit->fptr, TUINT, BinX, &fit->binning_x);
+	__tryToFindKeywords(fit->fptr, TUINT, BinY, &fit->binning_y);
 
 	status = 0;
 	fits_read_key(fit->fptr, TSTRING, "INSTRUME", &(fit->instrume), NULL,
@@ -317,7 +284,11 @@ void read_fits_header(fits *fit) {
 	fits_read_key(fit->fptr, TSTRING, "DATE-OBS", &(fit->date_obs), NULL,
 			&status);
 
-	tryToFindKeywordsDouble(fit, Focal, &fit->focal_length);
+	status = 0;
+	fits_read_key(fit->fptr, TSTRING, "DATE", &(fit->date), NULL,
+			&status);
+
+	__tryToFindKeywords(fit->fptr, TDOUBLE, Focal, &fit->focal_length);
 	if (!sequence_is_loaded() || com.seq.current == 0)
 		fprintf(stdout,
 				"Read from FITS header: pix size %gx%g, binning %hix%hi, focal %g\n",
@@ -328,7 +299,7 @@ void read_fits_header(fits *fit) {
 	fits_read_key(fit->fptr, TDOUBLE, "CCD-TEMP", &(fit->ccd_temp), NULL,
 			&status);	// Non-standard keywords used in MaxIm DL
 
-	tryToFindKeywordsDouble(fit, Exposure, &fit->exposure);
+	__tryToFindKeywords(fit->fptr, TDOUBLE, Exposure, &fit->exposure);
 
 	status = 0;
 	fits_read_key(fit->fptr, TDOUBLE, "APERTURE", &(fit->aperture), NULL,
@@ -593,6 +564,7 @@ int read_opened_fits_partial(sequence *seq, int layer, int index, WORD *buffer,
 	return 0;
 }
 
+/* creates, saves and closes the file associated to f, overwriting previous  */
 int savefits(const char *name, fits *f) {
 	int status, i;
 	long orig[3] = { 1L, 1L, 1L }, pixel_count;
@@ -617,7 +589,7 @@ int savefits(const char *name, fits *f) {
 	unlink(filename); /* Delete old file if it already exists */
 
 	status = 0;
-	if (fits_create_file(&(f->fptr), filename, &status)) {/* create new FITS file */
+	if (fits_create_file(&(f->fptr), filename, &status)) { /* create new FITS file */
 		report_fits_error(status);
 		return 1;
 	}
@@ -631,14 +603,14 @@ int savefits(const char *name, fits *f) {
 	switch (f->bitpix) {
 	case BYTE_IMG:
 		data8 = calloc(pixel_count, sizeof(BYTE));
+		WORD norm = get_normalized_value(f);
 		for (i = 0; i < pixel_count; i++) {
-			if (get_normalized_value(f) == USHRT_MAX)
+			if (norm == USHRT_MAX)
 				data8[i] = conv_to_BYTE(f->data[i]);
 			else
-				data8[i] = (BYTE)(f->data[i]);
+				data8[i] = (BYTE) (f->data[i]);
 		}
-		if (fits_write_pix(f->fptr, TBYTE, orig,
-				pixel_count, data8, &status)) {
+		if (fits_write_pix(f->fptr, TBYTE, orig, pixel_count, data8, &status)) {
 			report_fits_error(status);
 			if (data8)
 				free(data8);
@@ -647,15 +619,13 @@ int savefits(const char *name, fits *f) {
 		free(data8);
 		break;
 	case SHORT_IMG:
-		if ( fits_write_pix(f->fptr, TSHORT, orig,
-				pixel_count, f->data, &status)) {
+		if (fits_write_pix(f->fptr, TSHORT, orig, pixel_count, f->data, &status)) {
 			report_fits_error(status);
 			return 1;
 		}
 		break;
 	case USHORT_IMG:
-		if ( fits_write_pix(f->fptr, TUSHORT, orig,
-				pixel_count, f->data, &status)) {
+		if (fits_write_pix(f->fptr, TUSHORT, orig, pixel_count, f->data, &status)) {
 			report_fits_error(status);
 			return 1;
 		}
@@ -815,7 +785,7 @@ void save_fits_header(fits *fit) {
 		else if (fit->dft_type[0] == 'P')
 			strcpy(comment, "Phase of a Discrete Fourier Transform");
 		else
-			status = 1;			// should not happend
+			status = 1;			// should not happen
 		fits_update_key(fit->fptr, TSTRING, "DFT_TYPE", &(fit->dft_type),
 				comment, &status);
 	}
@@ -827,7 +797,7 @@ void save_fits_header(fits *fit) {
 		else if (fit->dft_ord[0] == 'R')
 			strcpy(comment, "High spatial freq. are located at image center");
 		else
-			status = 1;			// should not happend
+			status = 1;			// should not happen
 		fits_update_key(fit->fptr, TSTRING, "DFT_ORD", &(fit->dft_ord), comment,
 				&status);
 	}
@@ -855,10 +825,10 @@ void save_fits_header(fits *fit) {
 }
 
 /* Duplicates some of a fits data into another, with various options; the third
- * parameter, oper, indicates with bits what operations wille be done:
+ * parameter, oper, indicates with bits what operations will be done:
  *
  * - CP_ALLOC: allocates the to->data pointer to the size of from->data and
- *   sets to->pdatas; required if data is not already allocated with the
+ *   sets to->pdata; required if data is not already allocated with the
  *   correct size or at all. No data is copied
  * - CP_COPYA: copies the actual data, from->data to to->data on all layers,
  *   but no other information from the source
@@ -1056,7 +1026,7 @@ void fits_flip_top_to_bottom(fits *fit) {
 }
 
 /* This function copies an area from the fits 'from' on layer 'layer' into
- * another and initalizes all relevant data */
+ * another and initializes all relevant data */
 /* the crop function does the same but in place and for all channels without
  * reallocating */
 void extract_region_from_fits(fits *from, int layer, fits *to,
@@ -1119,3 +1089,14 @@ int new_fit_image(fits *fit, int width, int height, int nblayer) {
 		return 1;
 }
 
+void keep_first_channel_from_fits(fits *fit) {
+	if (fit->naxis == 1)
+		return;
+	fit->naxis = 1;
+	fit->naxes[2] = 1;
+	fit->data = realloc(fit->data, fit->rx * fit->ry * sizeof(WORD));
+	fit->pdata[RLAYER] = fit->data;
+	fit->pdata[GLAYER] = fit->data;
+	fit->pdata[BLAYER] = fit->data;
+	// mini and maxi could be wrong now
+}

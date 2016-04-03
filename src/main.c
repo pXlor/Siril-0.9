@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -199,6 +199,7 @@ int main(int argc, char *argv[]) {
 	gtk_text_buffer_create_tag (tbuf, "salmon", "foreground", "#ff9898", NULL);
 	gtk_text_buffer_create_tag (tbuf, "green", "foreground", "#01b301", NULL);
 	gtk_text_buffer_create_tag (tbuf, "blue", "foreground", "#7a7af8", NULL);
+	gtk_text_buffer_create_tag (tbuf, "plum", "foreground", "#8e4585", NULL);
 	
 	siril_log_color_message("Welcome to %s v%s\n", "bold", PACKAGE, VERSION);
 
@@ -278,9 +279,6 @@ int main(int argc, char *argv[]) {
 
 	g_free(csspath);
 
-	/* initialize prepreocess-related stuff */
-	initialize_preprocessing();
-	
 	/* initialize registration methods */
 	initialize_registration_methods();
 

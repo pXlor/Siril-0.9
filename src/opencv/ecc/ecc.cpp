@@ -593,6 +593,8 @@ int findTransform(fits *reference, fits *image, int layer,
 			retvalue = 1;
 		}
 	}
+	else
+		retvalue = rho;
 
 	warp_matrix.release();
 	ref.release();

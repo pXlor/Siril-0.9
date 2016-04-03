@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -735,7 +735,7 @@ int debayer(fits* fit, interpolation_method interpolation) {
 	WORD *newbuf;
 
 	newbuf = debayer_buffer(buf, &width, &height, interpolation,
-			com.raw_set.bayer_pattern);
+			com.debayer.bayer_pattern);
 	if (newbuf == NULL) {
 		return 1;
 	}

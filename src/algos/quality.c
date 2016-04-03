@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -358,7 +358,7 @@ int BlankImageCount = 0;
 int MinPixels = 50;
 
 static int _FindCentre_Barycentre(fits *fit, int x1, int y1, int x2, int y2,
-		int *x_avg, int *y_avg) {
+		double *x_avg, double *y_avg) {
 	int img_width = fit->rx;
 	int img_height = fit->ry;
 	int x, y;
@@ -414,8 +414,8 @@ static int _FindCentre_Barycentre(fits *fit, int x1, int y1, int x2, int y2,
 	}
 
 	if (count > 0) {
-		*x_avg = (int) ((double) x_total / (double) count + 0.5);
-		*y_avg = (int) ((double) y_total / (double) count + 0.5);
+		*x_avg = ((double) x_total / (double) count + 0.5);
+		*y_avg = ((double) y_total / (double) count + 0.5);
 		BlankImageCount = 0;
 	}
 
@@ -424,8 +424,8 @@ static int _FindCentre_Barycentre(fits *fit, int x1, int y1, int x2, int y2,
 	return (1);
 }
 
-static int _FindCentre(fits *fit, int x1, int y1, int x2, int y2, int *x_avg,
-		int *y_avg) {
+static int _FindCentre(fits *fit, int x1, int y1, int x2, int y2, double *x_avg,
+		double *y_avg) {
 
 	return _FindCentre_Barycentre(fit, x1, y1, x2, y2, x_avg, y_avg);
 
@@ -433,9 +433,9 @@ static int _FindCentre(fits *fit, int x1, int y1, int x2, int y2, int *x_avg,
 }
 
 // find the centre of brightness of the whole image
-int FindCentre(fits *fit, int *x_avg, int *y_avg) {
+int FindCentre(fits *fit, double *x_avg, double *y_avg) {
 	int x1 = 2;
-	int x2 = fit->rx - 1;
+	int x2 = fit->rx - 3;
 	int y1 = 0;
 	int y2 = fit->ry - 1;
 
@@ -455,7 +455,8 @@ double Aperture(fits *fit, int layer) {
 	int width = fit->rx;
 	int height = fit->ry;
 	WORD *ubuf = (WORD *) fit->pdata[layer];
-	int x, y, x1, y1, x2, y2, xc, yc, r1, r2, r;
+	int x, y, x1, y1, x2, y2, r1, r2, r;
+	double xc, yc;
 	double total1, total2, rval;
 
 	xc = yc = 0;

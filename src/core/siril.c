@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -39,6 +39,7 @@
 
 #include "core/siril.h"
 #include "core/proto.h"
+#include "core/processing.h"
 #include "gui/callbacks.h"
 #include "algos/colors.h"
 #include "gui/histogram.h"
@@ -48,6 +49,7 @@
 #include "opencv/opencv.h"
 #include "algos/Def_Math.h"
 #include "algos/Def_Wavelet.h"
+#include "algos/cosmetic_correction.h"
 #include "io/ser.h"
 
 #define MAX_ITER 15
@@ -95,42 +97,41 @@ int nozero(fits *fit, int level) {
 	return 0;
 }
 
+/*****************************************************************************
+ *       S I R I L      A R I T H M E T I C      O P E R A T I O N S         *
+ ****************************************************************************/
+
 /* equivalent to (map simple_operation a), with simple_operation being
  * (lambda (pixel) (oper pixel scalar))
  * oper is a for addition, s for substraction (i for difference) and so on. */
-int soper(fits *a, float scalar, char oper) {
+int soper(fits *a, double scalar, char oper) {
 	WORD *gbuf;
 	int i, layer;
+	int n = a->rx * a->ry;
+
+	assert(n > 0);
 
 	for (layer = 0; layer < a->naxes[2]; ++layer) {
 		gbuf = a->pdata[layer];
 		switch (oper) {
 		case OPER_ADD:
-			for (i = 0; i < a->rx * a->ry; ++i) {
-				gbuf[i] =
-						gbuf[i] + scalar < USHRT_MAX ?
-								gbuf[i] + scalar : USHRT_MAX;
+			for (i = 0; i < n; ++i) {
+				gbuf[i] = round_to_WORD((double) gbuf[i] + scalar);
 			}
 			break;
 		case OPER_SUB:
-			for (i = 0; i < a->rx * a->ry; ++i) {
-				if (scalar <= *gbuf) {
-					gbuf[i] -= scalar;
-				} else {
-					gbuf[i] = 0;
-				}
+			for (i = 0; i < n; ++i) {
+				gbuf[i] = round_to_WORD((double) gbuf[i] - scalar);
 			}
 			break;
 		case OPER_MUL:
-			for (i = 0; i < a->rx * a->ry; ++i) {
-				gbuf[i] =
-						gbuf[i] * scalar < USHRT_MAX ?
-								gbuf[i] * scalar : USHRT_MAX;
+			for (i = 0; i < n; ++i) {
+				gbuf[i] = round_to_WORD((double) gbuf[i] * scalar);
 			}
 			break;
 		case OPER_DIV:
-			for (i = 0; i < a->rx * a->ry; ++i) {
-				gbuf[i] /= scalar;
+			for (i = 0; i < n; ++i) {
+				gbuf[i] = round_to_WORD((double) gbuf[i] / scalar);
 			}
 			break;
 		}
@@ -142,7 +143,7 @@ int soper(fits *a, float scalar, char oper) {
  * a = a oper b
  * returns 0 on success */
 int imoper(fits *a, fits *b, char oper) {
-	int i, j, layer;
+	int i, layer;
 
 	if (a->rx != b->rx || a->ry != b->ry) {
 		siril_log_message(
@@ -153,47 +154,26 @@ int imoper(fits *a, fits *b, char oper) {
 	for (layer = 0; layer < a->naxes[2]; ++layer) {
 		WORD *buf = b->pdata[layer];
 		WORD *gbuf = a->pdata[layer];
+		int n = a->rx * a->ry;
 		switch (oper) {
 		case OPER_ADD:
-			for (i = 0; i < b->rx; ++i) {
-				for (j = 0; j < b->ry; ++j) {
-					if ((*buf + *gbuf) > USHRT_MAX) {
-						*(gbuf++) = USHRT_MAX;			// avoid clipping
-						buf++;
-					} else
-						*(gbuf++) += *(buf++);
-				}
+			for (i = 0; i < n; ++i) {
+				gbuf[i] = round_to_WORD(gbuf[i] + buf[i]);
 			}
 			break;
 		case OPER_SUB:
-			for (i = 0; i < b->rx; ++i) {
-				for (j = 0; j < b->ry; ++j) {
-					if (*buf <= *gbuf) {
-						*(gbuf++) -= *(buf++);
-					} else {
-						*(gbuf++) = 0;
-						buf++;
-					}
-				}
+			for (i = 0; i < n; ++i) {
+				gbuf[i] = round_to_WORD(gbuf[i] - buf[i]);
 			}
 			break;
 		case OPER_MUL:
-			for (i = 0; i < b->rx; ++i) {
-				for (j = 0; j < b->ry; ++j) {
-					*(gbuf++) *= *(buf++);
-				}
+			for (i = 0; i < n; ++i) {
+				gbuf[i] = round_to_WORD(gbuf[i] * buf[i]);
 			}
 			break;
 		case OPER_DIV:
-			for (i = 0; i < b->rx; ++i) {
-				for (j = 0; j < b->ry; ++j) {
-					if (*buf == 0) {
-						*(gbuf++) = USHRT_MAX;
-						buf++;
-					} else {
-						*(gbuf++) /= *(buf++);
-					}
-				}
+			for (i = 0; i < n; ++i) {
+				gbuf[i] = round_to_WORD(gbuf[i] / buf[i]);
 			}
 			break;
 		}
@@ -265,19 +245,6 @@ int addmax(fits *a, fits *b) {
 	return 0;
 }
 
-int fmul(fits *a, int layer, float coeff) {
-	WORD *buf;
-	int i;
-
-	if (coeff < 0.0)
-		return 1;
-	buf = a->pdata[layer];
-	for (i = 0; i < a->rx * a->ry; ++i) {
-		buf[i] = round_to_WORD(buf[i] * coeff);
-	}
-	return 0;
-}
-
 /* If fdiv is ok, function returns 0. If overflow, fdiv returns 1*/
 int fdiv(fits *a, fits *b, float coef) {
 	int i, layer;
@@ -337,6 +304,10 @@ int ndiv(fits *a, fits *b) {
 	free(div);
 	return 0;
 }
+
+/**********************************************************
+ *
+ */
 
 #ifdef HAVE_OPENCV
 int unsharp(fits *fit, double sigma, double amount, gboolean verbose) {
@@ -577,70 +548,34 @@ int rshift2(char *genname, char *outname, int number, char *shiftfile) {
 }
 #endif
 
-
-/* code borrowed from Lynkeos */
-/* this function will be removed after validation of the new entropy below */
-double old_entropy(WORD *image, unsigned int rx, unsigned int ry) {
-	// Padded width for in place transform
-	double e = 0, bmax = 0;
-	unsigned long x, y;
-
-	// Compute the quadratic pixel sum
-	for (y = 0; y < ry; y++)
-		for (x = 0; x < rx; x++)
-			bmax += image[y * rx + x] * image[y * rx + x];
-
-	bmax = sqrt(bmax);
-
-	// Compute the entropy
-	for (y = 0; y < ry; y++) {
-		for (x = 0; x < rx; x++) {
-			double b = image[y * rx + x] / bmax;
-			if (b > 0.0)
-				e -= b * log(b);
-		}
-	}
-	return (e);
-}
-
 /* This entropy function computes the entropy for the image in gfit for its
- * layer 'layer', in the area designated by area which must be non-NULL.
+ * layer 'layer', in the area designated by area which can be NULL.
  * An optional imstats parameter can be used to provide the background and
  * sigma value, and when it is given, the entropy will only be computed for
  * pixels with values above background + 1 * sigma. It must be NULL otherwise.
  */
 double entropy(fits *fit, int layer, rectangle *area, imstats *opt_stats) {
-	double e = 0.0, bmax = 0.0, threshold = 0.0;
-	int i, j, stridebuf;
-	WORD *buf;
-	stridebuf = fit->rx - area->w;
+	double e = 0.0, threshold = 0.0;
+	gsl_histogram *histo;
+	size_t i, size, n;
+
 	if (opt_stats && opt_stats->median >= 0.0 && opt_stats->sigma >= 0.0)
 		threshold = opt_stats->median + 1 * opt_stats->sigma;
 
-	// Compute the quadratic pixel sum
-	buf = fit->pdata[layer] + (fit->ry - area->y - area->h) * fit->rx + area->x;
-	for (i = 0; i < area->h; ++i) {
-		for (j = 0; j < area->w; ++j) {
-			double b = (double) (*buf);
-			if (b > threshold)
-				bmax += b * b;
-			buf++;
-		}
-	}
-	bmax = sqrt(bmax);
+	if (area == NULL)
+		histo = computeHisto(fit, layer);
+	else
+		histo = computeHisto_Selection(fit, layer, area);
 
-	// Compute the entropy
-	buf = fit->pdata[layer] + (fit->ry - area->y - area->h) * fit->rx + area->x;
-	for (i = 0; i < area->h; ++i) {
-		for (j = 0; j < area->w; ++j) {
-			double b = (double) (*buf);
-			double bm = b / bmax;
-			if (b > threshold /*&& bm > 0.0*/) /* can't be 0 */
-				e -= bm * log(bm);
-			buf++;
-		}
-		buf += stridebuf;
+	n = fit->rx * fit->ry;
+	assert (n > 0);
+	size = gsl_histogram_bins(histo);
+	for (i = 0; i < size; i++) {
+		double p = gsl_histogram_get(histo, i);
+		if (p > threshold && p < size)
+			e += (p / n) * log(n / p);
 	}
+	gsl_histogram_free(histo);
 
 	return e;
 }
@@ -684,10 +619,10 @@ double contrast(fits* fit, int layer) {
 int ddp(fits *a, int level, float coeff, float sigma) {
 	copyfits(a, &wfit[0], CP_ALLOC | CP_COPYA | CP_FORMAT, 0);
 	unsharp(&wfit[0], sigma, 0, FALSE);
-	soper(&wfit[0], level, OPER_ADD);
+	soper(&wfit[0], (double) level, OPER_ADD);
 	nozero(&wfit[0], 1);
 	fdiv(a, &wfit[0], level);
-	soper(a, coeff, OPER_MUL);
+	soper(a, (double) coeff, OPER_MUL);
 	clearfits(&wfit[0]);
 	return 0;
 }
@@ -931,27 +866,98 @@ int lrgb(fits *l, fits *r, fits *g, fits *b, fits *lrgb) {
 	return 0;
 }
 
-/* In this function, offset has already been subtracted to the flat
- * and the dark. */
-int preprocess(fits *brut, fits *offset, fits *dark, fits *flat, float level,
-		gboolean use_ccd_formula) {
+static double evaluateNoiseOfCalibratedImage(fits *fit, fits *dark, double k) {
+	double noise = 0;
+	fits *dark_tmp;
+	fits *fit_tmp;
+	int chan;
 
-	if (use_ccd_formula && (com.preprostatus & USE_OFFSET))
+	dark_tmp = calloc(1, sizeof(fits));
+	fit_tmp = calloc(1, sizeof(fits));
+
+	new_fit_image(dark_tmp, dark->rx, dark->ry, 1);
+	new_fit_image(fit_tmp, fit->rx, fit->ry, 1);
+
+	copyfits(dark, dark_tmp, CP_ALLOC | CP_EXTRACT, 0);
+	copyfits(fit, fit_tmp, CP_ALLOC | CP_EXTRACT, 0);
+
+	soper(dark_tmp, k, OPER_MUL);
+	imoper(fit_tmp, dark_tmp, OPER_SUB);
+
+	for (chan = 0; chan < fit->naxes[2]; chan++) {
+		imstats *stat = NULL;
+		stat = statistics(fit_tmp, chan, NULL, STATS_BASIC);
+		noise += stat->bgnoise;
+		//printf("noise=%lf, k=%lf\n", noise, k);
+		free(stat);
+	}
+	clearfits(dark_tmp);
+	clearfits(fit_tmp);
+
+	return noise;
+}
+
+#define GR ((sqrt(5) - 1) / 2)
+
+static double goldenSectionSearch(fits *brut, fits *dark, double a, double b,
+		double tol) {
+	double c, d;
+	double fc, fd;
+
+	c = b - GR * (b - a);
+	d = a + GR * (b - a);
+	do {
+		fc = evaluateNoiseOfCalibratedImage(brut, dark, c);
+		fd = evaluateNoiseOfCalibratedImage(brut, dark, d);
+		if (fc < fd) {
+			b = d;
+			d = c;
+			c = b - GR * (b - a);
+		} else {
+			a = c;
+			c = d;
+			d = a + GR * (b - a);
+		}
+	} while (fabs(c - d) > tol);
+	return ((b + a) / 2);
+}
+
+static int preprocess(fits *brut, fits *offset, fits *dark, fits *flat, float level) {
+
+	if (com.preprostatus & USE_OFFSET)
 		imoper(brut, offset, OPER_SUB);
 
-	if (com.preprostatus & USE_DARK)
+	/* if dark optimization, the master-dark has already been subtracted */
+	if ((com.preprostatus & USE_DARK) && !(com.preprostatus & USE_DARK))
 		imoper(brut, dark, OPER_SUB);
 
 	if (com.preprostatus & USE_FLAT) {
-#ifdef USE_FLAT_AUTOLEVEL		// is it needed anymore ?
-		ndiv(brut, flat);
-#else
-		if (fdiv(brut, flat, level) > 0)
-			siril_log_message(
-					"Overflow detected, change level value in settings: %0.2lf is too high.\n",
-					level);
-#endif
+		fdiv(brut, flat, level);
 	}
+
+	return 0;
+}
+
+static int darkOptimization(fits *brut, fits *dark, fits *offset) {
+	double k;
+	double lo = 0.0;
+	double up = 2.0;
+
+	fits *dark_tmp = calloc(1, sizeof(fits));
+	new_fit_image(dark_tmp, dark->rx, dark->ry, 1);
+	copyfits(dark, dark_tmp, CP_ALLOC | CP_EXTRACT, 0);
+
+	/* Minimization of background noise to find better k */
+	k = goldenSectionSearch(brut, dark_tmp, lo, up, 1E-3);
+
+	siril_log_message("Dark optimization: %.3lf\n", k);
+	/* Multiply coefficient to master-dark */
+	if (com.preprostatus & USE_OFFSET)
+		imoper(dark_tmp, offset, OPER_SUB);
+	soper(dark_tmp, k, OPER_MUL);
+	imoper(brut, dark_tmp, OPER_SUB);
+
+	clearfits(dark_tmp);
 
 	return 0;
 }
@@ -974,17 +980,6 @@ gpointer seqpreprocess(gpointer p) {
 	} else
 		return GINT_TO_POINTER(1);
 
-	if (args->use_ccd_formula && (com.preprostatus & USE_DARK)
-			&& (com.preprostatus & USE_OFFSET)) {
-		set_progress_bar_data("Substracting offset to dark...", PROGRESS_NONE);
-		imoper(dark, offset, OPER_SUB);
-	}
-
-	if ((com.preprostatus & USE_OFFSET) && (com.preprostatus & USE_FLAT)) {
-		set_progress_bar_data("Substracting offset to flat...", PROGRESS_NONE);
-		imoper(flat, offset, OPER_SUB);
-	}
-
 	if (com.preprostatus & USE_FLAT) {
 		if (args->autolevel) {
 			/* TODO: evaluate the layer to apply but generally RLAYER is a good choice.
@@ -1002,8 +997,26 @@ gpointer seqpreprocess(gpointer p) {
 		msg[255] = '\0';
 		set_progress_bar_data(msg, 0.5);
 
-		preprocess(com.uniq->fit, offset, dark, flat, args->normalisation,
-				args->use_ccd_formula);
+		if ((com.preprostatus & USE_OPTD) && (com.preprostatus & USE_DARK))
+			darkOptimization(com.uniq->fit, dark, offset);
+
+		preprocess(com.uniq->fit, offset, dark, flat, args->normalisation);
+
+		if ((com.preprostatus & USE_COSME) && (com.preprostatus & USE_DARK)) {
+			if (dark->naxes[2] == 1) {
+			/* Cosmetic correction */
+			long icold, ihot;
+			deviant_pixel *dev = find_deviant_pixels(dark, args->sigma, &icold, &ihot);
+			siril_log_message("%ld pixels corrected (%ld + %ld)\n",
+					icold + ihot, icold, ihot);
+			cosmeticCorrection(com.uniq->fit, dev, icold + ihot, args->is_cfa);
+			if (dev)
+				free(dev);
+			}
+			else
+				siril_log_message("Darkmap cosmetic correction"
+						"is only supported with single channel images\n");
+		}
 
 		snprintf(dest_filename, 255, "%s%s", com.uniq->ppprefix,
 		basename(com.uniq->filename));
@@ -1013,22 +1026,32 @@ gpointer seqpreprocess(gpointer p) {
 		set_progress_bar_data(msg, PROGRESS_NONE);
 		savefits(dest_filename, com.uniq->fit);
 	} else {	// sequence
-		struct ser_struct *new_ser_file = calloc(1, sizeof(struct ser_struct));
+		struct ser_struct *new_ser_file;
 		char source_filename[256];
 		int i;
+		long icold, ihot;
+		deviant_pixel *dev = NULL;
 
+		// creating a SER file if the input data is SER
 		if (com.seq.type == SEQ_SER) {
-			char new_ser[256];
-			new_ser[255] = '\0';
-
-			memcpy(new_ser_file, com.seq.ser_file, sizeof(struct ser_struct));
-			snprintf(new_ser, 255, "%s%s", com.seq.ppprefix,
-					new_ser_file->filename);
-			unlink(new_ser);
-			new_ser_file->fd = open(new_ser, O_CREAT | O_RDWR,
-					S_IWRITE | S_IREAD);
-			ser_write_header(new_ser_file);
+			char new_ser_filename[256];
+			new_ser_file = calloc(1, sizeof(struct ser_struct));
+			snprintf(new_ser_filename, 255, "%s%s", com.seq.ppprefix, com.seq.ser_file->filename);
+			ser_create_file(new_ser_filename, new_ser_file, TRUE, com.seq.ser_file);
 		}
+
+		if ((com.preprostatus & USE_COSME) && (com.preprostatus & USE_DARK)) {
+			if (dark->naxes[2] == 1) {
+				dev = find_deviant_pixels(dark, args->sigma, &icold, &ihot);
+				siril_log_message("%ld pixels corrected (%ld + %ld)\n",
+						icold + ihot, icold, ihot);
+			} else
+				siril_log_message("Darkmap cosmetic correction"
+						"is only supported with single channel images\n");
+		}
+
+		fits *fit = calloc(1, sizeof(fits));
+
 		for (i = 0; i < com.seq.number; i++) {
 			if (!get_thread_run())
 				break;
@@ -1038,59 +1061,52 @@ gpointer seqpreprocess(gpointer p) {
 			msg[255] = '\0';
 			set_progress_bar_data(msg,
 					(double) (i + 1) / (double) com.seq.number);
-			if (seq_read_frame(&com.seq, i, &(wfit[4]))) {
+			if (seq_read_frame(&com.seq, i, fit)) {
 				snprintf(msg, 255, "Could not read one of the raw files: %s."
 						" Aborting preprocessing.", source_filename);
 				msg[255] = '\0';
 				set_progress_bar_data(msg, PROGRESS_RESET);
 				args->retval = 1;
-				close(new_ser_file->fd);
-				free(new_ser_file);
+				if (com.seq.type == SEQ_SER) {
+					ser_close_file(new_ser_file);
+					free(new_ser_file);
+				}
+				if (p) free(p);
 				gdk_threads_add_idle(end_sequence_prepro, args);
 				return GINT_TO_POINTER(1);
 			}
-			preprocess(&(wfit[4]), offset, dark, flat, args->normalisation,
-					args->use_ccd_formula);
+			if ((com.preprostatus & USE_OPTD) && (com.preprostatus & USE_DARK))
+				darkOptimization(fit, dark, offset);
+
+			preprocess(fit, offset, dark, flat, args->normalisation);
+
+			if ((com.preprostatus & USE_COSME) && (com.preprostatus & USE_DARK) && (dark->naxes[2] == 1))
+				cosmeticCorrection(fit, dev, icold + ihot, args->is_cfa);
+
 			snprintf(dest_filename, 255, "%s%s", com.seq.ppprefix,
 					source_filename);
 			dest_filename[255] = '\0';
 			snprintf(msg, 255, "Saving image %d/%d (%s)", i + 1, com.seq.number,
 					dest_filename);
 			if (com.seq.type == SEQ_SER) {
-				if ((new_ser_file->color_id != SER_MONO)
-						&& (!com.raw_set.ser_cfa)) {
-					char *msg = siril_log_message(
-							"You must preprocess your SER files without applying demosaicing.\n"
-							"Uncheck the corresponding box in settings.\n");
-					show_dialog(msg, "Warning", "gtk-dialog-warning");
-					close(new_ser_file->fd);
-					free(new_ser_file);
-					set_progress_bar_data(PROGRESS_TEXT_RESET, PROGRESS_RESET);
-					args->retval = 1;
-					gdk_threads_add_idle(end_sequence_prepro, args);
-					return GINT_TO_POINTER(1);
-				}
-				ser_write_frame_from_fit(new_ser_file, &(wfit[4]));
+				ser_write_frame_from_fit(new_ser_file, fit, i);
 			} else {
-				savefits(dest_filename, &(wfit[4]));
+				savefits(dest_filename, fit);
 			}
+			clearfits(fit);
 		}
-		close(new_ser_file->fd);
-		free(new_ser_file);
+		free(fit);
+		// closing SER file if it applies
+		if (com.seq.type == SEQ_SER) {
+			close(new_ser_file->fd);
+			free(new_ser_file);
+		}
 		set_progress_bar_data(PROGRESS_TEXT_RESET, PROGRESS_RESET);
+		if (dev) free(dev);
 	}
 	args->retval = 0;
 	gdk_threads_add_idle(end_sequence_prepro, args);
 	return GINT_TO_POINTER(0);
-}
-
-void initialize_preprocessing() {
-	char str[17];
-
-	sprintf(str, "formula_button_%d", com.preproformula);
-	GtkToggleButton *formula_button = GTK_TOGGLE_BUTTON(lookup_widget(str));
-
-	gtk_toggle_button_set_active(formula_button, TRUE);
 }
 
 /* computes the background value using the histogram and/or median value.
@@ -1117,97 +1133,6 @@ double background(fits* fit, int reqlayer, rectangle *selection) {
 	return bg;
 }
 
-/* Based on Jean-Luc Starck and Fionn Murtagh (1998), Automatic Noise
- * Estimation from the Multiresolution Support, Publications of the 
- * Royal Astronomical Society of the Pacific, vol. 110, pp. 193–199. */
-int backgroundnoise(fits* fit, double sigma[]) {
-	int layer, k;
-	fits *waveimage = calloc(1, sizeof(fits));
-
-	if (waveimage == NULL) {
-		fprintf(stderr, "backgroundnoise: error allocating data\n");
-		return 1;
-	}
-
-
-	copyfits(fit, waveimage, CP_ALLOC | CP_FORMAT | CP_COPYA, 0);
-#ifdef HAVE_OPENCV	// a bit faster
-	cvComputeFinestScale(waveimage);
-#else
-	if (get_wavelet_layers(waveimage, 4, 0, TO_PAVE_BSPLINE, -1)) {
-		siril_log_message("Siril cannot evaluate the noise in the image\n");
-		clearfits(waveimage);
-		return 1;
-	}
-#endif
-
-	for (layer = 0; layer < fit->naxes[2]; layer++) {
-		imstats *stat = statistics(waveimage, layer, NULL, STATS_SIGMA);
-		double sigma0 = stat->sigma;
-		double mean = stat->mean;
-		double epsilon = 0.0;
-		WORD lo, hi;
-		WORD *buf = waveimage->pdata[layer];
-		unsigned int i;
-		unsigned int ndata = fit->rx * fit->ry;
-		assert(ndata > 0);
-		WORD *array1 = calloc(ndata, sizeof(WORD));
-		WORD *array2 = calloc(ndata, sizeof(WORD));
-		if (array1 == NULL || array2 == NULL) {
-			siril_log_message("backgroundnoise: Error allocating data\n");
-			if (array1)
-				free(array1);
-			if (array2)
-				free(array2);
-			free(stat);
-			return 1;
-		}
-		WORD *set = array1, *subset = array2;
-		memcpy(set, buf, ndata * sizeof(WORD));
-
-		lo = round_to_WORD(LOW_BOUND * stat->normValue);
-		hi = round_to_WORD(HIGH_BOUND * stat->normValue);
-
-		sigma[layer] = sigma0;
-
-		int n = 0;
-		do {
-			sigma0 = sigma[layer];
-			for (i = 0, k = 0; i < ndata; i++) {
-				if (set[i] >= lo && set[i] <= hi) {
-					if (fabs(set[i] - mean) < 3.0 * sigma0) {
-						subset[k++] = set[i];
-					}
-				}
-			}
-			ndata = k;
-			sigma[layer] = gsl_stats_ushort_sd(subset, 1, ndata);
-			set = subset;
-			(set == array1) ? (subset = array2) : (subset = array1);
-			if (ndata == 0) {
-				free(array1);
-				free(array2);
-				free(stat);
-				siril_log_message("backgroundnoise: Error, no data computed\n");
-				sigma[layer] = 0.0;
-				return 1;
-			}
-			n++;
-			epsilon = fabs(sigma[layer] - sigma0) / sigma[layer];
-		} while (epsilon > EPSILON && n < MAX_ITER);
-		sigma[layer] *= SIGMA_PER_FWHM; // normalization
-		sigma[layer] /= 0.974; // correct for 2% systematic bias
-		if (n == MAX_ITER)
-			siril_log_message("backgroundnoise: does not converge\n");
-		free(array1);
-		free(array2);
-		free(stat);
-	}
-	clearfits(waveimage);
-
-	return 0;
-}
-
 void show_FITS_header(fits *fit) {
 	if (fit->header)
 		show_data_dialog(fit->header, "FITS Header");
@@ -1223,20 +1148,20 @@ int verbose_resize_gaussian(fits *image, int toX, int toY, int interpolation) {
 	struct timeval t_start, t_end;
 
 	switch (interpolation) {
-	case 0:
+	case OPENCV_NEAREST:
 		str_inter = strdup("Nearest-Neighbor");
 		break;
 	default:
-	case 1:
+	case OPENCV_LINEAR:
 		str_inter = strdup("Bilinear");
 		break;
-	case 2:
+	case OPENCV_AREA:
 		str_inter = strdup("Pixel Area Relation");
 		break;
-	case 3:
+	case OPENCV_CUBIC:
 		str_inter = strdup("Bicubic");
 		break;
-	case 4:
+	case OPENCV_LANCZOS4:
 		str_inter = strdup("Lanczos4");
 		break;
 	}
@@ -1263,20 +1188,20 @@ int verbose_rotate_image(fits *image, double angle, int interpolation,
 	case -1:
 		str_inter = "No";
 		break;
-	case 0:
+	case OPENCV_NEAREST:
 		str_inter = "Nearest-Neighbor";
 		break;
 	default:
-	case 1:
+	case OPENCV_LINEAR:
 		str_inter = "Bilinear";
 		break;
-	case 2:
+	case OPENCV_AREA:
 		str_inter = "Pixel Area Relation";
 		break;
-	case 3:
+	case OPENCV_CUBIC:
 		str_inter = "Bicubic";
 		break;
-	case 4:
+	case OPENCV_LANCZOS4:
 		str_inter = "Lanczos4";
 		break;
 	}
@@ -1356,40 +1281,10 @@ int get_wavelet_layers(fits *fit, int Nbr_Plan, int Plan, int Type, int reqlayer
 	return 0;
 }
 
-int find_hot_pixels(fits *fit, double sigma, char *filename) {
-	int x, y, count = 0;
-	WORD *buf = fit->pdata[RLAYER];
-	FILE* cosme_file = NULL;
-	strcat(filename, ".lst");
-	cosme_file = fopen(filename, "w");
+/*****************************************************************************
+ *                      M E D I A N     F I L T E R                          *
+ ****************************************************************************/
 
-	for (y = 1; y < fit->ry - 1; y++) {
-		for (x = 1; x < fit->rx - 1; x++) {
-			WORD tab[8];
-			tab[0] = buf[x - 1 + y * fit->rx];
-			tab[1] = buf[x + 1 + y * fit->rx];
-			tab[2] = buf[x + (y - 1) * fit->rx];
-			tab[3] = buf[x + (y + 1) * fit->rx];
-			tab[4] = buf[x - 1 + (y - 1) * fit->rx];
-			tab[5] = buf[x + 1 + (y - 1) * fit->rx];
-			tab[6] = buf[x - 1 + (y + 1) * fit->rx];
-			tab[7] = buf[x + 1 + (y + 1) * fit->rx];
-			quicksort_s(tab, 8);
-			//~ double median = gsl_stats_median_from_sorted_data (tab, 1, 8);
-			double mean = gsl_stats_ushort_mean(tab, 1, 8);
-			double absdev = gsl_stats_ushort_absdev_m(tab, 1, 8, mean);
-			double pixel = (double) buf[x + y * fit->rx];
-			if ((pixel - mean) > absdev * sigma) {
-				fprintf(cosme_file, "P %d %d\n", x, y);
-				count++;
-			}
-		}
-	}
-	fclose(cosme_file);
-	return count;
-}
-
-// idle function executed at the end of the median_filter processing
 gboolean end_median_filter(gpointer p) {
 	struct median_filter_data *args = (struct median_filter_data *) p;
 	stop_processing_thread();// can it be done here in case there is no thread?
@@ -1499,6 +1394,52 @@ gpointer median_filter(gpointer p) {
 	return GINT_TO_POINTER(0);
 }
 
+static int fmul(fits *a, int layer, float coeff) {
+	WORD *buf;
+	int i;
+
+	if (coeff < 0.0)
+		return 1;
+	buf = a->pdata[layer];
+	for (i = 0; i < a->rx * a->ry; ++i) {
+		buf[i] = round_to_WORD(buf[i] * coeff);
+	}
+	return 0;
+}
+
+/*****************************************************************************
+ *      B A N D I N G      R E D U C T I O N      M A N A G E M E N T        *
+ ****************************************************************************/
+
+int banding_image_hook(struct generic_seq_args *args, int i, int j, fits *fit) {
+	struct banding_data *banding_args = (struct banding_data *)args->user;
+	return BandingEngine(fit, banding_args->sigma, banding_args->amount,
+			banding_args->protect_highlights, banding_args->applyRotation);
+}
+
+void apply_banding_to_sequence(struct banding_data *banding_args) {
+	struct generic_seq_args *args = malloc(sizeof(struct generic_seq_args));
+	args->seq = &com.seq;
+	args->filtering_criterion = seq_filter_included;
+	args->nb_filtered_images = com.seq.selnum;
+	args->force_ser_output = FALSE;
+	args->prepare_hook = ser_prepare_hook;
+	args->finalize_hook = ser_finalize_hook;
+	args->save_hook = NULL;
+	args->parallel = TRUE;
+	args->image_hook = banding_image_hook;
+	args->idle_function = NULL;
+	args->user = banding_args;
+	args->description = "Banding Reduction";
+	args->new_seq_prefix = banding_args->seqEntry;
+	args->load_new_sequence = TRUE;
+
+	banding_args->fit = NULL;	// not used here
+
+	gettimeofday(&args->t_start, NULL);
+	start_in_new_thread(generic_sequence_worker, args);
+}
+
 // idle function executed at the end of the BandingEngine processing
 gboolean end_BandingEngine(gpointer p) {
 	struct banding_data *args = (struct banding_data *) p;
@@ -1516,56 +1457,75 @@ gboolean end_BandingEngine(gpointer p) {
  * This code come from CanonBandingReduction.js v0.9.1, a script of
  * PixInsight, originally written by Georg Viehoever and
  * distributed under the terms of the GNU General Public License ******/
-gpointer BandingEngine(gpointer p) {
+gpointer BandingEngineThreaded(gpointer p) {
 	struct banding_data *args = (struct banding_data *) p;
+	struct timeval t_start, t_end;
+
+	siril_log_color_message("Banding Reducing: processing...\n", "red");
+	gettimeofday(&t_start, NULL);
+
+	int retval = BandingEngine(args->fit, args->sigma, args->amount, args->protect_highlights, args->applyRotation);
+
+	gettimeofday(&t_end, NULL);
+	show_time(t_start, t_end);
+	gdk_threads_add_idle(end_BandingEngine, args);
+	
+	return GINT_TO_POINTER(retval);
+}
+
+int BandingEngine(fits *fit, double sigma, double amount, gboolean protect_highlights, gboolean applyRotation) {
 	int chan, row, i;
 	WORD *line, *fixline;
 	double minimum = DBL_MAX, globalsigma = 0.0;
 	fits *fiximage;
-	double invsigma = 1.0 / args->sigma;
-	struct timeval t_start, t_end;
+	double invsigma = 1.0 / sigma;
 
 	fiximage = calloc(1, sizeof(fits));
 	if (fiximage == NULL) {
 		fprintf(stderr, "BandingEngine: error allocating data\n");
-		return GINT_TO_POINTER(1);
+		return 1;
 	}
 
-	siril_log_color_message("Canon Banding Reducing: processing...\n", "red");
-	gettimeofday(&t_start, NULL);
+	if (applyRotation) {
+#ifdef HAVE_OPENCV
+		cvRotateImage(fit, 90.0, -1, 0);
+#else
+		siril_log_message("Rotation is only possible when Siril has been compiled with OpenCV support.\n");
+		free(fiximage);
+		return 1;
+#endif
+	}
 
-	new_fit_image(fiximage, args->fit->rx, args->fit->ry, args->fit->naxes[2]);
+	new_fit_image(fiximage, fit->rx, fit->ry, fit->naxes[2]);
 
-	for (chan = 0; chan < args->fit->naxes[2]; chan++) {
-		imstats *stat = statistics(args->fit, chan, NULL, STATS_MAD);
+	for (chan = 0; chan < fit->naxes[2]; chan++) {
+		imstats *stat = statistics(fit, chan, NULL, STATS_BASIC | STATS_MAD);
 		double background = stat->median;
-		double *rowvalue = calloc(args->fit->ry, sizeof(double));
+		double *rowvalue = calloc(fit->ry, sizeof(double));
 		if (rowvalue == NULL) {
 			fprintf(stderr, "BandingEngine: error allocating data\n");
 			free(stat);
-			gdk_threads_add_idle(end_BandingEngine, args);
-			return GINT_TO_POINTER(1);
+			return 1;
 		}
-		if (args->protect_highlights) {
+		if (protect_highlights) {
 			globalsigma = stat->mad * MAD_NORM;
 		}
-		for (row = 0; row < args->fit->ry; row++) {
-			line = args->fit->pdata[chan] + row * args->fit->rx;
-			WORD *cpyline = calloc(args->fit->rx, sizeof(WORD));
+		for (row = 0; row < fit->ry; row++) {
+			line = fit->pdata[chan] + row * fit->rx;
+			WORD *cpyline = calloc(fit->rx, sizeof(WORD));
 			if (cpyline == NULL) {
 				fprintf(stderr, "BandingEngine: error allocating data\n");
 				free(stat);
 				free(rowvalue);
-				gdk_threads_add_idle(end_BandingEngine, args);
-				return GINT_TO_POINTER(1);
+				return 1;
 			}
-			memcpy(cpyline, line, args->fit->rx * sizeof(WORD));
-			int n = args->fit->rx;
+			memcpy(cpyline, line, fit->rx * sizeof(WORD));
+			int n = fit->rx;
 			quicksort_s(cpyline, n);
-			if (args->protect_highlights) {
+			if (protect_highlights) {
 				WORD reject = round_to_WORD(
 						background + invsigma * globalsigma);
-				for (i = args->fit->rx - 1; i >= 0; i--) {
+				for (i = fit->rx - 1; i >= 0; i--) {
 					if (cpyline[i] < reject)
 						break;
 					n--;
@@ -1577,24 +1537,120 @@ gpointer BandingEngine(gpointer p) {
 			minimum = min(minimum, rowvalue[row]);
 			free(cpyline);
 		}
-		for (row = 0; row < args->fit->ry; row++) {
+		for (row = 0; row < fit->ry; row++) {
 			fixline = fiximage->pdata[chan] + row * fiximage->rx;
-			for (i = 0; i < args->fit->rx; i++)
+			for (i = 0; i < fit->rx; i++)
 				fixline[i] = round_to_WORD(rowvalue[row] - minimum);
 		}
 		free(rowvalue);
 		free(stat);
 	}
-	for (chan = 0; chan < args->fit->naxes[2]; chan++)
-		fmul(fiximage, chan, args->amount);
-	imoper(args->fit, fiximage, OPER_ADD);
+	for (chan = 0; chan < fit->naxes[2]; chan++)
+		fmul(fiximage, chan, amount);
+	imoper(fit, fiximage, OPER_ADD);
 
 	clearfits(fiximage);
-	gettimeofday(&t_end, NULL);
-	show_time(t_start, t_end);
-	gdk_threads_add_idle(end_BandingEngine, args);
+#ifdef HAVE_OPENCV
+	if (applyRotation)
+		cvRotateImage(fit, -90.0, -1, 0);
+#endif
+	return 0;
+}
 
-	return GINT_TO_POINTER(0);
+/*****************************************************************************
+ *       N O I S E     C O M P U T A T I O N      M A N A G E M E N T        *
+ ****************************************************************************/
+
+/* Based on Jean-Luc Starck and Fionn Murtagh (1998), Automatic Noise
+ * Estimation from the Multiresolution Support, Publications of the
+ * Royal Astronomical Society of the Pacific, vol. 110, pp. 193–199.
+ * slow algorithm. For now it is replaced by faster one. BUT, we need to keep it
+ * in case we need it -. */
+int backgroundnoise(fits* fit, double sigma[]) {
+	int layer, k;
+	fits *waveimage = calloc(1, sizeof(fits));
+
+	if (waveimage == NULL) {
+		fprintf(stderr, "backgroundnoise: error allocating data\n");
+		return 1;
+	}
+
+	copyfits(fit, waveimage, CP_ALLOC | CP_FORMAT | CP_COPYA, 0);
+#ifdef HAVE_OPENCV	// a bit faster
+	cvComputeFinestScale(waveimage);
+#else
+	if (get_wavelet_layers(waveimage, 4, 0, TO_PAVE_BSPLINE, -1)) {
+		siril_log_message("Siril cannot evaluate the noise in the image\n");
+		clearfits(waveimage);
+		return 1;
+	}
+#endif
+
+	for (layer = 0; layer < fit->naxes[2]; layer++) {
+		imstats *stat = statistics(waveimage, layer, NULL, STATS_BASIC);
+		double sigma0 = stat->sigma;
+		double mean = stat->mean;
+		double epsilon = 0.0;
+		WORD lo, hi;
+		WORD *buf = waveimage->pdata[layer];
+		unsigned int i;
+		unsigned int ndata = fit->rx * fit->ry;
+		assert(ndata > 0);
+		WORD *array1 = calloc(ndata, sizeof(WORD));
+		WORD *array2 = calloc(ndata, sizeof(WORD));
+		if (array1 == NULL || array2 == NULL) {
+			siril_log_message("backgroundnoise: Error allocating data\n");
+			if (array1)
+				free(array1);
+			if (array2)
+				free(array2);
+			free(stat);
+			return 1;
+		}
+		WORD *set = array1, *subset = array2;
+		memcpy(set, buf, ndata * sizeof(WORD));
+
+		lo = round_to_WORD(LOW_BOUND * stat->normValue);
+		hi = round_to_WORD(HIGH_BOUND * stat->normValue);
+
+		sigma[layer] = sigma0;
+
+		int n = 0;
+		do {
+			sigma0 = sigma[layer];
+			for (i = 0, k = 0; i < ndata; i++) {
+				if (set[i] >= lo && set[i] <= hi) {
+					if (fabs(set[i] - mean) < 3.0 * sigma0) {
+						subset[k++] = set[i];
+					}
+				}
+			}
+			ndata = k;
+			sigma[layer] = gsl_stats_ushort_sd(subset, 1, ndata);
+			set = subset;
+			(set == array1) ? (subset = array2) : (subset = array1);
+			if (ndata == 0) {
+				free(array1);
+				free(array2);
+				free(stat);
+				siril_log_message("backgroundnoise: Error, no data computed\n");
+				sigma[layer] = 0.0;
+				return 1;
+			}
+			n++;
+			epsilon = fabs(sigma[layer] - sigma0) / sigma[layer];
+		} while (epsilon > EPSILON && n < MAX_ITER);
+		sigma[layer] *= SIGMA_PER_FWHM; // normalization
+		sigma[layer] /= 0.974; // correct for 2% systematic bias
+		if (n == MAX_ITER)
+			siril_log_message("backgroundnoise: does not converge\n");
+		free(array1);
+		free(array2);
+		free(stat);
+	}
+	clearfits(waveimage);
+
+	return 0;
 }
 
 gboolean end_noise(gpointer p) {
@@ -1622,6 +1678,7 @@ gboolean end_noise(gpointer p) {
 
 gpointer noise(gpointer p) {
 	struct noise_data *args = (struct noise_data *) p;
+	int  chan;
 
 	if (args->verbose) {
 		siril_log_color_message("Noise standard deviation: calculating...\n",
@@ -1629,9 +1686,15 @@ gpointer noise(gpointer p) {
 		gettimeofday(&args->t_start, NULL);
 	}
 
-	if (backgroundnoise(args->fit, args->bgnoise)) {
+/*	if (backgroundnoise(args->fit, args->bgnoise)) {
 		gdk_threads_add_idle(end_noise, args);
 		return GINT_TO_POINTER(1);
+	}
+	*/
+	for (chan = 0; chan < args->fit->naxes[2]; chan++) {
+		imstats *stat = statistics(args->fit, chan, NULL, STATS_BASIC);
+		args->bgnoise[chan] = stat->bgnoise;
+		free(stat);
 	}
 
 	gdk_threads_add_idle(end_noise, args);

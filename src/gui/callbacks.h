@@ -72,10 +72,6 @@ void hide_rgb_window();
 int is_histogram_visible();
 void set_cursor_waiting(gboolean waiting);
 
-void start_in_new_thread(gpointer(*f)(gpointer p), gpointer p);
-void stop_processing_thread();
-void set_thread_run(gboolean b);
-gboolean get_thread_run();
 void progress_bar_reset_ready();
 void set_progress_bar_data(const char *text, double percent);
 void on_combozoom_changed(GtkComboBox *widget, gpointer user_data);
@@ -100,6 +96,7 @@ void set_prepro_button_sensitiveness();
 
 void on_removegreen_activate(GtkMenuItem *menuitem, gpointer user_data);
 void on_SCNR_Apply_clicked(GtkButton *button, gpointer user_data);
+void update_statusbar_convert();
 void fill_convert_list(GSList *list);
 
 void update_spinCPU(int max);

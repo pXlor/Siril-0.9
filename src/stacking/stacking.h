@@ -1,8 +1,7 @@
 #ifndef STACKING_H_
 #define STACKING_H_
 
-/* the dynamic image selection, based on various possible criteria */
-typedef int (*stack_filter)(sequence *seq, int nb_img, double param);
+#include "core/processing.h"
 
 /* the stacking method */
 struct stacking_args;
@@ -39,7 +38,7 @@ struct normalization_coeff {
 struct stacking_args {
 	stack_method method;
 	sequence *seq;
-	stack_filter filtering_criterion;
+	seq_image_filter filtering_criterion;
 	double filtering_parameter;
 	int nb_images_to_stack; // calculated from the above, for display purposes
 	int *image_indices;	// conversion between selected image indices and sequence image indices
@@ -58,6 +57,8 @@ struct stacking_args {
 
 void initialize_stacking_methods();
 
+void fill_list_of_unfiltered_images(struct stacking_args *args);
+
 int stack_summing(struct stacking_args *args);
 int stack_median(struct stacking_args *args);
 int stack_mean_with_rejection(struct stacking_args *args);
@@ -66,5 +67,10 @@ int stack_addmin(struct stacking_args *args);
 
 void start_stacking();
 void update_stack_interface();
+
+int stack_filter_all(sequence *seq, int nb_img, double any);
+int stack_filter_included(sequence *seq, int nb_img, double any);
+
+int compute_normalization(struct stacking_args *args, norm_coeff *coeff, normalization mode);
 
 #endif

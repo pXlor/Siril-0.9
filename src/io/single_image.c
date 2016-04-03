@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -26,6 +26,7 @@
 #include "core/siril.h"
 #include "core/proto.h"
 #include "gui/callbacks.h"
+#include "io/conversion.h"
 #include "io/single_image.h"
 #include "gui/PSF_list.h"
 #include "gui/histogram.h"
@@ -112,50 +113,15 @@ int read_single_image(const char* filename, fits *dest, char **realname_out) {
 		free(realname);
 		return 1;
 	}
-	switch (imagetype) {
-		case TYPEFITS:
-			retval = (readfits(realname, dest, NULL) != 0);
-			break;
-		case TYPEBMP:
-			retval = (readbmp(realname, dest) < 0);
-			break;
-		case TYPEPIC:
-			retval = (readpic(realname, dest) < 0);
-			break;
-#ifdef HAVE_LIBTIFF
-		case TYPETIFF:
-			retval = (readtif(realname, dest) < 0);
-			break;
-#endif
-		case TYPEPNM:
-			retval = (import_pnm_to_fits(realname, dest) < 0);
-			break;
-#ifdef HAVE_LIBJPEG
-		case TYPEJPG:
-			retval = (readjpg(realname, dest) < 0);
-			break;		
-#endif
-#ifdef HAVE_LIBPNG
-		case TYPEPNG:
-			retval = (readpng(realname, dest) < 0);
-			break;
-#endif
-#ifdef HAVE_LIBRAW
-		case TYPERAW:
-			retval = (open_raw_files(realname, dest, com.raw_set.cfa) < 0);
-			break;
-#endif
-		case TYPESER:
-		case TYPEAVI:
+	if (imagetype == TYPESER || imagetype == TYPEAVI) {
 			/* Returns 3 if ok */
-			retval = read_single_sequence(realname, imagetype);
-			break;
-		case TYPEUNDEF:
-		default:	// when the ifdefs are not compiled, default happens!
-			siril_log_message("Error opening %s: file type not supported.\n", filename);
-			retval = 2;
+		retval = read_single_sequence(realname, imagetype);
+	} else {
+		retval = any_to_fits(imagetype, realname, dest);
+		if (!retval)
+			debayer_if_needed(imagetype, dest);
 	}
-	if (retval > 0 && retval < 3)
+	if (retval != 0 && retval != 3)
 		siril_log_message("Opening %s failed.\n", realname);
 	if (realname_out)
 		*realname_out = realname;
@@ -251,13 +217,13 @@ int image_find_minmax(fits *fit, int force_minmax){
 	if (fit->maxi != 0 && !force_minmax) return 1;
 
 	/* search for min and max values in all layers */
-#pragma omp parallel for num_threads(com.max_thread) private(layer) schedule(dynamic,1)
-	for (layer=0; layer<fit->naxes[2]; ++layer){
+#pragma omp parallel for num_threads(com.max_thread) private(layer, i) schedule(dynamic,1)
+	for (layer = 0; layer < fit->naxes[2]; ++layer) {
 		WORD *buf = fit->pdata[layer];
 		fit->max[layer] = 0;
 		fit->min[layer] = USHRT_MAX;
 
-		for (i=0; i<fit->rx * fit->ry; ++i){
+		for (i = 0; i < fit->rx * fit->ry; ++i) {
 			fit->max[layer] = max(fit->max[layer], buf[i]);
 			fit->min[layer] = min(fit->min[layer], buf[i]);
 		}
@@ -268,7 +234,7 @@ int image_find_minmax(fits *fit, int force_minmax){
 	/* set the overall min and max values from layer values */
 	fit->maxi = 0;
 	fit->mini = USHRT_MAX;
-	for (layer=0; layer<fit->naxes[2]; ++layer){
+	for (layer = 0; layer < fit->naxes[2]; ++layer) {
 		fit->maxi = max(fit->max[layer], fit->maxi);
 		fit->mini = min(fit->min[layer], fit->mini);
 	}

@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -42,7 +42,7 @@ static WORD Compute_threshold(fits *fit, double starfinder, int layer, WORD *nor
 
 	assert(layer <= 3);
 
-	stat = statistics(fit, layer, NULL, STATS_SIGMA);
+	stat = statistics(fit, layer, NULL, STATS_BASIC);
 	threshold = (WORD) stat->median + starfinder * (WORD) stat->sigma;
 	*norm = (WORD) stat->normValue;
 	printf("Threshold = %d\n", threshold);

@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -25,6 +25,7 @@
 #include <float.h>
 
 #include "core/siril.h"
+#include "core/processing.h"
 #include "gui/callbacks.h"
 #include "io/single_image.h"
 #include "gui/histogram.h"
@@ -45,6 +46,8 @@ void hsl_to_rgb(double h, double sl, double l, double * r, double * g,
 		double * b) {
 	double v;
 
+	assert(h >= 0.0 && h <= 1.0);
+	if (h >= 1.0) h -= 1.0;		// this code doesn't work for h = 1
 	v = (l <= 0.5) ? (l * (1.0 + sl)) : (l + sl - l * sl);
 	if (v <= 0) {
 		*r = *g = *b = 0.0;
@@ -141,10 +144,7 @@ void rgb_to_hsl(double r, double g, double b, double *h, double *s, double *l) {
 	*h /= 6;
 }
 
-/* In these functions h =0...360, s=0...1, v=0....1 
- * So be careful: it is not the same behaviour than rgb_to_hsl
- * and its reversal. But I think that it is a better choice */
-
+/* all variables are between 0 and 1. h takes 0 for grey */
 void rgb_to_hsv(double r, double g, double b, double *h, double *s, double *v) {
 	double cmax, cmin, delta;
 
@@ -153,29 +153,34 @@ void rgb_to_hsv(double r, double g, double b, double *h, double *s, double *v) {
 	cmin = min(r, g);
 	cmin = min(cmin, b);
 	delta = cmax - cmin;
-	*s = (delta == 0.0 ? 0.0 : delta / cmax);
 	*v = cmax;
+	if (delta == 0.0) {
+		*s = 0.0;
+		*h = 0.0;
+		return;
+	}
+	*s = delta / cmax;
 
 	if (cmax == r)
-		*h = (((g - b) / delta)) * 60.0;
+		*h = (((g - b) / delta)) / 6.0;
 	else if (cmax == g)
-		*h = (((b - r) / delta) + 2.0) * 60.0;
+		*h = (((b - r) / delta) + 2.0) / 6.0;
 	else
-		*h = (((r - g) / delta) + 4.0) * 60.0;
+		*h = (((r - g) / delta) + 4.0) / 6.0;
 
 	if (*h < 0.0)
-		*h += 360.0;
+		*h += 1.0;
 }
 
 void hsv_to_rgb(double h, double s, double v, double *r, double *g, double *b) {
 	double p, q, t, f;
 	int i;
 
-	if (h >= 360.0)
-		h -= 360.0;
-	h /= 60.0;
-	i = (int) h;
-	f = h - i;
+	if (h >= 1.0)
+		h -= 1.0;
+	h *= 6.0;
+	i = (int)h;
+	f = h - (double)i;
 	p = v * (1.0 - s);
 	q = v * (1.0 - (s * f));
 	t = v * (1.0 - (s * (1.0 - f)));
@@ -216,18 +221,9 @@ void hsv_to_rgb(double h, double s, double v, double *r, double *g, double *b) {
 }
 
 void rgb_to_xyz(double r, double g, double b, double *x, double *y, double *z) {
-	if (r > 0.04045)
-		r = pow(((r + 0.055) / 1.055), 2.4);
-	else
-		r = r / 12.92;
-	if (g > 0.04045)
-		g = pow(((g + 0.055) / 1.055), 2.4);
-	else
-		g = g / 12.92;
-	if (b > 0.04045)
-		b = pow(((b + 0.055) / 1.055), 2.4);
-	else
-		b = b / 12.92;
+	r = (r <= 0.04045) ? r / 12.92 : pow(((r + 0.055) / 1.055), 2.4);
+	g = (g <= 0.04045) ? g / 12.92 : pow(((g + 0.055) / 1.055), 2.4);
+	b = (b <= 0.04045) ? b / 12.92 : pow(((b + 0.055) / 1.055), 2.4);
 
 	r *= 100;
 	g *= 100;
@@ -243,68 +239,46 @@ void xyz_to_LAB(double x, double y, double z, double *L, double *a, double *b) {
 	y /= 100.000;
 	z /= 108.883;
 
-	if (x > 0.008856452)
-		x = pow(x, 1 / 3.);
-	else
-		x = (7.787037037 * x) + (16. / 116.);
-	if (y > 0.008856452)
-		y = pow(y, 1 / 3.);
-	else
-		y = (7.787037037 * y) + (16. / 116.);
-	if (z > 0.008856452)
-		z = pow(z, 1 / 3.);
-	else
-		z = (7.787037037 * z) + (16. / 116.);
+	x = (x > 0.008856452) ? pow(x, 1 / 3.0) : (7.787037037 * x) + (16. / 116.);
+	y = (y > 0.008856452) ? pow(y, 1 / 3.0) : (7.787037037 * y) + (16. / 116.);
+	z = (z > 0.008856452) ? pow(z, 1 / 3.0) : (7.787037037 * z) + (16. / 116.);
 
-	*L = (116 * y) - 16;
-	*a = 500 * (x - y);
-	*b = 200 * (y - z);
+	*L = (116.0 * y) - 16.0;
+	*a = 500.0 * (x - y);
+	*b = 200.0 * (y - z);
 }
 
 void LAB_to_xyz(double L, double a, double b, double *x, double *y, double *z) {
-	*y = (L + 16.) / 116.;
-	*x = a / 500. + (*y);
-	*z = *y - b / 200.;
+	*y = (L + 16.0) / 116.0;
+	*x = a / 500.0 + (*y);
+	*z = *y - b / 200.0;
 
-	if (((*x) * (*x) * (*x)) > 0.008856452)
-		*x = (*x) * (*x) * (*x);
-	else
-		*x = (*x - 16. / 116.) / 7.787037037;
-	if (((*y) * (*y) * (*y)) > 0.008856452)
-		*y = (*y) * (*y) * (*y);
-	else
-		*y = (*y - 16. / 116.) / 7.787037037;
-	if (((*z) * (*z) * (*z)) > 0.008856452)
-		*z = (*z) * (*z) * (*z);
-	else
-		*z = (*z - 16. / 116.) / 7.787037037;
+	double x3, y3, z3;
+	x3 = (*x) * (*x) * (*x);
+	y3 = (*y) * (*y) * (*y);
+	z3 = (*z) * (*z) * (*z);
 
-	*x = 95.047 * (*x);
-	*y = 100.000 * (*y);
-	*z = 108.883 * (*z);
+	*x = (x3 > 0.008856452) ? x3 : (*x - 16. / 116.) / 7.787037037;
+	*y = (y3 > 0.008856452) ? y3 : (*y - 16. / 116.) / 7.787037037;
+	*z = (z3 > 0.008856452) ? z3 : (*z - 16. / 116.) / 7.787037037;
+
+	*x *= 95.047;
+	*y *= 100.000;
+	*z *= 108.883;
 }
 
 void xyz_to_rgb(double x, double y, double z, double *r, double *g, double *b) {
-	x /= 100.;
-	y /= 100.;
-	z /= 100.;
+	x /= 100.0;
+	y /= 100.0;
+	z /= 100.0;
 
-	*r = 3.240479 * x - 1.537150 * y - 0.498535 * z;
+	*r =  3.240479 * x - 1.537150 * y - 0.498535 * z;
 	*g = -0.969256 * x + 1.875992 * y + 0.041556 * z;
-	*b = 0.055648 * x - 0.204043 * y + 1.057311 * z;
+	*b =  0.055648 * x - 0.204043 * y + 1.057311 * z;
 
-	if (*r > 0.0031308)
-		*r = 1.055 * (pow(*r, (1 / 2.4))) - 0.055;
-	else
-		*r = 12.92 * (*r);
-	if (*g > 0.0031308)
-		*g = 1.055 * (pow(*g, (1 / 2.4))) - 0.055;
-	else
-		*g = 12.92 * (*g);
-	if (*b > 0.0031308)
-		*b = 1.055 * (pow(*b, (1 / 2.4))) - 0.055;
-	else
-		*b = 12.92 * (*b);
+	*r = (*r > 0.0031308) ? 1.055 * (pow(*r, (1 / 2.4))) - 0.055 : 12.92 * (*r);
+	*g = (*g > 0.0031308) ? 1.055 * (pow(*g, (1 / 2.4))) - 0.055 : 12.92 * (*g);
+	*b = (*b > 0.0031308) ? 1.055 * (pow(*b, (1 / 2.4))) - 0.055 : 12.92 * (*b);
 }
 
 // idle function executed at the end of the extract_channels processing
@@ -372,7 +346,7 @@ gpointer extract_channels(gpointer p) {
 			double g = (double) buf[GLAYER][i] / USHRT_MAX_DOUBLE;
 			double b = (double) buf[BLAYER][i] / USHRT_MAX_DOUBLE;
 			rgb_to_hsv(r, g, b, &h, &s, &v);
-			buf[RLAYER][i] = round_to_WORD(h);// h is set between 0 and 360 in this function
+			buf[RLAYER][i] = round_to_WORD(h * 360.0);
 			buf[GLAYER][i] = round_to_WORD(s * USHRT_MAX_DOUBLE);
 			buf[BLAYER][i] = round_to_WORD(v * USHRT_MAX_DOUBLE);
 		}
@@ -440,13 +414,13 @@ gpointer enhance_saturation(gpointer p) {
 	args->h_min /= 360.0;
 	args->h_max /= 360.0;
 	if (args->preserve) {
-		imstats *stat = statistics(args->fit, GLAYER, NULL, STATS_SIGMA);
+		imstats *stat = statistics(args->fit, GLAYER, NULL, STATS_BASIC);
 		bg = stat->median + stat->sigma;
 		bg /= stat->normValue;
 		free(stat);
 	}
 
-#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(dynamic, 1)
+#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
 	for (i = 0; i < args->fit->rx * args->fit->ry; i++) {
 		double h, s, l;
 		double r = (double) buf[RLAYER][i] / USHRT_MAX_DOUBLE;
@@ -509,7 +483,7 @@ gpointer scnr(gpointer p) {
 	gettimeofday(&t_start, NULL);
 
 	WORD norm = get_normalized_value(args->fit);
-#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(dynamic,1)
+#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
 	for (i = 0; i < nbdata; i++) {
 		double red = (double) buf[RLAYER][i] / norm;
 		double green = (double) buf[GLAYER][i] / norm;
@@ -828,7 +802,7 @@ static void white_balance(fits *fit, gboolean is_manual, rectangle white_selecti
 		high = gtk_range_get_value(scaleLimit[1]);
 		get_coeff_for_wb(fit, white_selection, black_selection, kw, bg, &norm, low, high);
 	}
-#pragma omp parallel for num_threads(com.max_thread) private(chan) schedule(dynamic, 1)
+#pragma omp parallel for num_threads(com.max_thread) private(chan) schedule(static)
 	for (chan = 0; chan < 3; chan++) {
 		if (kw[chan] == 1.0) continue;
 		calibrate(fit, chan, kw[chan], bg[chan], norm);
@@ -886,7 +860,7 @@ void on_calibration_apply_button_clicked(GtkButton *button, gpointer user_data) 
 	white_selection.w = gtk_spin_button_get_value(selection_white_value[2]);
 	white_selection.h = gtk_spin_button_get_value(selection_white_value[3]);
 
-	if (!white_selection.w || !white_selection.h) {
+	if ((!white_selection.w || !white_selection.h) && !is_manual) {
 		show_dialog("Make a selection of the white area before", "Warning",
 				"gtk-dialog-warning");
 		return;

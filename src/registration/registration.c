@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -40,6 +40,7 @@
 #include "algos/PSF.h"
 #include "gui/PSF_list.h"
 #include "algos/quality.h"
+#include "io/ser.h"
 #ifdef HAVE_OPENCV
 #include "opencv/opencv.h"
 #include "opencv/ecc/ecc.h"
@@ -153,28 +154,39 @@ struct registration_method *get_selected_registration_method() {
 	return reg_methods[index];
 }
 
+static void normalizeQualityData(struct registration_args *args, double q_min, double q_max) {
+	int frame;
+
+	for (frame = 0; frame < args->seq->number; ++frame) {
+		if (args->run_in_thread && !get_thread_run()) {
+			break;
+		}
+		if (!args->process_all_frames && !args->seq->imgparam[frame].incl)
+			continue;
+
+		args->seq->regparam[args->layer][frame].quality -= q_min;
+		args->seq->regparam[args->layer][frame].quality /= (q_max - q_min);
+	}
+}
+
 /* register images: calculate shift in images to be aligned with the reference image;
  * images are not modified, only shift parameters are saved in regparam in the sequence.
  * layer is the layer on which the registration will be done, green by default (set in siril_init())
  */
 int register_shift_dft(struct registration_args *args) {
-	int i, x, size, sqsize;
-	fftw_complex *ref, *img, *in, *out, *convol;
+	fits fit_ref;
+	int frame, size, sqsize;
+	fftw_complex *ref, *in, *out, *convol;
 	fftw_plan p, q;
-	int shiftx, shifty, shift;
-	int ret;
+	int ret, j;
 	int plan;
-	fftw_complex *cbuf, *ibuf, *obuf;
+	int abort = 0;
 	float nb_frames, cur_nb;
 	int ref_image;
 	regdata *current_regdata;
-	char tmpmsg[1024], tmpfilename[256];
 	rectangle full_area;	// the area to use after getting image_part
-	int j;
-	double q_max = 0;
+	double q_max = 0, q_min = DBL_MAX;
 	int q_index = -1;
-	fits fit;
-	memset(&fit, 0, sizeof(fits));
 
 	/* the selection needs to be squared for the DFT */
 	assert(args->selection.w == args->selection.h);
@@ -213,21 +225,19 @@ int register_shift_dft(struct registration_args *args) {
 	set_progress_bar_data(
 			"Register DFT: loading and processing reference frame",
 			PROGRESS_NONE);
-	ret = seq_read_frame_part(args->seq, args->layer, ref_image, &fit,
+	memset(&fit_ref, 0, sizeof(fits));
+	ret = seq_read_frame_part(args->seq, args->layer, ref_image, &fit_ref,
 			&args->selection);
-
-	q_max = current_regdata[ref_image].quality;
-	q_index = ref_image;
 
 	if (ret) {
 		siril_log_message(
 				"Register: could not load first image to register, aborting.\n");
 		free(current_regdata);
+		clearfits(&fit_ref);
 		return ret;
 	}
 
 	ref = fftw_malloc(sizeof(fftw_complex) * sqsize);
-	img = fftw_malloc(sizeof(fftw_complex) * sqsize);
 	in = fftw_malloc(sizeof(fftw_complex) * sqsize);
 	out = fftw_malloc(sizeof(fftw_complex) * sqsize);
 	convol = fftw_malloc(sizeof(fftw_complex) * sqsize);
@@ -242,90 +252,122 @@ int register_shift_dft(struct registration_args *args) {
 
 	// copying image selection into the fftw data
 	for (j = 0; j < sqsize; j++)
-		ref[j] = (double) fit.data[j];
+		ref[j] = (double) fit_ref.data[j];
 
 	// We don't need fit anymore, we can destroy it.
-	current_regdata[ref_image].quality = QualityEstimate(&fit, args->layer, QUALTYPE_NORMAL);
-	clearfits(&fit);
+	current_regdata[ref_image].quality = QualityEstimate(&fit_ref, args->layer, QUALTYPE_NORMAL);
+	clearfits(&fit_ref);
 	fftw_execute_dft(p, ref, in); /* repeat as needed */
 	current_regdata[ref_image].shiftx = 0;
 	current_regdata[ref_image].shifty = 0;
 
-	for (i = 0, cur_nb = 0.f; i < args->seq->number; ++i) {
-		if (args->run_in_thread && !get_thread_run())
-			break;
-		if (i == ref_image)
-			continue;
-		if (!args->process_all_frames && !args->seq->imgparam[i].incl)
-			continue;
+	q_min = q_max = current_regdata[ref_image].quality;
+	q_index = ref_image;
 
-		seq_get_image_filename(args->seq, i, tmpfilename);
-		g_snprintf(tmpmsg, 1024, "Register: processing image %s\n", tmpfilename);
-		set_progress_bar_data(tmpmsg, PROGRESS_NONE);
-		if (!(ret = seq_read_frame_part(args->seq, args->layer, i, &fit,
-				&args->selection))) {
-
-			// copying image selection into the fftw data
-			for (j = 0; j < sqsize; j++)
-				img[j] = (double) fit.data[j];
-
-			// We don't need fit anymore, we can destroy it.
-			current_regdata[i].quality = QualityEstimate(&fit, args->layer, QUALTYPE_NORMAL);
-
-			if (current_regdata[i].quality > q_max) {
-				q_max = current_regdata[i].quality;
-				q_index = i;
+	cur_nb = 0.f;
+#pragma omp parallel for num_threads(com.max_thread) private(frame) schedule(static) \
+	if((args->seq->type == SEQ_REGULAR && fits_is_reentrant()) || args->seq->type == SEQ_SER)
+	for (frame = 0; frame < args->seq->number; ++frame) {
+		if (!abort) {
+			if (args->run_in_thread && !get_thread_run()) {
+				abort = 1;
+				continue;
 			}
+			if (frame == ref_image)
+				continue;
+			if (!args->process_all_frames && !args->seq->imgparam[frame].incl)
+				continue;
 
-			clearfits(&fit);
-			fftw_execute_dft(p, img, out); /* repeat as needed */
-			/* originally, quality is computed with the quality
-			 * function working on the fft space. Now we use quality
-			 * instead.
-			 */
-			cbuf = convol;
-			ibuf = in;
-			obuf = out;
-			for (x = 0; x < sqsize; x++) {
-				*cbuf++ = *ibuf++ * conj(*obuf++);
-			}
+			char tmpmsg[1024], tmpfilename[256];
+			fits fit;
+			memset(&fit, 0, sizeof(fits));
 
-			fftw_execute_dft(q, convol, ref); /* repeat as needed */
-			shift = 0;
-			for (x = 1; x < sqsize; ++x) {
-				if (creal(ref[x]) > creal(ref[shift])) {
-					shift = x;
-					// break or get last value?
+			seq_get_image_filename(args->seq, frame, tmpfilename);
+			g_snprintf(tmpmsg, 1024, "Register: processing image %s\n",
+					tmpfilename);
+			set_progress_bar_data(tmpmsg, PROGRESS_NONE);
+			if (!(seq_read_frame_part(args->seq, args->layer, frame, &fit,
+					&args->selection))) {
+
+				int x;
+				fftw_complex *img = fftw_malloc(sizeof(fftw_complex) * sqsize);
+				fftw_complex *out2 = fftw_malloc(sizeof(fftw_complex) * sqsize);
+
+				// copying image selection into the fftw data
+				for (x = 0; x < sqsize; x++)
+					img[x] = (double) fit.data[x];
+
+				// We don't need fit anymore, we can destroy it.
+				current_regdata[frame].quality = QualityEstimate(&fit, args->layer,
+						QUALTYPE_NORMAL);
+
+				clearfits(&fit);
+
+#pragma omp critical
+				{
+					double qual = current_regdata[frame].quality;
+					if (qual > q_max) {
+						q_max = qual;
+						q_index = frame;
+					}
+					q_min = min(q_min, qual);
 				}
-			}
-			shifty = shift / size;
-			shiftx = shift % size;
-			if (shifty > size / 2) {
-				shifty -= size;
-			}
-			if (shiftx > size / 2) {
-				shiftx -= size;
-			}
 
-			current_regdata[i].shiftx = shiftx;
-			current_regdata[i].shifty = shifty;
+				fftw_execute_dft(p, img, out2); /* repeat as needed */
 
-			/* shiftx and shifty are the x and y values for translation that
-			 * would make this image aligned with the reference image.
-			 * WARNING: the y value is counted backwards, since the FITS is
-			 * stored down from up.
-			 */
-			fprintf(stderr, "reg: file %d, shiftx=%d shifty=%d quality=%g\n",
-					args->seq->imgparam[i].filenum, current_regdata[i].shiftx,
-					current_regdata[i].shifty, current_regdata[i].quality);
-			cur_nb += 1.f;
-			set_progress_bar_data(NULL, cur_nb / nb_frames);
-		} else {
-			//report_fits_error(ret, error_buffer);
-			if (current_regdata == args->seq->regparam[args->layer])
-				args->seq->regparam[args->layer] = NULL;
-			free(current_regdata);
-			return ret;
+				fftw_complex *convol2 = fftw_malloc(sizeof(fftw_complex) * sqsize);
+
+				for (x = 0; x < sqsize; x++) {
+					convol2[x] = in[x] * conj(out2[x]);
+				}
+
+				fftw_execute_dft(q, convol2, out2); /* repeat as needed */
+				fftw_free(convol2);
+
+				int shift = 0;
+				for (x = 1; x < sqsize; ++x) {
+					if (creal(out2[x]) > creal(out2[shift])) {
+						shift = x;
+						// break or get last value?
+					}
+				}
+				int shifty = shift / size;
+				int shiftx = shift % size;
+				if (shifty > size / 2) {
+					shifty -= size;
+				}
+				if (shiftx > size / 2) {
+					shiftx -= size;
+				}
+
+				current_regdata[frame].shiftx = shiftx;
+				current_regdata[frame].shifty = shifty;
+
+				/* shiftx and shifty are the x and y values for translation that
+				 * would make this image aligned with the reference image.
+				 * WARNING: the y value is counted backwards, since the FITS is
+				 * stored down from up.
+				 */
+#ifdef DEBUG
+				fprintf(stderr,
+						"reg: frame %d, shiftx=%d shifty=%d quality=%g\n",
+						args->seq->imgparam[frame].filenum,
+						current_regdata[frame].shiftx, current_regdata[frame].shifty,
+						current_regdata[frame].quality);
+#endif
+#pragma omp atomic
+				cur_nb += 1.f;
+				set_progress_bar_data(NULL, cur_nb / nb_frames);
+				fftw_free(img);
+				fftw_free(out2);
+			} else {
+				//report_fits_error(ret, error_buffer);
+				if (current_regdata == args->seq->regparam[args->layer])
+					args->seq->regparam[args->layer] = NULL;
+				free(current_regdata);
+				abort = ret = 1;
+				continue;
+			}
 		}
 	}
 
@@ -334,14 +376,15 @@ int register_shift_dft(struct registration_args *args) {
 	fftw_free(in);
 	fftw_free(out);
 	fftw_free(ref);
-	fftw_free(img);
 	fftw_free(convol);
-	args->seq->regparam[args->layer] = current_regdata;
-	update_used_memory();
-	siril_log_message("Registration finished.\n");
-	siril_log_color_message("Best frame: #%d with quality=%g.\n", "bold",
-			q_index, q_max);
-	return 0;
+	if (!ret) {
+		args->seq->regparam[args->layer] = current_regdata;
+		normalizeQualityData(args, q_min, q_max);
+		update_used_memory();
+		siril_log_message("Registration finished.\n");
+		siril_log_color_message("Best frame: #%d.\n", "bold", q_index);
+	}
+	return ret;
 }
 
 /* register images: calculate shift in images to be aligned with the reference image;
@@ -359,7 +402,8 @@ int register_shift_fwhm(struct registration_args *args) {
 	 * images to register, which provides FWHM but also star coordinates */
 	// TODO: detect that it was already computed, and don't do it again
 	// -> should be done at a higher level and passed in the args
-	if (do_fwhm_sequence_processing(args->seq, args->layer))	// stores in regparam
+	if (do_fwhm_sequence_processing(args->seq, args->layer, 0,
+			args->run_in_thread))	// stores in regparam
 		return 1;
 
 	current_regdata = args->seq->regparam[args->layer];
@@ -466,6 +510,7 @@ int register_star_alignment(struct registration_args *args) {
 	regdata *current_regdata;
 	starFinder sf;
 	fits fit;
+	struct ser_struct *new_ser;
 
 	memset(&fit, 0, sizeof(fits));
 	memset(&sf, 0, sizeof(starFinder));
@@ -539,6 +584,21 @@ int register_star_alignment(struct registration_args *args) {
 	if (args->process_all_frames)
 		args->seq->new_total = args->seq->number;
 	else args->seq->new_total = args->seq->selnum;
+
+	if (args->seq->type == SEQ_SER) {
+		char dest[256];
+
+		new_ser = malloc(sizeof(struct ser_struct));
+
+		const char *ptr = strrchr(args->seq->seqname, '/');
+		if (ptr)
+			snprintf(dest, 255, "%s%s.ser", args->text, ptr + 1);
+		else
+			snprintf(dest, 255, "%s%s.ser", args->text, args->seq->seqname);
+
+		ser_create_file(dest, new_ser, TRUE, args->seq->ser_file);
+	}
+
 	for (frame = 0, cur_nb = 0.f; frame < args->seq->number; frame++) {
 		if (args->run_in_thread && !get_thread_run())
 			break;
@@ -603,12 +663,18 @@ int register_star_alignment(struct registration_args *args) {
 			}
 			fit_sequence_get_image_filename(args->seq, frame, filename, TRUE);
 
-			snprintf(dest, 255, "%s%s", args->text, filename);
-			savefits(dest, &fit);
+			if (args->seq->type == SEQ_SER)
+				ser_write_frame_from_fit(new_ser, &fit, frame);
+			else
+				savefits(dest, &fit);
 
 			cur_nb += 1.f;
 			set_progress_bar_data(NULL, cur_nb / nb_frames);
 		}
+	}
+	if (args->seq->type == SEQ_SER) {
+		ser_write_and_close(new_ser);
+		free(new_ser);
 	}
 	args->seq->regparam[args->layer] = current_regdata;
 	update_used_memory();
@@ -620,15 +686,13 @@ int register_star_alignment(struct registration_args *args) {
 }
 
 int register_ecc(struct registration_args *args) {
-	int frame, ref_image, ret;
+	int frame, ref_image, ret, failed = 0;
 	float nb_frames, cur_nb;
 	regdata *current_regdata;
-	fits ref, im;
-	double q_max = 0;
+	fits ref;
+	double q_max = 0, q_min = DBL_MAX;
 	int q_index = -1;
-
-	memset(&im, 0, sizeof(fits));
-	memset(&ref, 0, sizeof(fits));
+	int abort = 0;
 
 	if (!args->seq->regparam) {
 		fprintf(stderr, "regparam should have been created before\n");
@@ -657,6 +721,8 @@ int register_ecc(struct registration_args *args) {
 	else
 		ref_image = args->seq->reference_image;
 
+	memset(&ref, 0, sizeof(fits));
+
 	/* first we're looking for stars in reference image */
 	ret = seq_read_frame(args->seq, ref_image, &ref);
 	if (ret) {
@@ -667,58 +733,92 @@ int register_ecc(struct registration_args *args) {
 		return 1;
 	}
 	current_regdata[ref_image].quality = QualityEstimate(&ref, args->layer, QUALTYPE_NORMAL);
-	q_max = current_regdata[ref_image].quality;
+	/* we make sure to free data in the destroyed fit */
+	clearfits(&ref);
+	/* Ugly code: as QualityEstimate destroys fit we need to reload it */
+	seq_read_frame(args->seq, ref_image, &ref);
+	q_min = q_max = current_regdata[ref_image].quality;
 	q_index = ref_image;
 
 	/* then we compare to other frames */
 	if (args->process_all_frames)
 		args->seq->new_total = args->seq->number;
 	else args->seq->new_total = args->seq->selnum;
-	for (frame = 0, cur_nb = 0.f; frame < args->seq->number; frame++) {
-		if (args->run_in_thread && !get_thread_run())
-			break;
-		if (!args->process_all_frames && !args->seq->imgparam[frame].incl)
-			continue;
-		current_regdata[frame].shiftx = 0;
-		current_regdata[frame].shifty = 0;
 
-		if (args->run_in_thread && !get_thread_run())
-			break;
-		if (!args->process_all_frames && !args->seq->imgparam[frame].incl)
-			continue;
+	cur_nb = 0.f;
+#pragma omp parallel for num_threads(com.max_thread) private(frame) schedule(static) \
+	if((args->seq->type == SEQ_REGULAR && fits_is_reentrant()) || args->seq->type == SEQ_SER)
+	for (frame = 0; frame < args->seq->number; frame++) {
+		if (!abort) {
+			if (args->run_in_thread && !get_thread_run()) {
+				abort = 1;
+				continue;
+			}
+			if (!args->process_all_frames && !args->seq->imgparam[frame].incl)
+				continue;
+			current_regdata[frame].shiftx = 0;
+			current_regdata[frame].shifty = 0;
 
-		if (frame != ref_image) {
-			ret = seq_read_frame(args->seq, frame, &im);
-			if (!ret) {
-				reg_ecc reg_param;
-				memset(&reg_param, 0, sizeof(reg_ecc));
+			char tmpmsg[1024], tmpfilename[256];
 
-				if (findTransform(&ref, &im, args->layer, &reg_param)) {
-					siril_log_message("Cannot perform ECC alignment\n");
-					break;
+			seq_get_image_filename(args->seq, frame, tmpfilename);
+			g_snprintf(tmpmsg, 1024, "Register: processing image %s\n",
+					tmpfilename);
+			set_progress_bar_data(tmpmsg, PROGRESS_NONE);
+
+			if (frame != ref_image) {
+				fits im;
+
+				memset(&im, 0, sizeof(fits));
+				ret = seq_read_frame(args->seq, frame, &im);
+				if (!ret) {
+					reg_ecc reg_param;
+					memset(&reg_param, 0, sizeof(reg_ecc));
+
+					if (findTransform(&ref, &im, args->layer, &reg_param)) {
+						siril_log_message(
+								"Cannot perform ECC alignment for frame %d\n",
+								frame);
+						/* We exclude this frame */
+						com.seq.imgparam[frame].incl = FALSE;
+#pragma omp atomic
+						++failed;
+						clearfits(&im);
+						continue;
+					}
+
+					current_regdata[frame].quality = QualityEstimate(&im,
+							args->layer, QUALTYPE_NORMAL);
+
+#pragma omp critical
+					{
+						double qual = current_regdata[frame].quality;
+						if (qual > q_max) {
+							q_max = qual;
+							q_index = frame;
+						}
+						q_min = min(q_min, qual);
+					}
+
+					current_regdata[frame].shiftx = -round_to_int(reg_param.dx);
+					current_regdata[frame].shifty = -round_to_int(reg_param.dy);
+
+#pragma omp atomic
+					cur_nb += 1.f;
+					set_progress_bar_data(NULL, cur_nb / nb_frames);
+					clearfits(&im);
 				}
-				// We don't need fit anymore, we can destroy it.
-				current_regdata[frame].quality = QualityEstimate(&im, args->layer,
-						QUALTYPE_NORMAL);
-
-				if (current_regdata[frame].quality > q_max) {
-					q_max = current_regdata[frame].quality;
-					q_index = frame;
-				}
-
-				current_regdata[frame].shiftx = -round_to_int(reg_param.dx);
-				current_regdata[frame].shifty = -round_to_int(reg_param.dy);
-
-				cur_nb += 1.f;
-				set_progress_bar_data(NULL, cur_nb / nb_frames);
 			}
 		}
 	}
 	args->seq->regparam[args->layer] = current_regdata;
+	normalizeQualityData(args, q_min, q_max);
+	clearfits(&ref);
 	update_used_memory();
 	siril_log_message("Registration finished.\n");
-	siril_log_color_message("Best frame: #%d with quality=%g.\n", "bold",
-			q_index, q_max);
+	if (failed)
+		siril_log_color_message("%d frames were excluded.\n", "red", failed);
+	siril_log_color_message("Best frame: #%d.\n", "bold", q_index);
 
 	return 0;
 }
@@ -741,41 +841,17 @@ void on_comboboxregmethod_changed(GtkComboBox *box, gpointer user_data) {
 	writeinitfile();
 }
 
-int get_registration_layer(sequence *seq) {
+int get_registration_layer() {
 	int reglayer;
-	gboolean has_changed = FALSE;
 	GtkComboBox *registbox = GTK_COMBO_BOX(lookup_widget("comboboxreglayer"));
 
 	if (!sequence_is_loaded())
 		return -1;
 	reglayer = gtk_combo_box_get_active(registbox);
 
-	if (seq->nb_layers == 3) {
-		if (!seq->regparam[reglayer]) {
-			if (seq->regparam[GLAYER]) {
-				reglayer = GLAYER;
-				has_changed = TRUE;
-			}
-			else if (seq->regparam[RLAYER]) {
-				reglayer = RLAYER;
-				has_changed = TRUE;
-			}
-			else if (seq->regparam[BLAYER]) {
-				reglayer = BLAYER;
-				has_changed = TRUE;
-			}
-		}
-		if (has_changed) {
-			gtk_combo_box_set_active(registbox, reglayer);
-		}
-	}
 	return reglayer;
 }
 
-/* Selects the "register all" or "register selected" according to the number of
- * selected images, if argument is false.
- * Verifies that enough images are selected and an area is selected.
- */
 /* Selects the "register all" or "register selected" according to the number of
  * selected images, if argument is false.
  * Verifies that enough images are selected and an area is selected.

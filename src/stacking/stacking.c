@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -27,9 +27,6 @@
 #include <gsl/gsl_fit.h>
 #ifdef _OPENMP
 #include <omp.h>
-#endif
-#ifdef HAVE_CONFIG_H
-#include <config.h>
 #endif
 
 #include "core/siril.h"
@@ -73,19 +70,21 @@ void initialize_stacking_methods() {
 	gtk_combo_box_set_active(GTK_COMBO_BOX(rejectioncombo), com.stack.rej_method);
 }
 
+/* scale0, mul0 and offset0 are output arguments when i = 0, input arguments otherwise */
 static int _compute_normalization_for_image(struct stacking_args *args, int i,
-		double *offset, double *mul, double *scale, int mode, double *scale0,
+		double *offset, double *mul, double *scale, normalization mode, double *scale0,
 		double *mul0, double *offset0) {
 	imstats *stat = NULL;
 
-	if (args->force_norm || !(stat = seq_get_imstats(args->seq, args->image_indices[i], NULL, STATS_EXTRA))) {
+	if (!(stat = seq_get_imstats(args->seq, args->image_indices[i], NULL, STATS_EXTRA))) {
 		fits fit;
 		memset(&fit, 0, sizeof(fits));
 		if (seq_read_frame(args->seq, args->image_indices[i], &fit)) {
 			return 1;
 		}
 		stat = seq_get_imstats(args->seq, args->image_indices[i], &fit, STATS_EXTRA);
-		clearfits(&fit);
+		if (args->seq->type != SEQ_INTERNAL)
+			clearfits(&fit);
 	}
 
 	switch (mode) {
@@ -118,8 +117,8 @@ static int _compute_normalization_for_image(struct stacking_args *args, int i,
 	return 0;
 }
 
-static int compute_normalization(struct stacking_args *args, norm_coeff *coeff, int mode) {
-	int i, retval = 0, cur_nb = 0;
+int compute_normalization(struct stacking_args *args, norm_coeff *coeff, normalization mode) {
+	int i, retval = 0, cur_nb = 1;
 	double scale0, mul0, offset0;
 	char *tmpmsg;
 
@@ -136,7 +135,17 @@ static int compute_normalization(struct stacking_args *args, norm_coeff *coeff, 
 
 	tmpmsg = siril_log_message("Computing normalization...\n");
 	tmpmsg[strlen(tmpmsg) - 1] = '\0';
-	set_progress_bar_data(tmpmsg, PROGRESS_NONE);
+	set_progress_bar_data(tmpmsg, PROGRESS_RESET);
+
+	/* We empty the cache if needed (force to recompute) */
+	if (args->force_norm) {
+		for (i = 0; i < args->seq->number; i++) {
+			if (args->seq->imgparam && args->seq->imgparam[i].stats) {
+				free(args->seq->imgparam[i].stats);
+				args->seq->imgparam[i].stats = NULL;
+			}
+		}
+	}
 
 	// compute for the first image to have scale0 mul0 and offset0
 	if (_compute_normalization_for_image(args, 0, coeff->offset, coeff->mul, coeff->scale, mode,
@@ -144,6 +153,8 @@ static int compute_normalization(struct stacking_args *args, norm_coeff *coeff, 
 		set_progress_bar_data("Normalization failed.", PROGRESS_NONE);
 		return 1;
 	}
+
+	set_progress_bar_data(NULL, 1.0 / (double)args->nb_images_to_stack);
 
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) if (args->seq->type == SEQ_SER || fits_is_reentrant())
 	for (i = 1; i < args->nb_images_to_stack; ++i) {
@@ -160,7 +171,7 @@ static int compute_normalization(struct stacking_args *args, norm_coeff *coeff, 
 #pragma omp atomic
 			cur_nb++;	// only used for progress bar
 			set_progress_bar_data(NULL,
-					(double) cur_nb / ((double) args->nb_images_to_stack + 1.));
+					(double)cur_nb / ((double)args->nb_images_to_stack));
 		}
 	}
 	set_progress_bar_data(NULL, PROGRESS_DONE);
@@ -187,7 +198,7 @@ int stack_summing(struct stacking_args *args) {
 
 	/* should be pre-computed to display it in the stacking tab */
 	nb_frames = args->nb_images_to_stack;
-	reglayer = get_registration_layer(args->seq);
+	reglayer = get_registration_layer();
 
 	if (nb_frames <= 1) {
 		siril_log_message("No frame selected for stacking (select at least 2). Aborting.\n");
@@ -224,6 +235,14 @@ int stack_summing(struct stacking_args *args) {
 			goto free_and_reset_progress_bar;
 		}
 
+		if (args->seq->nb_layers == -1) {
+			/* sequence has not been opened before, this is set in set_seq.
+			 * It happens with the stackall command that stacks a
+			 * sequence right after readseqfile.
+			 */
+			args->seq->rx = fit->rx; args->seq->ry = fit->ry;
+			args->seq->nb_layers = fit->naxes[2];
+		}
 		assert(args->seq->nb_layers == 1 || args->seq->nb_layers == 3);
 		assert(fit->naxes[2] == args->seq->nb_layers);
 
@@ -454,12 +473,12 @@ int stack_median(struct stacking_args *args) {
 		naxes[0] = args->seq->ser_file->image_width;
 		naxes[1] = args->seq->ser_file->image_height;
 		ser_color type_ser = args->seq->ser_file->color_id;
-		if (com.raw_set.ser_cfa && type_ser != RGB && type_ser != BGR)
+		if (!com.debayer.open_debayer && type_ser != SER_RGB && type_ser != SER_BGR)
 			type_ser = SER_MONO;
 		naxes[2] = type_ser == SER_MONO ? 1 : 3;
 		naxis = type_ser == SER_MONO ? 2 : 3;
 		/* case of Super Pixel not handled yet */
-		if (com.raw_set.bayer_inter == BAYER_SUPER_PIXEL) {
+		if (com.debayer.bayer_inter == BAYER_SUPER_PIXEL) {
 			siril_log_message("Super-pixel is not handled yet for on the fly SER stacking\n");
 			retval = -1;
 			goto free_and_close;
@@ -513,7 +532,7 @@ int stack_median(struct stacking_args *args) {
 	/* Define some useful constants */
 	double total = (double)(naxes[2] * naxes[1] + 2);	// only used for progress bar
 
-	int nb_threads = 1;
+	int nb_threads;
 #ifdef _OPENMP
 	nb_threads = com.max_thread;
 	if (args->seq->type == SEQ_REGULAR && fits_is_reentrant()) {
@@ -526,6 +545,8 @@ int stack_median(struct stacking_args *args) {
 				" stacking will be executed on only one core\n");
 		siril_log_message("Your version of cfitsio does not support multi-threading\n");
 	}
+#else
+	nb_threads = 1;
 #endif
 
 	int nb_channels = naxes[2];
@@ -801,7 +822,7 @@ int stack_addmax(struct stacking_args *args) {
 
 	/* should be pre-computed to display it in the stacking tab */
 	nb_frames = args->nb_images_to_stack;
-	reglayer = get_registration_layer(args->seq);
+	reglayer = get_registration_layer();
 
 	if (nb_frames <= 1) {
 		siril_log_message("No frame selected for stacking (select at least 2). Aborting.\n");
@@ -962,7 +983,7 @@ int stack_addmin(struct stacking_args *args) {
 
 	/* should be pre-computed to display it in the stacking tab */
 	nb_frames = args->nb_images_to_stack;
-	reglayer = get_registration_layer(args->seq);
+	reglayer = get_registration_layer();
 
 	if (nb_frames <= 1) {
 		siril_log_message("No frame selected for stacking (select at least 2). Aborting.\n");
@@ -1182,7 +1203,7 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 	norm_coeff coeff;
 
 	nb_frames = args->nb_images_to_stack;
-	reglayer = get_registration_layer(args->seq);
+	reglayer = get_registration_layer();
 
 	if (args->seq->type != SEQ_REGULAR && args->seq->type != SEQ_SER) {
 		char *msg = siril_log_message("Rejection stacking is only supported for FITS images and SER sequences.\nUse \"Sum Stacking\" instead.\n");
@@ -1288,12 +1309,12 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 		naxes[0] = args->seq->ser_file->image_width;
 		naxes[1] = args->seq->ser_file->image_height;
 		ser_color type_ser = args->seq->ser_file->color_id;
-		if (com.raw_set.ser_cfa && type_ser != RGB && type_ser != BGR)
+		if (!com.debayer.open_debayer && type_ser != SER_RGB && type_ser != SER_BGR)
 			type_ser = SER_MONO;
 		naxes[2] = type_ser == SER_MONO ? 1 : 3;
 		naxis = type_ser == SER_MONO ? 2 : 3;
 		/* case of Super Pixel not handled yet */
-		if (com.raw_set.bayer_inter == BAYER_SUPER_PIXEL) {
+		if (com.debayer.bayer_inter == BAYER_SUPER_PIXEL) {
 			siril_log_message("Super-pixel is not handled yet for on the fly SER stacking\n");
 			retval = -1;
 			goto free_and_close;
@@ -1347,7 +1368,7 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 	/* Define some useful constants */
 	double total = (double)(naxes[2] * naxes[1] + 2);	// only used for progress bar
 
-	int nb_threads = 1;
+	int nb_threads;
 #ifdef _OPENMP
 	nb_threads = com.max_thread;
 	if (args->seq->type == SEQ_REGULAR && fits_is_reentrant()) {
@@ -1360,6 +1381,8 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 				" stacking will be executed on only one core\n");
 		siril_log_message("Your version of cfitsio does not support multi-threading\n");
 	}
+#else
+	nb_threads = 1;
 #endif
 
 	int nb_channels = naxes[2];
@@ -1976,6 +1999,7 @@ static gboolean end_stacking(gpointer p) {
 		com.uniq->nb_layers = gfit.naxes[2];
 		com.uniq->layers = calloc(com.uniq->nb_layers, sizeof(layer_info));
 		com.uniq->fit = &gfit;
+		com.uniq->fit->maxi = 0;	// force to recompute min/max
 		/* Giving summary if average rejection stacking */
 		_show_summary(args);
 		/* Giving noise estimation */
@@ -2114,7 +2138,7 @@ int stack_filter_included(sequence *seq, int nb_img, double any) {
 int stack_filter_fwhm(sequence *seq, int nb_img, double max_fwhm) {
 	int layer;
 	if (!seq->regparam) return 0;
-	layer = get_registration_layer(seq);
+	layer = get_registration_layer();
 	if (layer == -1) return 0;
 	if (!seq->regparam[layer]) return 0;
 	if (seq->imgparam[nb_img].incl && seq->regparam[layer][nb_img].fwhm > 0.0f)
@@ -2126,7 +2150,7 @@ int stack_filter_fwhm(sequence *seq, int nb_img, double max_fwhm) {
 int stack_filter_quality(sequence *seq, int nb_img, double max_quality) {
 	int layer;
 	if (!seq->regparam) return 0;
-	layer = get_registration_layer(seq);
+	layer = get_registration_layer();
 	if (layer == -1) return 0;
 	if (!seq->regparam[layer]) return 0;
 	if (seq->imgparam[nb_img].incl && seq->regparam[layer][nb_img].quality > 0.0)
@@ -2147,18 +2171,19 @@ int compute_nb_filtered_images() {
 	return count;
 }
 
-/* fill the image_indices mapping in a pre-allocated array */
-void fill_list_of_unfiltered_images(int *indices) {
-	int i, j = 0;
-	if (!sequence_is_loaded()) return;
-	for (i=0, j=0; i<com.seq.number; i++) {
-		if (stackparam.filtering_criterion(
+/* fill the image_indices mapping for the args->image_indices array, which has
+ * to be already allocated to the correct size at least */
+void fill_list_of_unfiltered_images(struct stacking_args *args) {
+	int i, j;
+	for (i=0, j=0; i<args->seq->number; i++) {
+		if (args->filtering_criterion(
 					&com.seq, i,
-					stackparam.filtering_parameter)) {
-			indices[j] = i;
+					args->filtering_parameter)) {
+			args->image_indices[j] = i;
 			j++;
 		}
 	}
+	assert(j <= args->nb_images_to_stack);
 }
 
 /****************************************************************/
@@ -2170,7 +2195,7 @@ double compute_highest_accepted_fwhm(double percent) {
 	int i, layer;
 	double *val = malloc(com.seq.number * sizeof(double));
 	double highest_accepted;
-	layer = get_registration_layer(&com.seq);
+	layer = get_registration_layer();
 	if (layer == -1 || !com.seq.regparam || !com.seq.regparam[layer]) {
 		free(val);
 		return 0.0;
@@ -2205,7 +2230,7 @@ double compute_highest_accepted_quality(double percent) {
 	int i, layer;
 	double *val = malloc(com.seq.number * sizeof(double));
 	double highest_accepted;
-	layer = get_registration_layer(&com.seq);
+	layer = get_registration_layer();
 	if (layer == -1 || !com.seq.regparam || !com.seq.regparam[layer]) {
 		free(val);
 		return 0.0;
@@ -2251,6 +2276,8 @@ void update_stack_interface() {	// was adjuststackspin
 		widgetnormalize = lookup_widget("combonormalize");
 
 	}
+	if (!sequence_is_loaded()) return;
+	stackparam.seq = &com.seq;
 
 	switch (gtk_combo_box_get_active(method_combo)) {
 		default:
@@ -2323,7 +2350,7 @@ void update_stack_interface() {	// was adjuststackspin
 	if (stackparam.nb_images_to_stack >= 2) {
 		if (stackparam.image_indices) free(stackparam.image_indices);
 		stackparam.image_indices = malloc(stackparam.nb_images_to_stack * sizeof(int));
-		fill_list_of_unfiltered_images(stackparam.image_indices);
+		fill_list_of_unfiltered_images(&stackparam);
 		gtk_widget_set_sensitive(go_stack, TRUE);
 	} else {
 		gtk_widget_set_sensitive(go_stack, FALSE);

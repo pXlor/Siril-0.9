@@ -11,7 +11,12 @@
 #include <tiffio.h>
 #endif
 
+#ifdef HAVE_LIBGIF
+#include <gif_lib.h>
+#endif
+
 /****************** image_format_fits.h ******************/
+int computeRawFitsStats(fits *fit, int layer);
 int	readfits(const char *filename, fits *fit, char *realname);
 void	read_fits_header(fits *fit);
 char*	list_header(fits *fit);
@@ -32,17 +37,18 @@ void	rgb48bit_to_fits48bit(WORD *rgbbuf, fits *fit, gboolean inverted, gboolean 
 void	fits_flip_top_to_bottom(fits *fit);
 void	extract_region_from_fits(fits *from, int layer, fits *to, const rectangle *area);
 int 	new_fit_image(fits *fit, int width, int height, int nblayer);
+void	keep_first_channel_from_fits(fits *fit);
 
 /****************** image_formats_internal.h ******************/
 /* BMP */
 int 	readbmp(const char *, fits *);
-int 	savebmp(char *, fits *);
+int 	savebmp(const char *, fits *);
 int	bmp32tofits48(unsigned char *rvb, int rx, int ry, fits *fitr, gboolean inverted);
 int	bmp24tofits48(unsigned char *rvb, int rx, int ry, fits *fitr);
 int	bmp8tofits(unsigned char *rvb, int rx, int ry, fits *fitr);
 
 /* PNM */
-int 	import_pnm_to_fits(char *filename, fits *fit);
+int 	import_pnm_to_fits(const char *filename, fits *fit);
 int	saveppm(const char *name, fits *fit);
 int	savepgm(const char *name, fits *fit);
 
@@ -88,6 +94,11 @@ int readraw_in_cfa(const char *, fits *);
 int open_raw_files(const char *, fits *, int);
 #endif
 
+#ifdef HAVE_LIBGIF
+int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int delay, int loop_count);
+void closegif(GifFileType **gif);
+#endif
+
 /****************** utils.h ******************/
 int	round_to_int(double x);
 WORD	round_to_WORD(double x);
@@ -119,8 +130,14 @@ char*	convtoupper(char *filename);
 char*	extract_path(const char *path);
 char*	remove_ext_from_filename(const char *basename);
 char*	replace_spaces_from_filename(const char *filename);
-char* str_append(char** data, const char* newdata);
+char*	str_append(char** data, const char* newdata);
+char*	format_basename(char *root);
 
+/****************** quantize.h ***************/
+int fits_img_stats_ushort(WORD *array, long nx, long ny, int nullcheck,
+		WORD nullvalue, long *ngoodpix, WORD *minvalue, WORD *maxvalue,
+		double *mean, double *sigma, double *noise1, double *noise2, double *noise3,
+		double *noise5, int *status);
 
 /****************** siril.h ******************/
 /* crop sequence data from GUI */
@@ -128,6 +145,7 @@ struct crop_sequence_data {
 	sequence *seq;
 	rectangle *area;
 	const char *prefix;
+	int retvalue;
 };
 
 /* median filter data from GUI */
@@ -144,6 +162,8 @@ struct banding_data {
 	double sigma;
 	double amount;
 	gboolean protect_highlights;
+	gboolean applyRotation;
+	const gchar *seqEntry;
 };
 
 /* Noise data from GUI */
@@ -157,11 +177,10 @@ struct noise_data {
 int 	threshlo(fits *fit, int level);
 int 	threshhi(fits *fit, int level);
 int 	nozero(fits *fit, int level);
-int	soper(fits *a, float scalar, char oper);
+int	soper(fits *a, double scalar, char oper);
 int	imoper(fits *a, fits *b, char oper);
 int sub_background(fits* image, fits* background, int layer);
 int 	addmax(fits *a, fits *b);
-int fmul(fits *a, int layer, float coeff);
 int	fdiv(fits *a, fits *b, float scalar);
 int ndiv(fits *a, fits *b);
 double 	gaussienne(double sigma, int size, double *gauss);
@@ -191,16 +210,17 @@ int	verbose_rotate_image(fits *, double, int, int);
 #endif
 double gauss_cvf(double p);
 int get_wavelet_layers(fits *fit, int Nbr_Plan, int Plan, int Type, int reqlayer);
-int find_hot_pixels(fits *fit, double sigma, char* filename);
 gpointer median_filter(gpointer p);
-gpointer BandingEngine(gpointer p);
+void apply_banding_to_sequence(struct banding_data *banding_args);
+gpointer BandingEngineThreaded(gpointer p);
+int BandingEngine(fits *fit, double sigma, double amount, gboolean protect_highlights, gboolean applyRotation);
 gpointer noise(gpointer p);
 
 /****************** sequence.h ******************/
-int read_single_sequence(char *realname, int imagetype);
+int	read_single_sequence(char *realname, int imagetype);
 int	seqsetnum(int image_number);
 int	check_seq(int force);
-int check_only_one_film_seq(char* name);
+int	check_only_one_film_seq(char* name);
 int	set_seq(const char *);
 char *	seq_get_image_filename(sequence *seq, int index, char *name_buf);
 int	seq_read_frame(sequence *seq, int index, fits *dest);
@@ -218,10 +238,9 @@ void	initialize_sequence(sequence *seq, gboolean is_zeroed);
 void	free_sequence(sequence *seq, gboolean free_seq_too);
 void	sequence_free_preprocessing_data(sequence *seq);
 gboolean sequence_is_loaded();
-int	sequence_processing(sequence *seq, sequence_proc process, int layer);
-int	seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit);
-int	do_fwhm_sequence_processing(sequence *seq, int layer);
-int	seqprocess_planetary(sequence *seq, int seq_layer, int frame_no, fits *fit);
+int	sequence_processing(sequence *seq, sequence_proc process, int layer, gboolean run_in_thread);
+int	seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area);
+int	do_fwhm_sequence_processing(sequence *seq, int layer, int print_psf, gboolean run_in_thread);
 void	check_or_allocate_regparam(sequence *seq, int layer);
 sequence *create_internal_sequence(int size);
 void	internal_sequence_set(sequence *seq, int index, fits *fit);
@@ -229,6 +248,7 @@ int	internal_sequence_find_index(sequence *seq, fits *fit);
 gpointer crop_sequence(gpointer p);
 gboolean sequence_is_rgb(sequence *seq);
 imstats* seq_get_imstats(sequence *seq, int index, fits *the_image, int option);
+void	check_area_is_in_image(rectangle *area, sequence *seq);
 
 /****************** seqfile.h ******************/
 sequence * readseqfile(const char *name);

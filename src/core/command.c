@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -32,6 +32,7 @@
 #include "core/siril.h"
 #include "core/command.h"
 #include "core/proto.h"
+#include "core/processing.h"
 #include "io/conversion.h"
 #include "gui/callbacks.h"
 #include "algos/colors.h"
@@ -44,6 +45,10 @@
 #include "io/single_image.h"
 #include "algos/gradient.h"
 #include "algos/fft.h"
+#include "algos/quality.h"
+#include "algos/cosmetic_correction.h"
+#include "stacking/stacking.h"
+#include "registration/registration.h"
 
 #ifdef HAVE_OPENCV
 #include "opencv/opencv.h"
@@ -59,10 +64,12 @@ command commande[] = {
 	{"bgnoise", 0, "bgnoise", process_bgnoise},
 	
 	{"cd", 1, "cd directory (define the working directory)", process_cd},
+	{"cdg", 0, "cdg", process_cdg},
 	{"clearstar", 0, "clearstar", process_clearstar},
 	{"contrast", 0, "contrast", process_contrast},
+	{"cosme", 1, "cosme [filename].lst", process_cosme},
+	{"cosme_cfa", 1, "cosme [filename].lst", process_cosme},
 	{"crop", 0, "crop [x y width height]", process_crop}, 
-//	{"crop2", 3, "crop2 genname outname number [x y width height]", process_crop2}, 
 
 	{"ddp", 3, "ddp level coef sigma", process_ddp}, 
 	
@@ -71,14 +78,17 @@ command commande[] = {
 	{"extract", 1, "extract NbPlans", process_extract},
 	
 	{"fdiv", 2, "fdiv filename scalar", process_fdiv},
-	{"fill", 1, "fill value", process_fill},
-	{"fill2", 1, "fill2 value [x y width height]", process_fill2},
-	{"findstar", 0, "findstar", process_findstar},
-	//~ {"find_hot", 2, "find_hot file threshold", process_findhot},
-	{"fmedian", 2, "fmedian ksize modulation", process_fmedian},
 	{"fftd", 2, "fftd magnitude phase", process_fft},
 	{"ffti", 2, "ffti magnitude phase", process_fft},
-	{"fixbanding", 2, "fixbanding amount", process_fixbanding},
+	{"fill", 1, "fill value", process_fill},
+	{"fill2", 1, "fill2 value [x y width height]", process_fill2},
+	{"find_hot", 3, "find_hot filename cold_sigma hot_sigma", process_findhot},
+	{"find_cosme", 2, "find_cosme cold_sigma hot_sigma", process_findcosme},
+	{"find_cosme_cfa", 2, "find_cosme_cfa cold_sigma hot_sigma", process_findcosme},
+	{"findstar", 0, "findstar", process_findstar},
+	{"fmedian", 2, "fmedian ksize modulation", process_fmedian},
+	{"fixbanding", 2, "fixbanding amount sigma", process_fixbanding},
+
 	
 	{"gauss", 1, "gauss sigma ", process_gauss},	
 	//~ {"gauss2", 1, "gauss sigma", process_gauss2},
@@ -101,6 +111,7 @@ command commande[] = {
 	
 	{"mirrorx", 0, "mirrorx", process_mirrorx},
 	{"mirrory", 0, "mirrory", process_mirrory},
+	{"mult", 1, "mult scalar", process_mult},
 	
 	{"new", 2, "new width height nb_layers", process_new},
 	{"nozero", 1, "nozero level (replaces null values by level)", process_nozero}, /* replaces null values by level */
@@ -129,18 +140,27 @@ command commande[] = {
 	{"savetif", 1, "savetif filename (save current image in tif 16bits)", process_savetif},
 	{"savetif8", 1, "savetif8 filename (save current image in tif 8bits)", process_savetif},
 #endif
-	{"split", 3, "split R G B", process_split},
-	{"stat", 0, "stat", process_stat},
-	
+	{"select", 2, "select from to", process_select},
+	{"seqcrop", 0, "seqcrop", process_seq_crop},
+	{"seqfind_cosme", 2, "seqfind_cosme cold_sigma hot_sigma", process_findcosme},
+	{"seqfind_cosme_cfa", 2, "seqfind_cosme_cfa cold_sigma hot_sigma", process_findcosme},
+	{"seqpsf", 0, "seqpsf", process_seq_psf},
 #ifdef _OPENMP
 	{"setcpu", 1, "setcpu number", process_set_cpu},
 #endif
+	{"setmag", 1, "setmag magnitude", process_set_mag},
+	{"split", 3, "split R G B", process_split},
+	{"stat", 0, "stat", process_stat},
+	{"stackall", 0, "stackall", process_stackall},
+	
 	{"threshlo", 1, "threshlo level", process_threshlo},
 	{"threshhi", 1, "threshi level", process_threshhi}, 
 	{"thresh", 2, "thresh hi lo (threshes hi and lo)", process_thresh}, /* threshes hi and lo */
 	
 	/* unsharp masking of current image or genname sequence */
+	{"unselect", 2, "unselect from to", process_unselect},
 	{"unsharp", 2, "unsharp sigma multi", process_unsharp},
+	{"unsetmag", 0, "unsetmag", process_unset_mag},
 //	{"unsharp2", 5, "unsharp2 sigma multi src dest number", process_unsharp2},
 
 	{"visu", 2, "visu low high", process_visu},
@@ -282,6 +302,19 @@ int process_imoper(int nb){
 	return 0;
 }
 
+int process_mult(int nb) {
+	double k = atof(word[1]);
+	if (k < 0) {
+		siril_log_message("Coefficient MUST be a positive value\n");
+		return 1;
+	}
+	soper(&gfit, k, OPER_MUL);
+	adjust_cutoff_from_updated_gfit();
+	redraw(com.cvport, REMAP_ALL);
+	redraw_previews();
+	return 0;
+}
+
 int process_addmax(int nb){
 	clearfits(&(wfit[4]));
 	readfits(word[1], &(wfit[4]), NULL);
@@ -309,15 +342,16 @@ int process_fdiv(int nb){
 
 int process_entropy(int nb){
 	rectangle area;
-	if (com.selection.w > 0 && com.selection.h > 0)
+	double e;
+
+	if (com.selection.w > 0 && com.selection.h > 0) {
 		memcpy(&area, &com.selection, sizeof(rectangle));
-	else {
-		area.x = area.y = 0;
-		area.h = gfit.ry;
-		area.w = gfit.rx;
+		e = entropy(&gfit, com.cvport, &area, NULL);
 	}
-	double ent = entropy(&gfit, com.cvport, &area, NULL);
-	siril_log_message("entropy: %10.2f\n", ent);
+	else {
+		e = entropy(&gfit, com.cvport, NULL, NULL);
+	}
+	siril_log_message("entropy: %.3lf\n", e);
 	return 0;
 }
 
@@ -326,15 +360,6 @@ int process_gauss(int nb){
 	adjust_cutoff_from_updated_gfit();
 	redraw(com.cvport, REMAP_ALL);
 	redraw_previews();
-	return 0;
-}
-
-int process_gauss2(int nb){
-	int i;
-	
-	for (i=0; i<com.seq.number; ++i) {
-		printf("test\n");
-	}
 	return 0;
 }
 
@@ -348,7 +373,7 @@ int process_unsharp(int nb){
 
 int process_crop(int nb){
 	rectangle area;
-	if (!com.drawn || com.drawing){		// TODO: what's that test?
+	if ((!com.selection.h) || (!com.selection.w)) {
 		if (nb==5){
 			if (atoi(word[1])<0 || atoi(word[2])<0){
 				siril_log_message("Crop: x and y must be positive values.\n");
@@ -484,9 +509,9 @@ int process_log(int nb){
 }
 
 int process_ls(int nb){
-	DIR* ptdir;
-	struct dirent* entry;
-	char filename[256];
+	struct dirent **list;
+	char filename[256], *path;
+	int i, n;
 	
 	filename[0]='\0';
 	/* If a path is given in argument */
@@ -504,7 +529,7 @@ int process_ls(int nb){
 				strcat(filename, "/");
 				strcat(filename, word[1]);
 			}	
-			ptdir = opendir(filename);
+			path = strdup(filename);
 		}
 		/* Should not happend */
 		else {
@@ -518,50 +543,63 @@ int process_ls(int nb){
 			siril_log_message("Cannot list files, set working directory first.\n");
 			return 1;
 		}
-		ptdir = opendir(com.wd);
+		path = strdup(com.wd);
 	}
-	if (!ptdir) {
+	if (!path) {
 		siril_log_message("Siril cannot open the directory.\n");
 		return 1;
 	}
+
+	n = scandir(path, &list, 0, alphasort);
+	if (n < 0)
+		perror("scandir");
+
 	/* List the entries */
-	while ((entry = readdir(ptdir)) != NULL) {
+	for (i = 0; i < n; ++i) {
 		struct stat entrystat;
 		char file_path[256];
-		if (entry->d_name[0] == '.')
-			continue;	/* no hidden files */
+		const char *ext;
+		if (list[i]->d_name[0] == '.')
+			continue; /* no hidden files */
 		if (filename[0] != '\0')
-			sprintf(file_path, "%s/%s", filename, entry->d_name);
-		else
-			sprintf(file_path, "%s", entry->d_name);
+			sprintf(file_path, "%s/%s", filename, list[i]->d_name);
+		else {
+			sprintf(file_path, "%s", list[i]->d_name);
+		}
 		if (lstat(file_path, &entrystat)) {
 			perror("stat");
-			break;		
+			break;
 		}
 		if (S_ISLNK(entrystat.st_mode)) {
-			siril_log_color_message("Link: %s\n", "bold", entry->d_name);
+			siril_log_color_message("Link: %s\n", "bold", list[i]->d_name);
 			continue;
 		}
 		if (S_ISDIR(entrystat.st_mode)) {
-			siril_log_color_message("Directory: %s\n", "green", entry->d_name);
+			siril_log_color_message("Directory: %s\n", "green",
+					list[i]->d_name);
 			continue;
 		}
-		int fnlen = strlen(entry->d_name);
-		if (fnlen < 5) continue;
-		int extlen = strlen(get_filename_ext(entry->d_name));
-		if (get_type_for_extension_name(entry->d_name + fnlen - (extlen + 1)) != TYPEUNDEF){
-			if ((get_type_for_extension_name(entry->d_name + fnlen - (extlen + 1)) == TYPEAVI) ||
-					(get_type_for_extension_name(entry->d_name + fnlen - 4) == TYPESER))
-				siril_log_color_message("Video: %s\n", "salmon", entry->d_name);
+		ext = get_filename_ext(list[i]->d_name);
+		if (!ext)
+			continue;
+		image_type type = get_type_for_extension(ext);
+		if (type != TYPEUNDEF) {
+			if (type == TYPEAVI || type == TYPESER)
+				siril_log_color_message("Sequence: %s\n", "salmon",
+						list[i]->d_name);
+			else if (type == TYPEFITS)
+				siril_log_color_message("Image: %s\n", "plum", list[i]->d_name);
 			else
-				siril_log_color_message("Image: %s\n", "red", entry->d_name);
-		}
-		// RAW files are not listed with the above filter
-		if (!strncasecmp(entry->d_name + fnlen - 4, ".seq", 4))
-			siril_log_color_message("Sequence: %s\n", "blue", entry->d_name);
+				siril_log_color_message("Image: %s\n", "red", list[i]->d_name);
+		} else if (!strncmp(ext, "seq", 4))
+			siril_log_color_message("Sequence: %s\n", "blue", list[i]->d_name);
 	}
 	siril_log_message("********* END OF THE LIST *********\n");
-	closedir(ptdir);
+	for (i = 0; i < n; i++)
+		free(list[i]);
+	free(list);
+	free(path);
+
 	return 0;
 }
 
@@ -605,7 +643,7 @@ int process_rotate(int nb) {
 	
 	set_cursor_waiting(TRUE);
 	degree = atof(word[1]);
-	verbose_rotate_image(&gfit, degree, 1, 1);	//INTER_LINEAR
+	verbose_rotate_image(&gfit, degree, OPENCV_LINEAR, 1);	//INTER_LINEAR
 	redraw(com.cvport, REMAP_ALL);
 	redraw_previews();
 	set_cursor_waiting(FALSE);
@@ -615,7 +653,7 @@ int process_rotate(int nb) {
 
 int process_rotatepi(int nb){
 #ifdef HAVE_OPENCV
-	verbose_rotate_image(&gfit, 180.0, 1, 1);
+	verbose_rotate_image(&gfit, 180.0, OPENCV_LINEAR, 1);
 #else
 	fits_rotate_pi(&gfit);
 #endif
@@ -624,13 +662,50 @@ int process_rotatepi(int nb){
 	return 0;	
 }
 
+int process_set_mag(int nb) {
+	int layer = match_drawing_area_widget(com.vport[com.cvport], FALSE);
+	double mag;
+
+	mag = atof(word[1]);
+
+	if (layer != -1) {
+
+		if (com.selection.w > 300 || com.selection.h > 300){
+			siril_log_message("Current selection is too large. To determine the PSF, please make a selection around a single star.\n");
+			return 1;
+		}
+		if (com.selection.w <= 0 || com.selection.h <= 0){
+			siril_log_message("Select an area first\n");
+			return 1;
+		}
+		fitted_PSF *result = psf_get_minimisation(&gfit, layer, &com.selection);
+		if (result) {
+			com.magOffset = mag - result->mag;
+			siril_log_message("Relative magnitude: %.3lf, "
+					"True reduced magnitude: %.3lf, "
+					"Offset: %.3lf\n", result->mag, mag, com.magOffset);
+			free(result);
+		}
+	}
+	return 0;
+}
+
+int process_unset_mag(int nb) {
+	com.magOffset = 0.0;
+
+	return 0;
+}
+
 int process_psf(int nb){
 	int layer = match_drawing_area_widget(com.vport[com.cvport], FALSE);
 	if (layer != -1) {
-		if (!com.drawn || com.drawing)
-			return 1;
+
 		if (com.selection.w > 300 || com.selection.h > 300){
-			siril_log_message("Current selection is too large. To determine the PSF, please make a selection around a star.\n");
+			siril_log_message("Current selection is too large. To determine the PSF, please make a selection around a single star.\n");
+			return 1;
+		}
+		if (com.selection.w <= 0 || com.selection.h <= 0){
+			siril_log_message("Select an area first\n");
 			return 1;
 		}
 		fitted_PSF *result = psf_get_minimisation(&gfit, layer, &com.selection);
@@ -639,6 +714,61 @@ int process_psf(int nb){
 			free(result);
 		}
 	}
+	return 0;
+}
+
+void *_psf_thread(void *arg) {
+	int layer = (intptr_t) arg;
+	do_fwhm_sequence_processing(&com.seq, layer, 1, 1);
+	gdk_threads_add_idle(end_generic, NULL);
+	return NULL;
+}
+
+int process_seq_psf(int nb) {
+	if (get_thread_run()) {
+		siril_log_message("Another task is already in progress, ignoring new request.\n");
+		return 1;
+	}
+	if (com.selection.w > 300 || com.selection.h > 300){
+		siril_log_message("Current selection is too large. To determine the PSF, please make a selection around a single star.\n");
+		return 1;
+	}
+	if (com.selection.w <= 0 || com.selection.h <= 0){
+		siril_log_message("Select an area first\n");
+		return 1;
+	}
+
+	int layer = match_drawing_area_widget(com.vport[com.cvport], FALSE);
+	if (sequence_is_loaded() && layer != -1) {
+		siril_log_message("Running the PSF on the loaded sequence, layer %d\n", layer);
+		siril_log_message("Results will be displayed at the end of the processing, on the console output, in the following form:\n");
+		start_in_new_thread(_psf_thread, (void *)(intptr_t)layer);
+		return 0;
+	}
+	else {
+		siril_log_message("This command can be used only when a sequence is loaded\n");
+		return 1;
+	}
+}
+
+int process_seq_crop(int nb) {
+	if (get_thread_run()) {
+		siril_log_message(
+				"Another task is already in progress, ignoring new request.\n");
+		return 1;
+	}
+
+	if (com.selection.w != 0 || com.selection.h != 0)
+		return 1;
+
+	struct crop_sequence_data *args = malloc(sizeof(struct crop_sequence_data));
+
+	args->seq = &com.seq;
+	args->area = &com.selection;
+	args->prefix = "cropped_";
+
+	set_cursor_waiting(TRUE);
+	start_in_new_thread(crop_sequence, args);
 	return 0;
 }
 
@@ -827,16 +957,136 @@ int process_findstar(int nb){
 	return 0;
 }
 
-/* FIXME */
 int process_findhot(int nb){
-	double sigma = atof(word[2]);
-	int count;
-	
-	count = find_hot_pixels(&gfit, sigma, word[1]);
-	siril_log_message("Number of hot pixels: %d\n", count);
-	//~ adjust_cutoff_from_updated_gfit();
-	//~ redraw(com.cvport, REMAP_ALL);
-	//~ redraw_previews();
+	long icold, ihot;
+	char filename[256];
+	int i;
+	char type;
+	if (gfit.naxes[2] != 1) {
+		siril_log_message("find_hot must be applied on an one-channel master-dark frame");
+		return 1;
+	}
+	double sig[2];
+	sig[0] = atof(word[2]);
+	sig[1] = atof(word[3]);
+
+	deviant_pixel *dev = find_deviant_pixels(&gfit, sig, &icold, &ihot);
+	siril_log_message("%ld cold and %ld hot pixels\n", icold, ihot);
+
+	FILE* cosme_file = NULL;
+	sprintf(filename, "%s.lst", word[1]);
+	cosme_file = fopen(filename, "w");
+	if (cosme_file == NULL) {
+		siril_log_message("Cannot open file: %s\n", filename);
+		free(dev);
+		return 1;
+	}
+
+	for (i = 0; i < icold + ihot; i++) {
+		int y = gfit.ry - (int) dev[i].p.y - 1;  /* FITS is stored bottom to top */
+		if (dev[i].type == HOT_PIXEL)
+			type = 'H';
+		else
+			type = 'C';
+		fprintf(cosme_file, "P %d %d %c\n", (int) dev[i].p.x, y, type);
+	}
+
+	free(dev);
+	fclose(cosme_file);
+
+	return 0;
+}
+
+int process_cosme(int nb) {
+	FILE* cosme_file = NULL;
+	deviant_pixel dev;
+	double dirty;
+	int is_cfa, i = 0, retval = 0;
+	int nb_tokens;
+	char line[64];
+	char type;
+
+	if (!ends_with(word[1], ".lst"))
+		strcat(word[1], ".lst");
+	cosme_file = fopen(word[1], "r");
+	if (cosme_file == NULL) {
+		siril_log_message("Cannot open file: %s\n", word[1]);
+		return 1;
+	}
+	if (word[0][5] == '_')
+		is_cfa = 1;
+	else
+		is_cfa = 0;
+
+	while (fgets(line, 63, cosme_file)) {
+		++i;
+		switch (line[0]) {
+		case '#': // comments.
+			continue;
+			break;
+		case 'P':
+			nb_tokens = sscanf(line + 2, "%lf %lf %c", &dev.p.x, &dev.p.y, &type);
+			if (nb_tokens != 2 && nb_tokens != 3) {
+				fprintf(stderr, "cosmetic correction: "
+						"cosme file format error at line %d: %s", i, line);
+				retval = 1;
+				continue;
+			}
+			if (nb_tokens == 2)	{
+				type = 'H';
+			}
+			if (type == 'H')
+				dev.type = HOT_PIXEL;
+			else
+				dev.type = COLD_PIXEL;
+			dev.p.y = gfit.ry - dev.p.y - 1;  /* FITS are stored bottom to top */
+			cosmeticCorrOnePoint(&gfit, dev, is_cfa);
+			break;
+		case 'L':
+			nb_tokens = sscanf(line + 2, "%lf %lf %c", &dev.p.y, &dirty, &type);
+			if (nb_tokens != 2 && nb_tokens != 3) {
+				fprintf(stderr, "cosmetic correction: "
+						"cosme file format error at line %d: %s\n", i, line);
+				retval = 1;
+				continue;
+			}
+			dev.type = HOT_PIXEL; // we force it
+			dev.p.y = gfit.ry - dev.p.y - 1; /* FITS are stored bottom to top */
+			cosmeticCorrOneLine(&gfit, dev, is_cfa);
+			break;
+		case 'C':
+#ifdef HAVE_OPENCV
+			nb_tokens = sscanf(line + 2, "%lf %lf %c", &dev.p.y, &dirty, &type);
+			if (nb_tokens != 2 && nb_tokens != 3) {
+				fprintf(stderr, "cosmetic correction: "
+						"cosme file format error at line %d: %s\n", i, line);
+				retval = 1;
+				continue;
+			}
+			dev.type = HOT_PIXEL; // we force it
+			dev.p.y = gfit.rx - dev.p.y - 1; /* FITS are stored bottom to top */
+			cvRotateImage(&gfit, 90.0, -1, 0);
+			cosmeticCorrOneLine(&gfit, dev, is_cfa);
+			cvRotateImage(&gfit, -90.0, -1, 0);
+#else
+			siril_log_message("Opencv need to be compiled to remove bad column.\n");
+			retval = 1;
+#endif
+			break;
+		default:
+			fprintf(stderr, "cosmetic correction: "
+					"cosme file format error at line %d: %s\n", i, line);
+			retval = 1;
+		}
+	}
+
+	fclose(cosme_file);
+	if (retval)
+		siril_log_message("There were some errors, please check your input file.\n");
+
+	adjust_cutoff_from_updated_gfit();
+	redraw(com.cvport, REMAP_ALL);
+	redraw_previews();
 	return 0;
 }
 
@@ -866,6 +1116,19 @@ int process_fmedian(int nb){
 	set_cursor_waiting(TRUE);
 	start_in_new_thread(median_filter, args);
 	
+	return 0;
+}
+
+/* The name of this command should be COG in english but this choice
+ * was done to be consistent with IRIS
+ */
+int process_cdg(int nb) {
+	double x_avg, y_avg;
+
+	FindCentre(&gfit, &x_avg, &y_avg);
+	y_avg = gfit.ry - y_avg;	// FITS are stored bottom to top
+	siril_log_message("Center of gravity coordinates are (%.3lf, %.3lf)\n", x_avg, y_avg);
+
 	return 0;
 }
 
@@ -983,9 +1246,80 @@ int process_fixbanding(int nb) {
 	args->fit = &gfit;
 
 	set_cursor_waiting(TRUE);
-	start_in_new_thread(BandingEngine, args);
+	start_in_new_thread(BandingEngineThreaded, args);
 	
 	return 0;
+}
+
+int process_findcosme(int nb) {
+
+	if (!sequence_is_loaded() && !single_image_is_loaded())
+		return 1;
+	struct cosmetic_data *args = malloc(sizeof(struct cosmetic_data));
+
+	args->sigma[0] = atof(word[1]);
+	args->sigma[1] = atof(word[2]);
+	if (word[0][10] == '_' || word[0][13] == '_') {	// find_cosme_cfa or seqfind_cosme_cfa
+		args->is_cfa = TRUE;
+	}
+	else {
+		args->is_cfa = FALSE;
+	}
+	args->fit = &gfit;
+	set_cursor_waiting(TRUE);
+	if (word[0][0] == 's' && sequence_is_loaded()) {
+		args->seqEntry = "cc_";
+		apply_cosmetic_to_sequence(args);
+	} else {
+		start_in_new_thread(autoDetectThreaded, args);
+	}
+
+	return 0;
+}
+
+int select_unselect(gboolean select) {
+	if (!sequence_is_loaded()) {
+		siril_log_message("Use this command to select images in a sequence, load a sequence first.\n");
+		return 1;
+	}
+	int from = atoi(word[1]);
+	int to = atoi(word[2]);
+	if (from < 0 || from >= com.seq.number) {
+		siril_log_message("The first argument must be between 0 and the number of images minus one.\n");
+		return 1;
+	}
+	int i;
+	gboolean current_updated = FALSE;
+	for (i=from; i<=to; i++) {
+		if (i >= com.seq.number) break;
+		if (com.seq.imgparam[i].incl != select) {
+			com.seq.imgparam[i].incl = select;
+			sequence_list_change_selection_index(i);
+			if (select)
+				com.seq.selnum++;
+			else	com.seq.selnum--;
+			if (i == com.seq.current)
+				current_updated = TRUE;
+		}
+	}
+
+	if (current_updated) {
+		adjust_exclude(com.seq.current, TRUE);
+	}
+
+	update_reg_interface(FALSE);
+	writeseqfile(&com.seq);
+	siril_log_message("selection update finished, %d images are selected in the sequence\n", com.seq.selnum);
+
+	return 0;
+}
+
+int process_select(int nb){
+	return select_unselect(TRUE);
+}
+
+int process_unselect(int nb){
+	return select_unselect(FALSE);
 }
 
 int process_split(int nb){
@@ -1020,6 +1354,59 @@ int process_stat(int nb){
 	}
 	return 0;
 }
+
+gpointer stackall_worker(gpointer args) {
+	DIR *dir;
+	struct dirent *file;
+	int number_of_loaded_sequences = 0, retval = 0;
+
+	siril_log_message("Looking for sequences in current working directory...\n");
+	if (check_seq(0) || (dir = opendir(com.wd)) == NULL) {
+		siril_log_message("Error while searching sequences or opening the directory.\n");
+		com.wd[0] = '\0';
+		gdk_threads_add_idle(end_generic, NULL);
+		return NULL;
+	}
+	siril_log_message("Starting stacking of found sequences...\n");
+	while ((file = readdir(dir)) != NULL) {
+		char *suf;
+
+		if ((suf = strstr(file->d_name, ".seq")) && strlen(suf) == 4) {
+			sequence *seq = readseqfile(file->d_name);
+			if (seq != NULL) {
+				char filename[256];
+				struct stacking_args args;
+				//args.method = stack_summing;
+				args.seq = seq;
+				args.filtering_criterion = stack_filter_all;
+				args.nb_images_to_stack = seq->number;
+				snprintf(filename, 256, "%s%sstacked.fit", seq->seqname,
+						ends_with(seq->seqname, "_") ? "" : "_");
+				gettimeofday(&args.t_start, NULL);
+
+				retval = stack_summing(&args);
+				if (savefits(filename, &gfit))
+					siril_log_message("Could not save the stacking result %s\n",
+							filename);
+
+				free_sequence(seq, TRUE);
+				++number_of_loaded_sequences;
+				if (retval) break;
+			}
+		}
+	}
+	closedir(dir);
+	siril_log_message("Stacked %d sequences %s.\n", number_of_loaded_sequences,
+			retval ? "with errors" : "successfully");
+	gdk_threads_add_idle(end_generic, NULL);
+	return NULL;
+}
+
+int process_stackall(int nb) {
+	start_in_new_thread(stackall_worker, NULL);
+	return 0;
+}
+
 
 #ifdef _OPENMP
 int process_set_cpu(int nb){
@@ -1137,356 +1524,3 @@ int processcommand(const char *line) {
 	free(myline);
 	return 0;
 }
-/**********************************************************************/
-/************** OLD FUNCTIONS: MUST BE REINTEGRATED OR NOT*************/
-/**********************************************************************/
-
-#if 0
-	/* displays genname sequence from start_im to end_im with delay in 0.1 s and stride stride */
-	{"animate", 3, "animate genname start_im end_im delay stride", process_animate},
-	{"convert", 1, "convert filename", process_convert}, 
-	/* register a sequence of images */
-	{"register", 2, "register genname number [size x y]", process_register},
-	/* stacking a sequence using genname.shift */
-	{"composit", 2, "composit genname number shifted", process_composit},	
-	{"medstack", 2, "medstack genname number outfile ", process_medstack}, 
-	/* shift current image by x,y */
-	{"shift", 2, "shift x y", process_shift}, 
-	{"shift2", 5, "shift2 in out n x y", process_shift2}, 
-	/* effectively shifts first n images sequence "in", output goes to sequence "out" */
-	{"rshift2", 4, "rshift2 in out n shiftfile", process_rshift2}, 
-	{"rrgb", 1, "file [file file]", process_rrgb}, /* 1 rgb file or 3 r,g,b files */
-	{"grgb", 1, "file [file file]", process_grgb}, /* 1 rgb file or 3 r,g,b files */
-	{"brgb", 1, "file [file file]", process_brgb}, /* 1 rgb file or 3 r,g,b files */
-	{"lrgb", 2, "file file [file file]", process_lrgb},/* 1 lum file + (1 rgb file or 3 r,g,b files */
-	/* i***2 commands oper the genname sequence and filename*/
-	{"iadd2", 4, "iadd2 genname outname filename number", process_imoper2},
-	{"isub2", 4, "isub2 genname outname filename number", process_imoper2},
-	{"imul2", 4, "imul2 genname outname filename number", process_imoper2}, 
-	{"idiv2", 4, "idiv2 genname outname filename number", process_imoper2},
-	/* s*** commands oper scalar and curent image */
-	{"sadd", 1, "sadd scalar", process_soper},
-	{"smul", 1, "smul scalar", process_soper}, 
-	{"sdiv", 1, "sdiv scalar", process_soper},
-	{"ssub", 1, "ssub scalar", process_soper},
-	/* s***2 commands oper the genname sequence and scalar */
-	{"sadd2", 4, "sadd2 genname outname scalar number", process_soper2},
-	{"smul2", 4, "smul2 genname outname scalar number", process_soper2}, 
-	{"sdiv2", 4, "sdiv2 genname outname scalar number", process_soper2},
-	{"ssub2", 4, "sdiv2 genname outname scalar number", process_soper2},
-	{"composervb", 1, "composervb filename", process_composervb}, /* compose et sauve un bmp a partir de (wfit[0]), (wfit[1]), (wfit[2] */
-	{"trichro", 3, "trichro rfile gfile bfile", process_trichro}, /* compose et affiche un rgb a partir de rfile, vfile, bfile */
-#endif
-
-#if 0
-int process_convert(int nb){
-	int type;
-	char suffix[16];
-
-	// use stat_file instead
-	if (findtype(word[1], suffix, &type)){
-		siril_log_message("Dont know how to convert %s.%s\n",word[1], suffix);
-		return 1;
-	};
-	// FIXME	convert(word[1], suffix,type);
-	return 0;
-}
-
-int process_trichro(int nb){
-	fprintf(stderr, "process_trichro is obsolete\n");
-	return 0;
-}
-
-int process_composervb(int nb){
-	fprintf(stderr,"composervb: is obsolete\n");
-	return 0;
-}
-
-// scalar add
-int process_soper(int nb){ 
-	float scalar;
-
-	scalar=atof(word[1]);
-	soper(&gfit,scalar,word[0][1]);
-	redraw(com.cvport,REMAP_ALL);
-	return 0;
-}
-
-int process_imoper2(int nb){
-	int i;
-	int number;
-
-	number=atoi(word[4]);
-	readfits(word[3], &(wfit[4]), NULL);
-	for (i=1;i<=number;++i){
-		readfits(buildfilename(word[1],i), &(gfit), NULL);
-		process_imoper(0);
-		savefits(buildfilename(word[2],i),&(gfit));
-	}
-	return 0;
-}
-
-int process_soper2(int nb){
-	int i;
-	int number;
-	char in[256];
-
-	number=atoi(word[4]);
-	strncpy(in,word[1],255);
-	strcpy(word[1],word[4]);
-	for (i=1;i<=number;++i){
-		readfits(buildfilename(in,i), &(gfit), NULL);
-		process_soper(0);
-		savefits(buildfilename(word[2],i),&(gfit));
-	}
-	return 0;
-}
-
-int process_composit(int nb){
-	isempty(word[1]);
-	if (nb==4){
-		composit(word[1], atoi(word[2]), (char)atoi(word[3])); 
-	}
-	else {
-		composit(word[1], atoi(word[2]), 1); 
-	}
-	//level_adjust(&com.g);
-	redraw(com.cvport, REMAP_ALL);
-	return 0;
-}
-
-int process_shift(int nb){
-	shift(atoi(word[1]), atoi(word[2])); 
-	redraw(com.cvport, REMAP_ALL);
-	//	level_adjust(&com.g);
-	return 0;
-}
-
-int process_shift2(int nb){
-	int i, /*n,*/ x, y;
-
-	isempty(word[1]);
-	isempty(word[2]);
-	//n=atoi(word[3]);
-	x=atoi(word[4]);
-	y=atoi(word[5]);
-
-	for(i=1;i<=atoi(word[3]);++i){
-		buildfilename(word[1],i);
-		readfits(com.formname, &gfit, com.formname);
-		shift(x,y); 
-		buildfilename(word[2],i);
-		savefits(com.formname,&gfit);
-	}
-	return 0;
-}
-
-int process_rshift2(int nb){
-	isempty(word[1]);
-	isempty(word[2]);
-	if (nb==5){
-		rshift2(word[1], word[2], atoi(word[3]), word[4]); 
-	}
-	level_adjust(&gfit);
-	return 0;
-}
-
-int process_unsharp2(int nb){
-	int i;
-
-	for (i=0;i<=atoi(word[5]);++i){
-		if(!readfits(buildfilename(word[3], i), &(gfit), NULL)){
-			process_unsharp(nb);
-			savefits(buildfilename(word[4], i), &(gfit));
-		}
-	}
-	return 0;
-}
-
-int process_crop2(int nb){
-	int i, err;
-	char ofilename[256];
-
-	if (!com.drawn){
-		if (nb==8){
-			com.rectX = atoi(word[4]);
-			com.rectY = atoi(word[5]);
-			com.rectW = atoi(word[6]);
-			com.rectH = atoi(word[7]);
-		}
-		else {
-			siril_log_message("Crop2: select a region or provide x,y,width,height\n");
-			return 1;
-		}
-	}
-
-	for (i=1;i<=atoi(word[3]);++i){	
-		buildfilename(word[1],i);
-		snprintf(ofilename,255,"%s%d",word[2],i);
-		err=readfits(com.formname,&(gfit), NULL);
-		if (err){
-			siril_log_message("Crop2: aborted\n");
-			return 1;
-		}
-		crop(&(gfit));
-		savefits(ofilename,&(gfit));
-	}
-	redraw(com.cvport, REMAP_ALL);
-	return 0;
-}
-
-int process_medstack(int nb){
-	char filename[256];
-	stat_file(word[3], &(com.imagetype), filename);
-	medstack(word[1],atoi(word[2]),filename);
-	strcpy(word[1],filename);
-	process_load(1);
-	return 0;
-}
-
-int process_register(int nb){
-	struct registration_args reg_args;
-
-	if (com.drawn){
-		reg_args.sel1size = max(com.rectW, com.rectH);
-		reg_args.sel1X = com.rectX + com.rectW/2;
-		reg_args.sel1Y = com.rectY + com.rectH/2;
-	}
-	else{
-		if (nb<6){
-			siril_log_message("Select a rectangle or provide centerx centery size\n");
-			return 0;
-		}
-		reg_args.sel1X = atoi(word[3]);
-		reg_args.sel1Y = atoi(word[4]);
-		reg_args.sel1size = atoi(word[5]);
-	}
-	reg_args.all_images = TRUE;
-	//reg_args.number = atoi(word[2]);
-	isempty(word[1]);
-	readseqfile(com.seq.name);
-	register_shift(word[1], &reg_args, com.reglayer); 
-	writeseqfile(com.seq.name);
-	return 0;
-}
-
-int process_animate(int nb){
-	int i, start, end, stride, err;
-	double delay;
-
-	start=atoi(word[2]);
-	end=atoi(word[3]);
-	delay=atof(word[4]);
-	stride=max(1,atoi(word[5]));
-	if(delay <0.02)
-		delay=0.02;
-	if(delay >1)
-		delay=(double)1;
-	for (i=start;i<=end && !(com.busy & ST_CANCEL);i+=stride){
-		timing(0,"");
-		buildfilename(word[1],i);
-		err=readfits(com.formname, &(gfit), com.formname);
-		siril_log_message("Displaying image %s %f\n", com.formname,delay);
-		progress(0);
-		if (err){
-			siril_log_message("animate: error\n");
-		}
-		else{
-			redraw(com.cvport,REMAP_ALL);
-		}
-
-		while (timing(1,"")<delay){
-			progress(0);
-		}
-	}
-	return 0;
-}
-
-int xrgb(int nb, int layer){
-	siril_log_message("Entering xrgb command, nb %d reading %s:%s:%s\n", nb, word[1], word[2], word[3]);
-	switch(nb){
-		case 2: // only one RGB filename is given
-			// according to the value x of layer
-			// perform xrgb composite
-			readfits(word[1],wfit+4, NULL);
-			copyfits(wfit+4,&gfit,CP_ALLOC|CP_EXPAND|CP_FORMAT,0); 	/* lrgb result goes to gfit */
-			copyfits(wfit+4,wfit,CP_ALLOC|CP_EXTRACT,layer); 	/* l */
-			copyfits(wfit+4,wfit+1,CP_ALLOC|CP_EXTRACT,RLAYER);	/* r */
-			copyfits(wfit+4,wfit+2,CP_ALLOC|CP_EXTRACT,GLAYER);	/* g */
-			copyfits(wfit+4,wfit+3,CP_ALLOC|CP_EXTRACT,BLAYER);	/* b */
-			break;
-
-		case 4:
-			readfits(word[1],wfit+1,NULL);	/* r */
-			copyfits(wfit+1,&gfit,CP_ALLOC|CP_EXPAND|CP_FORMAT,0); 	/* lrgb result goes to gfit */
-			readfits(word[2],wfit+2,NULL);	/* g */
-			readfits(word[3],wfit+3,NULL);	/* b */
-			copyfits(wfit+layer+1,wfit,CP_COPYA|CP_ALLOC|CP_FORMAT,layer); 	/* l */
-			break;
-
-		default:
-			// error
-			break;
-	}
-	fprintf(stderr,"invoking lrgb command from xrgb\n");
-	lrgb(wfit, wfit+1, wfit+2, wfit+3, &gfit);
-	redraw(com.cvport, REMAP_ALL);
-	redraw_previews();
-	return 0;
-}
-
-int process_rrgb(int nb){
-	fprintf(stderr,"entering rrgb command\n");
-	xrgb(nb,RLAYER);
-	return 0;
-}
-
-int process_grgb(int nb){
-	fprintf(stderr,"entering grgb command\n");
-	xrgb(nb,GLAYER);
-	return 0;
-}
-
-int process_brgb(int nb){
-	fprintf(stderr,"entering brgb command\n");
-	xrgb(nb,BLAYER);
-	return 0;
-}
-
-int process_lrgb(int nb){
-	//
-	// lrgb combines an rgb fits and a luminance fits
-	// through a short irruption in HSI space.
-	// takes 2 or 3 arguments. 
-	//			lrgb with 2 filenames l,rgb as arg1 and arg2
-	//			lrgb with 4 filenames l,r,g,b as arg[1234]
-	// 	
-	fprintf(stderr,"entering lrgb command\n");
-	switch(nb){
-		case 2:
-			readfits(word[2],wfit,NULL);
-			readfits(word[3],wfit+4,NULL);
-			copyfits(wfit+4,wfit+1,CP_EXTRACT,RLAYER); 	/* r */
-			copyfits(wfit+4,wfit+2,CP_EXTRACT,GLAYER);	/* g */
-			copyfits(wfit+4,wfit+3,CP_EXTRACT,BLAYER);	/* b */
-			break;
-
-		case 3:
-			readfits(word[2],wfit,NULL);
-			readfits(word[3],wfit+4,NULL);
-			readfits(word[4],wfit+4,NULL);
-			readfits(word[5],wfit+4,NULL);
-			break;	
-
-		default:
-			// error
-			break;
-	}
-	fprintf(stderr,"invoking lrgb function\n");
-	copyfits(wfit,&gfit,CP_ALLOC|CP_EXPAND|CP_FORMAT,0); 	/* lrgb result goes to gfit */
-
-	lrgb(wfit, wfit+1, wfit+2, wfit+3, &gfit);	
-	redraw(com.cvport, REMAP_ALL);
-	return 0;
-}
-#endif

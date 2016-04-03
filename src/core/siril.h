@@ -52,14 +52,12 @@ typedef unsigned short WORD;		// default type for internal image data
 #define SN_NORM 1.1926
 #define QN_NORM 2.2191
 
-#define STATS_BASIC		(1 << 0)
-#define STATS_SIGMA		(1 << 1)
-#define STATS_AVGDEV	(1 << 2)
-#define STATS_MAD		(1 << 3)
-#define STATS_MINMAX	(1 << 4)
-#define STATS_BWMV		(1 << 5)
-#define STATS_MAIN		STATS_SIGMA | STATS_AVGDEV | STATS_MAD | STATS_MINMAX | STATS_BWMV
-#define STATS_IKSS		(1 << 6) /* take time, needed only for stacking */
+#define STATS_BASIC		(1 << 1)	// median, mean, sigma, noise
+#define STATS_AVGDEV	(1 << 2)	// average absolute deviation
+#define STATS_MAD		(1 << 3)	// median absolute deviation
+#define STATS_BWMV		(1 << 5)	// bidweight midvariance
+#define STATS_MAIN		STATS_BASIC | STATS_AVGDEV | STATS_MAD | STATS_BWMV
+#define STATS_IKSS		(1 << 6)	// Iterative K-sigma Estimator of Location and Scale. Take time, needed only for stacking
 #define STATS_EXTRA		STATS_MAIN | STATS_IKSS
 
 /* when requesting an image redraw, it can be asked to remap its data before redrawing it.
@@ -79,22 +77,25 @@ enum {
 
 
 typedef enum {
-	TYPEUNDEF,
-	TYPEFITS,
-	TYPETIFF,
-	TYPEBMP,
-	TYPEPNG,
-	TYPEJPG,
-	TYPEPNM,
-	TYPEPIC,
-	TYPERAW,
-	TYPEAVI,
-	TYPESER,
+	TYPEUNDEF=(1 << 1),
+	TYPEFITS= (1 << 2),
+	TYPETIFF= (1 << 3),
+	TYPEBMP = (1 << 4),
+	TYPEPNG = (1 << 5),
+	TYPEJPG = (1 << 6),
+	TYPEPNM = (1 << 7),
+	TYPEPIC = (1 << 8),
+	TYPERAW = (1 << 9),
+	TYPEAVI = (1 << 10),
+	TYPESER = (1 << 11),
+	TYPEGIF = (1 << 12)
 } image_type;
 
 #define USE_DARK	0x01
 #define USE_FLAT	0x02
 #define USE_OFFSET	0x04
+#define USE_COSME   0x08	/* cosmetic correction */
+#define USE_OPTD    0x10	/* dark optimization */
 
 /* cookies for the file chooser */
 #define OD_NULL 	0
@@ -130,23 +131,16 @@ typedef enum {
 #define CP_EXTRACT	0x10	// extract a 16bit plane from a 48 bit fit
 #define CP_EXPAND	0x20	// expands a 16bit fits to a 48bit one.
 
-#define CONVALL	(1 << 0)	// all files, not based on an index
-/* file types available */
-#define CONVBMP	(1 << 1)
-#define CONVPNG	(1 << 2)
-#define CONVJPG	(1 << 3)
-#define CONVAVI	(1 << 4)
-#define CONVPNM	(1 << 5)
-#define CONVRAW (1 << 6)
-#define CONVCFA (1 << 7)
-#define CONVTIF (1 << 8)
-#define CONVPIC (1 << 9)
-#define CONVFIT (1 << 10)
-/* layer conversion type */
-#define CONV1X3	(1 << 16)
-#define CONV3X1	(1 << 17)
-#define CONV1X1	(1 << 18)
-#define CONVUFL	(1 << 20)	// use fixed length
+/* processing */
+#define CONVDEBAYER (1 << 1)
+/* SER flags */
+#define CONVDSTFITS (1 << 2)	// assumed as default
+#define CONVDSTSER (1 << 3)
+#define CONVMULTIPLE (1 << 4)
+/* channel conversion type */
+#define CONV1X3	(1 << 6)	// assumed as default
+#define CONV3X1	(1 << 7)
+#define CONV1X1	(1 << 8)
 
 /* operations on image data */
 #define OPER_ADD 'a'
@@ -206,13 +200,14 @@ struct imdata {
  * Returns < 0 for an error that should stop the processing on the sequence.
  * Other return values are not used.
  * Processed data should be written in the sequence data directly. */
-typedef int (*sequence_proc)(sequence *seq, int seq_layer, int frame_no, fits *fit);
+typedef int (*sequence_proc)(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area);
 
 /* preprocessing data from GUI */
 struct preprocessing_data {
 	struct timeval t_start;
 	gboolean autolevel;
-	gboolean use_ccd_formula;
+	double sigma[2];
+	gboolean is_cfa;
 	float normalisation;
 	int retval;
 };
@@ -278,6 +273,14 @@ typedef enum {
 } interpolation_method;
 
 typedef enum {
+	OPENCV_NEAREST,
+	OPENCV_LINEAR,
+	OPENCV_AREA,
+	OPENCV_CUBIC,
+	OPENCV_LANCZOS4,
+} opencv_interpolation;
+
+typedef enum {
     BAYER_FILTER_RGGB,
     BAYER_FILTER_BGGR,
     BAYER_FILTER_GBRG,
@@ -297,7 +300,7 @@ struct layer_info_struct {
 };
 
 typedef enum { SEQ_REGULAR, SEQ_SER,
-#ifdef HAVE_FFMS2
+#if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 	SEQ_AVI,
 #endif
 	SEQ_INTERNAL
@@ -330,7 +333,7 @@ struct sequ {
 
 	sequence_type type;
 	struct ser_struct *ser_file;
-#ifdef HAVE_FFMS2
+#if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 	struct film_struct *film_file;
 	char *ext;		// extension of video, NULL if not video
 #endif
@@ -391,6 +394,7 @@ struct ffit {
 	float pixel_size_x, pixel_size_y;	// XPIXSZ and YPIXSZ keys
 	unsigned int binning_x, binning_y;		// XBINNING and YBINNING keys
 	char date_obs[FLEN_VALUE];		// YYYY-MM-DDThh:mm:ss observation start, UT
+	char date[FLEN_VALUE];		// YYYY-MM-DDThh:mm:ss creation of file, UT
 	char instrume[FLEN_VALUE];		// INSTRUME key
 	/* data obtained from FITS or RAW files */
 	double focal_length, iso_speed, exposure, aperture, ccd_temp;
@@ -417,14 +421,18 @@ struct ffit {
  * Don't forget to update conversion.c:initialize_libraw_settings() data when
  * modifying the glade settings */
 struct libraw_config {
-	gboolean cfa, ser_cfa, ser_force_bayer;
 	double mul[3], bright;					// Color  & brightness adjustement mul[0] = red, mul[1] = green = 1, mul[2] = blue
 	int auto_mul, use_camera_wb, use_auto_wb;		// White Balance parameters
 	int user_qual;						// Index of the Matrix interpolation set in dcraw, 0: bilinear, 1: VNG, 2: PPG, 3: AHD
 	int user_black;						// black point correction
 	double gamm[2];						// Gamma correction
-	sensor_pattern bayer_pattern;
-	interpolation_method bayer_inter;					
+};
+
+struct debayer_config {
+	gboolean open_debayer;			// debayer images being opened
+	gboolean ser_use_bayer_header;		// use the pattern given in the SER header
+	sensor_pattern bayer_pattern;		// user-defined Bayer pattern
+	interpolation_method bayer_inter;	// interpolation method for non-libraw debayer
 };
 
 struct stack_config {
@@ -474,7 +482,6 @@ struct cominf {
 	sliders_mode sliders;		// 0: min/max, 1: MIPS-LO/HI, 2: user
 	gboolean leveldrag;		// middle click being dragged if true
 	int preprostatus;
-	int preproformula;		// 0: APN, 1: CCD
 	gboolean show_excluded;		// show excluded images in sequences NOT USED!
 	double zoom_value;		// 1.0 is normal zoom, use get_zoom_val() to access it
 
@@ -521,8 +528,8 @@ struct cominf {
 	int hist_display;		// displayed index
 	char *swap_dir;
 
-	gboolean is_cfa;		// in order to know which conversion it is
-	libraw raw_set;			// the libraw setting
+	libraw raw_set;			// the libraw settings
+	struct debayer_config debayer;	// debayer settings
 
 	sequence seq;			// currently loaded sequence	TODO: *seq
 	single *uniq;			// currently loaded image, if outside sequence
@@ -532,6 +539,7 @@ struct cominf {
 	fitted_PSF **stars;		// list of stars detected in the current image
 	gboolean star_is_seqdata;	// the only star in stars belongs to seq, don't free it
 	int selected_star;		// current selected star in the GtkListStore
+	double magOffset;		// offset to reduce the real magitude
 	
 	gradient *grad;
 	int grad_nb_boxes, grad_size_boxes;
@@ -540,13 +548,13 @@ struct cominf {
 	GThread *thread;		// the thread for processings
 	GMutex mutex;			// a mutex we use for this thread
 	gboolean run_thread;		// the main thread loop condition
-	int max_thread;		// maximum of thread used
+	int max_thread;			// maximum of thread used
 };
 
 /* this structure is used to characterize the statistics of the image */
 struct image_stats {
-	size_t count;
-	double mean, avgDev, median, sigma, min, max, normValue, mad, sqrtbwmv,
+	long count;
+	double mean, avgDev, median, sigma, bgnoise, min, max, normValue, mad, sqrtbwmv,
 			location, scale;
 	char layername[6];
 };

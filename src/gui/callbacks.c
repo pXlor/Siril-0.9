@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -49,6 +49,7 @@
 #include "registration/registration.h"
 #include "stacking/stacking.h"
 #include "algos/fft.h"
+#include "algos/cosmetic_correction.h"
 #include "compositing/compositing.h"
 #ifdef HAVE_OPENCV
 #include "opencv/opencv.h"
@@ -159,7 +160,7 @@ void fill_about_dialog() {
 
 	gtk_label_set_text(label_about, PACKAGE " v" VERSION );
 	markup = g_markup_printf_escaped ("<a href=\"%s\">Visit the Siril website</a>",
-			"http://free-astro.vinvin.tf/index.php/Siril");
+			"https://free-astro.org/index.php/Siril");
 	gtk_label_set_markup (url_about, markup);
 	g_free(markup);
 }
@@ -549,8 +550,7 @@ void draw_empty_image(cairo_t *cr, guint width, guint height) {
  */
 gboolean redraw_drawingarea(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	int image_width, image_height, window_width, window_height;
-	//fits *fit=&(gfit);
-	int vport = -1;
+	int vport;
 	double zoom;
 
 	// we need to identify which vport is being redrawn
@@ -566,8 +566,6 @@ gboolean redraw_drawingarea(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	zoom = get_zoom_val();
 	image_width = (int) (((double) window_width) / zoom);
 	image_height = (int) (((double) window_height) / zoom);
-	//gtk_style_context_get_color (gtk_widget_get_style_context(widget), 0, &color);
-	//gdk_cairo_set_source_rgba (cr, &color);
 
 	if (vport == RGB_VPORT) {
 		if (com.rgbbuf) {
@@ -886,9 +884,9 @@ int make_index_for_rainbow(BYTE index[][3]);
 void remap(int vport) {
 	// This function maps fit data with a linear LUT between lo and hi levels
 	// to the buffer to be displayed; display only is modified
-	guint x, y, i, j;
-	BYTE *dst, dst_pixel_value, *index, rainbow_index[UCHAR_MAX + 1][3];
-	WORD *src, hi, lo, tmp_pixel_value;
+	guint x, y;
+	BYTE *dst, *index, rainbow_index[UCHAR_MAX + 1][3];
+	WORD *src, hi, lo;
 	display_mode mode;
 	color_map color;
 	gboolean do_cut_over, inverted;
@@ -981,8 +979,9 @@ void remap(int vport) {
 
 	if (mode == HISTEQ_DISPLAY) {
 		double hist_sum;
-		double nb_pixels = 0.0;
+		double nb_pixels;
 		size_t hist_nb_bins;
+		size_t i;
 		gsl_histogram *histo = NULL;
 
 		compute_histo_for_gfit(1);
@@ -1016,11 +1015,9 @@ void remap(int vport) {
 			set_viewer_mode_widgets_sensitive(TRUE);
 	}
 
-	src = gfit.pdata[vport];	// index is i
-	i = 0;
+	src = gfit.pdata[vport];
 	/* Siril's FITS are stored bottom to top, so mapping needs to revert data order */
-	dst = com.graybuf[vport];	// index is j
-	j = (gfit.ry - 1) * com.surface_stride[vport];
+	dst = com.graybuf[vport];
 
 	color = gtk_toggle_button_get_active(
 			GTK_TOGGLE_BUTTON(lookup_widget("colormap_button")));
@@ -1028,41 +1025,41 @@ void remap(int vport) {
 	if (color == RAINBOW_COLOR)
 		make_index_for_rainbow(rainbow_index);
 	index = remap_index[vport];
-	/* cannot be parallelized because of i and j */
+
+#pragma omp parallel for num_threads(com.max_thread) private(y,x) schedule(static)
 	for (y = 0; y < gfit.ry; y++) {
-		for (x = 0; x < gfit.rx; x++, i++) {
+		for (x = 0; x < gfit.rx; x++) {
+			guint src_index = y * gfit.rx + x;
+			BYTE dst_pixel_value;
+			WORD tmp_pixel_value;
 			if (mode == HISTEQ_DISPLAY || mode == STF_DISPLAY)	// special case, no lo & hi
-				dst_pixel_value = index[src[i]];
-			else if (do_cut_over && src[i] > hi)	// cut
+				dst_pixel_value = index[src[src_index]];
+			else if (do_cut_over && src[src_index] > hi)	// cut
 				dst_pixel_value = 0;
 			else {
-				if (src[i] - lo < 0)
+				if (src[src_index] - lo < 0)
 					tmp_pixel_value = 0;
 				else
-					tmp_pixel_value = src[i] - lo;
+					tmp_pixel_value = src[src_index] - lo;
 				dst_pixel_value = index[tmp_pixel_value];
 			}
 			if (inverted)
 				dst_pixel_value = UCHAR_MAX - dst_pixel_value;
 
-			double r, g, b;
-
+			guint dst_index = ((gfit.ry - 1 - y) * gfit.rx + x) * 4;
 			switch (color) {
-			default:
-			case NORMAL_COLOR:
-				r = g = b = (double) dst_pixel_value;
-				break;
-			case RAINBOW_COLOR:
-				r = (double) rainbow_index[(int) dst_pixel_value][0];
-				g = (double) rainbow_index[(int) dst_pixel_value][1];
-				b = (double) rainbow_index[(int) dst_pixel_value][2];
+				default:
+				case NORMAL_COLOR:
+					dst[dst_index++] = dst_pixel_value;
+					dst[dst_index++] = dst_pixel_value;
+					dst[dst_index++] = dst_pixel_value;
+					break;
+				case RAINBOW_COLOR:
+					dst[dst_index++] = rainbow_index[dst_pixel_value][0];
+					dst[dst_index++] = rainbow_index[dst_pixel_value][1];
+					dst[dst_index++] = rainbow_index[dst_pixel_value][2];
 			}
-			dst[j++] = round_to_BYTE(b);
-			dst[j++] = round_to_BYTE(g);
-			dst[j++] = round_to_BYTE(r);
-			j++; /* 8-bit padding for the 32-bit cairo RGB24 format */
 		}
-		j -= 2 * com.surface_stride[vport];
 	}
 
 	// flush to ensure all writing to the image was done and redraw the surface
@@ -1178,9 +1175,10 @@ int make_index_for_rainbow(BYTE index[][3]) {
 	double h, s, v, r, g, b;
 
 	for (i = 0; i < UCHAR_MAX + 1; i++) {
-		r = g = b = (double) i / 255.0;
+		r = g = b = (double) i / UCHAR_MAX_DOUBLE;
 		rgb_to_hsv(r, g, b, &h, &s, &v);
-		h = (300. - (double) i * (300. / 255.)); /* Arbitrary: we want h from 300 to 0 deg */
+		double off = 300.0 / 360.0;  /* Arbitrary: we want h from 300 to 0 deg */
+		h = (off - (double) i * (off / UCHAR_MAX_DOUBLE));
 		s = 1.;
 		v = 1.; /* Saturation and Value are set to 100%  */
 		hsv_to_rgb(h, s, v, &r, &g, &b);
@@ -1257,15 +1255,17 @@ void free_reference_image() {
 /* enables or disables the "display reference" checkbox in registration preview */
 void enable_view_reference_checkbox(gboolean status) {
 	static GtkToggleButton *check_display_ref = NULL;
-	static GtkWidget *widget = NULL;
+	static GtkWidget *widget = NULL, *labelRegRef = NULL;
 	if (check_display_ref == NULL) {
 		check_display_ref = GTK_TOGGLE_BUTTON(
 				gtk_builder_get_object(builder, "checkbutton_displayref"));
 		widget = GTK_WIDGET(check_display_ref);
+		labelRegRef = lookup_widget("labelRegRef");
 	}
 	if (status && gtk_widget_get_sensitive(widget))
 		return;	// may be already enabled but deactivated by user, don't force it again
 	gtk_widget_set_sensitive(widget, status);
+	gtk_widget_set_visible(labelRegRef, !status);
 	gtk_toggle_button_set_active(check_display_ref, status);
 }
 
@@ -1490,8 +1490,8 @@ void opendial(void) {
 	gint res;
 	GtkWindow *main_window = GTK_WINDOW(
 			gtk_builder_get_object(builder, "main_window"));
-	GtkWindow *controle_window = GTK_WINDOW(
-			gtk_builder_get_object(builder, "controle_window"));
+	GtkWindow *control_window = GTK_WINDOW(
+			gtk_builder_get_object(builder, "control_window"));
 
 	if (!com.wd)
 		return;
@@ -1503,7 +1503,7 @@ void opendial(void) {
 	case OD_FLAT:
 	case OD_DARK:
 	case OD_OFFSET:
-		widgetdialog = gtk_file_chooser_dialog_new("Open File", controle_window,
+		widgetdialog = gtk_file_chooser_dialog_new("Open File", control_window,
 				GTK_FILE_CHOOSER_ACTION_OPEN, ("_Cancel"), GTK_RESPONSE_CANCEL,
 				("_Open"), GTK_RESPONSE_ACCEPT,
 				NULL);
@@ -1513,7 +1513,7 @@ void opendial(void) {
 		set_filters_dialog(dialog);
 		break;
 	case OD_CWD:
-		widgetdialog = gtk_file_chooser_dialog_new("Open File", controle_window,
+		widgetdialog = gtk_file_chooser_dialog_new("Open File", control_window,
 				GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, ("_Cancel"),
 				GTK_RESPONSE_CANCEL, ("_Open"), GTK_RESPONSE_ACCEPT,
 				NULL);
@@ -1532,7 +1532,7 @@ void opendial(void) {
 		set_filters_dialog(dialog);
 		break;
 	case OD_CONVERT:
-		widgetdialog = gtk_file_chooser_dialog_new("Open File", controle_window,
+		widgetdialog = gtk_file_chooser_dialog_new("Open File", control_window,
 				GTK_FILE_CHOOSER_ACTION_OPEN, ("_Cancel"), GTK_RESPONSE_CANCEL,
 				("_Open"), GTK_RESPONSE_ACCEPT,
 				NULL);
@@ -1643,28 +1643,11 @@ void on_open1_activate(GtkMenuItem *menuitem, gpointer user_data) {
 	opendial();
 }
 
-void on_formula_button_0_toggled(GtkToggleButton *button, gpointer user_data) {
-	com.preproformula = 0;
-	writeinitfile();
-}
-
-void on_formula_button_1_toggled(GtkToggleButton *button, gpointer user_data) {
-	com.preproformula = 1;
-	writeinitfile();
-}
-
 void set_filters_dialog(GtkFileChooser *chooser) {
-	gboolean is_cfa = FALSE;
-#ifdef HAVE_LIBRAW
-	GtkToggleButton *cfaButton = GTK_TOGGLE_BUTTON(
-			lookup_widget("radiobutton_conv_cfa"));
-	is_cfa = gtk_toggle_button_get_active(cfaButton);
-#endif
-
 	gtk_filter_add(chooser, "FITS Files (*.fit, *.fits, *.fts)",
 			"*.fit;*.FIT;*.fits;*.FITS;*.fts;*.FTS",
 			com.filter == TYPEFITS);
-	if (whichdial == OD_OPEN || (whichdial == OD_CONVERT && !is_cfa)) {
+	if (whichdial == OD_OPEN || whichdial == OD_CONVERT) {
 #ifdef HAVE_LIBRAW
 		/* RAW FILES */
 		int nb_raw;
@@ -1718,7 +1701,7 @@ void set_filters_dialog(GtkFileChooser *chooser) {
 		gtk_filter_add(chooser, "SER files (*.ser)", "*.ser;*.SER",
 				com.filter == TYPESER);
 
-#ifdef HAVE_FFMS2
+#if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 		/* FILM FILES */
 		int nb_film;
 		char *film;
@@ -1758,7 +1741,8 @@ void gtk_filter_add(GtkFileChooser *file_chooser, const gchar *title,
 }
 
 void set_prepro_button_sensitiveness() {
-	static GtkToggleButton *udark = NULL, *uoffset = NULL, *uflat = NULL;
+	static GtkToggleButton *udark = NULL, *uoffset = NULL, *uflat = NULL,
+			*checkAutoEvaluate = NULL;
 	if (udark == NULL) {
 		udark = GTK_TOGGLE_BUTTON(
 				gtk_builder_get_object(builder, "usedark_button"));
@@ -1766,12 +1750,43 @@ void set_prepro_button_sensitiveness() {
 				gtk_builder_get_object(builder, "useoffset_button"));
 		uflat = GTK_TOGGLE_BUTTON(
 				gtk_builder_get_object(builder, "useflat_button"));
+		checkAutoEvaluate = GTK_TOGGLE_BUTTON(
+				gtk_builder_get_object(builder, "checkbutton_auto_evaluate"));
 	}
+
 	gtk_widget_set_sensitive(lookup_widget("prepro_button"),
 			(sequence_is_loaded() || single_image_is_loaded())
 					&& (gtk_toggle_button_get_active(udark)
 							|| gtk_toggle_button_get_active(uoffset)
 							|| gtk_toggle_button_get_active(uflat)));
+	gtk_widget_set_sensitive(lookup_widget("grid24"),
+			gtk_toggle_button_get_active(udark));
+	gtk_widget_set_sensitive(lookup_widget("checkDarkOptimize"),
+			gtk_toggle_button_get_active(udark));
+	gtk_widget_set_sensitive(lookup_widget("checkbutton_auto_evaluate"),
+			gtk_toggle_button_get_active(uflat));
+	gtk_widget_set_sensitive(lookup_widget("entry_flat_norm"),
+			gtk_toggle_button_get_active(uflat)
+					&& !gtk_toggle_button_get_active(checkAutoEvaluate));
+}
+
+void on_cosmEnabledCheck_toggled(GtkToggleButton *button, gpointer user_data) {
+	GtkWidget *CFA, *SigHot, *SigCold, *checkHot, *checkCold;
+	gboolean is_active;
+
+	CFA = lookup_widget("cosmCFACheck");
+	SigHot = lookup_widget("spinSigCosmeHot");
+	SigCold = lookup_widget("spinSigCosmeCold");
+	checkHot = lookup_widget("checkSigHot");
+	checkCold = lookup_widget("checkSigCold");
+
+	is_active = gtk_toggle_button_get_active(button);
+
+	gtk_widget_set_sensitive(CFA, is_active);
+	gtk_widget_set_sensitive(SigHot, is_active);
+	gtk_widget_set_sensitive(SigCold, is_active);
+	gtk_widget_set_sensitive(checkHot, is_active);
+	gtk_widget_set_sensitive(checkCold, is_active);
 }
 
 void on_settings_activate(GtkMenuItem *menuitem, gpointer user_data) {
@@ -1807,41 +1822,30 @@ void on_close_settings_button_clicked(GtkButton *button, gpointer user_data) {
 	gtk_widget_hide(lookup_widget("settings_window"));
 }
 
-void on_focal_entry_changed(GtkEditable *editable, gpointer user_data) {
-	const gchar* focal_entry = gtk_entry_get_text(
-			GTK_ENTRY(lookup_widget("focal_entry")));
+void update_fwhm_units_ok() {
 	GtkWidget *label_ok = GTK_WIDGET(lookup_widget("label_ok"));
 
-	gfit.focal_length = atof(focal_entry);
+	gtk_widget_set_visible(label_ok,
+			gfit.focal_length > 0.0 && gfit.pixel_size_x > 0.0f
+					&& gfit.pixel_size_y > 0.0f);
+}
 
-	if (!gfit.focal_length || !gfit.pixel_size_x || !gfit.pixel_size_y)
-		gtk_widget_set_visible(label_ok, FALSE);
-	else
-		gtk_widget_set_visible(label_ok, TRUE);
+void on_focal_entry_changed(GtkEditable *editable, gpointer user_data) {
+	const gchar* focal_entry = gtk_entry_get_text(GTK_ENTRY(editable));
+	gfit.focal_length = atof(focal_entry);
+	update_fwhm_units_ok();
 }
 
 void on_pitchX_entry_changed(GtkEditable *editable, gpointer user_data) {
-	const gchar* pitchX_entry = gtk_entry_get_text(
-			GTK_ENTRY(lookup_widget("pitchX_entry")));
-	GtkWidget *label_ok = GTK_WIDGET(lookup_widget("label_ok"));
-
-	gfit.pixel_size_x = atof(pitchX_entry);
-	if (!gfit.focal_length || !gfit.pixel_size_x || !gfit.pixel_size_y)
-		gtk_widget_set_visible(label_ok, FALSE);
-	else
-		gtk_widget_set_visible(label_ok, TRUE);
+	const gchar* pitchX_entry = gtk_entry_get_text(GTK_ENTRY(editable));
+	gfit.pixel_size_x = (float)atof(pitchX_entry);
+	update_fwhm_units_ok();
 }
 
 void on_pitchY_entry_changed(GtkEditable *editable, gpointer user_data) {
-	const gchar* pitchY_entry = gtk_entry_get_text(
-			GTK_ENTRY(lookup_widget("pitchY_entry")));
-	GtkWidget *label_ok = GTK_WIDGET(lookup_widget("label_ok"));
-
-	gfit.pixel_size_y = atof(pitchY_entry);
-	if (!gfit.focal_length || !gfit.pixel_size_x || !gfit.pixel_size_y)
-		gtk_widget_set_visible(label_ok, FALSE);
-	else
-		gtk_widget_set_visible(label_ok, TRUE);
+	const gchar* pitchY_entry = gtk_entry_get_text(GTK_ENTRY(editable));
+	gfit.pixel_size_y = (float)atof(pitchY_entry);
+	update_fwhm_units_ok();
 }
 
 void clear_sampling_setting_box() {
@@ -1874,11 +1878,11 @@ void set_libraw_settings_menu_available(gboolean activate) {
 }
 
 void on_comboBayer_pattern_changed(GtkComboBox* box, gpointer user_data) {
-	com.raw_set.bayer_pattern = gtk_combo_box_get_active(box);
+	com.debayer.bayer_pattern = gtk_combo_box_get_active(box);
 }
 
 void on_comboBayer_inter_changed(GtkComboBox* box, gpointer user_data) {
-	com.raw_set.bayer_inter = gtk_combo_box_get_active(box);
+	com.debayer.bayer_inter = gtk_combo_box_get_active(box);
 }
 
 void set_GUI_CAMERA() {
@@ -1928,11 +1932,6 @@ void set_GUI_CAMERA() {
 void set_GUI_LIBRAW() {
 
 	/**********COLOR ADJUSTEMENT**************/
-	gtk_toggle_button_set_active(
-			GTK_TOGGLE_BUTTON(lookup_widget("checkbutton_CFA")),
-			com.raw_set.cfa);
-	update_raw_cfa_tooltip();
-
 	gtk_spin_button_set_value(
 			GTK_SPIN_BUTTON(lookup_widget("Brightness_spinbutton")),
 			com.raw_set.bright);
@@ -1979,33 +1978,14 @@ void set_GUI_LIBRAW() {
 	/********** DEBAYER ******************/
 	GtkComboBox *pattern = GTK_COMBO_BOX(lookup_widget("comboBayer_pattern"));
 	GtkComboBox *inter = GTK_COMBO_BOX(lookup_widget("comboBayer_inter"));
-	gtk_combo_box_set_active(pattern, com.raw_set.bayer_pattern);
-	gtk_combo_box_set_active(inter, com.raw_set.bayer_inter);
-
-	/************** SER *******************/
+	gtk_combo_box_set_active(pattern, com.debayer.bayer_pattern);
+	gtk_combo_box_set_active(inter, com.debayer.bayer_inter);
 	gtk_toggle_button_set_active(
-			GTK_TOGGLE_BUTTON(lookup_widget("checkbutton_SER")),
-			com.raw_set.ser_cfa);
+			GTK_TOGGLE_BUTTON(lookup_widget("checkbutton_SER_use_header")),
+			com.debayer.ser_use_bayer_header);
 	gtk_toggle_button_set_active(
-			GTK_TOGGLE_BUTTON(lookup_widget("checkbutton_SER_force_pattern")),
-			com.raw_set.ser_force_bayer);
-}
-
-void on_checkbutton_CFA_toggled(GtkToggleButton *button, gpointer user_data) {
-	GtkWidget *frame[8];
-	int i;
-
-	gboolean CFA_button = gtk_toggle_button_get_active(button);
-	frame[0] = lookup_widget("frame4");
-	frame[1] = lookup_widget("frame3");
-	frame[2] = lookup_widget("frame19");
-	frame[3] = lookup_widget("hbox8");
-	frame[4] = lookup_widget("hbox9");
-	frame[5] = lookup_widget("hbox11");
-	frame[6] = lookup_widget("checkbutton_multipliers");
-	frame[7] = lookup_widget("checkbutton_blackpoint");
-	for (i = 0; i < 8; i++)
-		gtk_widget_set_sensitive(frame[i], !CFA_button);
+			GTK_TOGGLE_BUTTON(lookup_widget("demosaicingButton")),
+			com.debayer.open_debayer);
 }
 
 void on_checkbutton_cam_toggled(GtkButton *button, gpointer user_data) {
@@ -2041,13 +2021,7 @@ void on_checkbutton_auto_toggled(GtkButton *button, gpointer user_data) {
 }
 
 void update_libraw_interface() {
-	/***** DEBAYER is updated with changed signal *******/
-
 	/**********COLOR ADJUSTEMENT**************/
-	com.raw_set.cfa = gtk_toggle_button_get_active(
-			GTK_TOGGLE_BUTTON(lookup_widget("checkbutton_CFA")));
-	update_raw_cfa_tooltip();
-
 	com.raw_set.bright = gtk_spin_button_get_value(
 			GTK_SPIN_BUTTON(lookup_widget("Brightness_spinbutton")));
 	com.raw_set.mul[0] = gtk_spin_button_get_value(
@@ -2088,10 +2062,8 @@ void update_libraw_interface() {
 	}
 	/* We write in config file */
 	/*************SER**********************/
-	com.raw_set.ser_cfa = gtk_toggle_button_get_active(
-			GTK_TOGGLE_BUTTON(lookup_widget("checkbutton_SER")));
-	com.raw_set.ser_force_bayer = gtk_toggle_button_get_active(
-			GTK_TOGGLE_BUTTON(lookup_widget("checkbutton_SER_force_pattern")));
+	com.debayer.ser_use_bayer_header = gtk_toggle_button_get_active(
+			GTK_TOGGLE_BUTTON(lookup_widget("checkbutton_SER_use_header")));
 	writeinitfile();
 }
 
@@ -2129,31 +2101,20 @@ void on_combobinning_changed(GtkComboBox *box, gpointer user_data) {
 	}
 }
 
-void on_checkbutton_multipliers_toggled(GtkButton *button, gpointer user_data) {
-	gtk_widget_set_sensitive(lookup_widget("Red_spinbutton"),
-			!(gtk_toggle_button_get_active(
-					GTK_TOGGLE_BUTTON(lookup_widget("checkbutton_multipliers")))));
-	gtk_widget_set_sensitive(lookup_widget("Blue_spinbutton"),
-			!(gtk_toggle_button_get_active(
-					GTK_TOGGLE_BUTTON(lookup_widget("checkbutton_multipliers")))));
-	if (gtk_toggle_button_get_active(
-			GTK_TOGGLE_BUTTON(lookup_widget("checkbutton_multipliers")))) {
+void on_checkbutton_multipliers_toggled(GtkToggleButton *button,
+		gpointer user_data) {
+	gboolean active;
+
+	active = gtk_toggle_button_get_active(button);
+
+	gtk_widget_set_sensitive(lookup_widget("hbox8"), !active);
+	gtk_widget_set_sensitive(lookup_widget("hbox11"), !active);
+	if (active) {
 		gtk_spin_button_set_value(
 				GTK_SPIN_BUTTON(lookup_widget("Red_spinbutton")), 1.0);
 		gtk_spin_button_set_value(
 				GTK_SPIN_BUTTON(lookup_widget("Blue_spinbutton")), 1.0);
 	}
-}
-
-void on_checkbutton_SER_toggled(GtkToggleButton *button, gpointer user_data) {
-	static GtkWidget *SER_force_pattern = NULL;
-	gboolean is_checked;
-
-	if (SER_force_pattern == NULL) {
-		SER_force_pattern = lookup_widget("checkbutton_SER_force_pattern");
-	}
-	is_checked = gtk_toggle_button_get_active(button);
-	gtk_widget_set_sensitive(SER_force_pattern, !is_checked);
 }
 
 void reset_swapdir() {
@@ -2885,14 +2846,9 @@ void display_filename() {
 
 /* set available layers in the layer list of registration */
 void set_layers_for_assign() {
-	static GtkComboBoxText *cbbt_layers = NULL;
 	int i;
-	if (cbbt_layers == NULL)
-		cbbt_layers = GTK_COMBO_BOX_TEXT(
-				gtk_builder_get_object(builder, "cbbt_layers_assign"));
 	if (!com.seq.layers)
 		return;
-	gtk_combo_box_text_remove_all(cbbt_layers);
 	for (i = 0; i < com.seq.nb_layers; i++) {
 		char layer[100];
 		if (!com.seq.layers[i].name) {
@@ -2912,9 +2868,7 @@ void set_layers_for_assign() {
 			}
 		}
 		g_snprintf(layer, sizeof(layer), "%d: %s", i, com.seq.layers[i].name);
-		gtk_combo_box_text_append_text(cbbt_layers, layer);
 	}
-	gtk_combo_box_set_active(GTK_COMBO_BOX(cbbt_layers), 0);
 }
 
 void set_layers_for_registration() {
@@ -3189,6 +3143,19 @@ void on_prepro_button_clicked(GtkButton *button, gpointer user_data) {
 				}
 			}
 		}
+		// if dark optimization selected
+		tbutton = GTK_TOGGLE_BUTTON(
+				gtk_builder_get_object(builder, "checkDarkOptimize"));
+		if (gtk_toggle_button_get_active(tbutton) == TRUE) {
+			com.preprostatus |= USE_OPTD;
+		}
+
+		// if cosmetic correction selected
+		tbutton = GTK_TOGGLE_BUTTON(
+				gtk_builder_get_object(builder, "cosmEnabledCheck"));
+		if (gtk_toggle_button_get_active(tbutton) == TRUE) {
+			com.preprostatus |= USE_COSME;
+		}
 	}
 
 	// if flat selected
@@ -3262,6 +3229,7 @@ void on_prepro_button_clicked(GtkButton *button, gpointer user_data) {
 			}
 		}
 	}
+
 	if (com.preprostatus == 0)
 		return;
 
@@ -3270,6 +3238,8 @@ void on_prepro_button_clicked(GtkButton *button, gpointer user_data) {
 	struct preprocessing_data *args = malloc(sizeof(struct preprocessing_data));
 	siril_log_color_message("Preprocessing...\n", "red");
 	gettimeofday(&args->t_start, NULL);
+
+	/* Get parameters */
 	GtkWidget *autobutton = lookup_widget("checkbutton_auto_evaluate");
 	args->autolevel = gtk_toggle_button_get_active(
 			GTK_TOGGLE_BUTTON(autobutton));
@@ -3280,9 +3250,26 @@ void on_prepro_button_clicked(GtkButton *button, gpointer user_data) {
 				gtk_builder_get_object(builder, "entry_flat_norm"));
 		args->normalisation = atof(gtk_entry_get_text(norm_entry));
 	}
-	GtkWidget *CCD_formula = lookup_widget("formula_button_1");
-	args->use_ccd_formula = gtk_toggle_button_get_active(
-			GTK_TOGGLE_BUTTON(CCD_formula));
+	GtkToggleButton *CFA;
+	GtkSpinButton *sigHot, *sigCold;
+
+	CFA = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder,"cosmCFACheck"));
+	sigHot = GTK_SPIN_BUTTON(gtk_builder_get_object(builder,"spinSigCosmeHot"));
+	sigCold = GTK_SPIN_BUTTON(gtk_builder_get_object(builder,"spinSigCosmeCold"));
+
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(lookup_widget("checkSigCold"))))
+		args->sigma[0] = gtk_spin_button_get_value(sigCold);
+	else
+		args->sigma[0] = -1.0;
+
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(lookup_widget("checkSigHot"))))
+		args->sigma[1] = gtk_spin_button_get_value(sigHot);
+	else
+		args->sigma[1] = -1.0;
+
+	args->is_cfa = gtk_toggle_button_get_active(CFA);
+
+	/****/
 
 	if (single_image_is_loaded()) {
 		int success = 0;
@@ -3354,6 +3341,7 @@ void on_ref_frame_toggled(GtkToggleButton *togglebutton, gpointer user_data) {
 	}
 	sequence_list_change_reference();
 	adjust_sellabel();	// reference image is named in the label
+	writeseqfile(&com.seq);
 }
 
 // from registration window
@@ -3373,17 +3361,16 @@ void on_seqproc_entry_changed(GtkComboBox *widget, gpointer user_data) {
 	if (name && name[0] != '\0') {
 		gchar *type;
 		set_cursor_waiting(TRUE);
-		if (ends_with(name, ".ser")) {
+		const char *ext = get_filename_ext(name);
+		if (!strcmp(ext, "ser")) {
 			name[strlen(name) - 1] = 'q';
 			type = " SER";
-#ifdef HAVE_FFMS2
-		} else if (!check_for_film_extensions(get_filename_ext(name))) {
-#else
-		} else if (ends_with(name, ".avi")) {
-#endif
-			int len = strlen(get_filename_ext(name));
-			strncpy(name + strlen(name) - len - 1, ".seq", len + 1);
+#if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
+		} else if (!check_for_film_extensions(ext)) {
+			int len = strlen(ext);
+			strncpy(name + strlen(name) - len - 1, "seq", len + 1);
 			type = " AVI";
+#endif
 		} else
 			type = "";
 		g_snprintf(msg, sizeof(msg), "Selected%s sequence %s...", type, name);
@@ -3418,8 +3405,9 @@ void on_checkseqbutton_clicked(GtkButton *button, gpointer user_data) {
 	set_cursor_waiting(TRUE);
 	progress_bar_set_text(
 			"Searching for sequences in the current working directory...");
-	check_seq(force);
-	update_sequences_list(NULL);
+	if (!check_seq(force))
+		update_sequences_list(NULL);
+
 	/* it's better to uncheck the force button each time it is used */
 	if (force)
 		gtk_toggle_button_set_active(forceButton, FALSE);
@@ -3675,53 +3663,6 @@ void set_cursor_waiting(gboolean waiting) {
 		list = g_list_next(list);
 	}
 	g_free(list);
-}
-
-// This function is reentrant
-void start_in_new_thread(gpointer (*f)(gpointer p), gpointer p) {
-	g_mutex_lock(&com.mutex);
-	if (com.run_thread || com.thread != NULL) {
-		fprintf(stderr, "The processing thread is busy, stop it first.\n");
-		g_mutex_unlock(&com.mutex);
-		return;
-	}
-
-	com.run_thread = TRUE;
-	g_mutex_unlock(&com.mutex);
-	com.thread = g_thread_new("processing", f, p);
-}
-
-void stop_processing_thread() {
-	if (com.thread == NULL) {
-		fprintf(stderr,
-				"The processing thread is not running, cannot stop it.\n");
-		return;
-	}
-
-	set_thread_run(FALSE);
-
-	g_thread_join(com.thread);
-	com.thread = NULL;
-}
-
-void set_thread_run(gboolean b) {
-	g_mutex_lock(&com.mutex);
-	com.run_thread = b;
-	g_mutex_unlock(&com.mutex);
-}
-
-gboolean get_thread_run() {
-	gboolean retval;
-	g_mutex_lock(&com.mutex);
-	retval = com.run_thread;
-	g_mutex_unlock(&com.mutex);
-	return retval;
-}
-
-void on_processes_button_cancel_clicked(GtkButton *button, gpointer user_data) {
-	if (com.thread != NULL)
-		siril_log_color_message("Process aborted by user\n", "red");
-	stop_processing_thread();
 }
 
 /* http://developer.gnome.org/gtk3/3.4/GtkProgressBar.html */
@@ -4349,10 +4290,20 @@ void on_processing_activate(GtkMenuItem *menuitem, gpointer user_data) {
 		gtk_widget_set_sensitive(lookup_widget("menu_channel_separation"),
 		FALSE);
 	}
-	if (single_image_is_loaded() || (sequence_is_loaded()))
+	if (single_image_is_loaded() || (sequence_is_loaded())) {
 		gtk_widget_set_sensitive(lookup_widget("menuitem_histo"), TRUE);
-	else
+	} else {
 		gtk_widget_set_sensitive(lookup_widget("menuitem_histo"), FALSE);
+	}
+
+	if ((sequence_is_loaded()) || single_image_is_loaded()) {
+		gtk_widget_set_sensitive(lookup_widget("menuitem_fixbanding"), TRUE);
+		gtk_widget_set_sensitive(lookup_widget("menuitem_cosmetic"), TRUE);
+	}
+	else {
+		gtk_widget_set_sensitive(lookup_widget("menuitem_fixbanding"), FALSE);
+		gtk_widget_set_sensitive(lookup_widget("menuitem_cosmetic"), FALSE);
+	}
 
 	if (single_image_is_loaded()
 			&& (!sequence_is_loaded()
@@ -4380,8 +4331,6 @@ void on_processing_activate(GtkMenuItem *menuitem, gpointer user_data) {
 		TRUE);
 		gtk_widget_set_sensitive(lookup_widget("menuitem_medianfilter"),
 		TRUE);
-		gtk_widget_set_sensitive(lookup_widget("menuitem_fixbanding"),
-		TRUE);
 	} else {
 		gtk_widget_set_sensitive(lookup_widget("menuitem_resample"), FALSE);
 		gtk_widget_set_sensitive(lookup_widget("menuitem_rotation"), FALSE);
@@ -4398,8 +4347,6 @@ void on_processing_activate(GtkMenuItem *menuitem, gpointer user_data) {
 		gtk_widget_set_sensitive(lookup_widget("menu_wavelet_separation"),
 		FALSE);
 		gtk_widget_set_sensitive(lookup_widget("menuitem_medianfilter"),
-		FALSE);
-		gtk_widget_set_sensitive(lookup_widget("menuitem_fixbanding"),
 		FALSE);
 	}
 }
@@ -4570,7 +4517,6 @@ void on_button_resample_ok_clicked(GtkButton *button, gpointer user_data) {
 	redraw(com.cvport, REMAP_ALL);
 	redraw_previews();
 	set_cursor_waiting(FALSE);
-	gtk_widget_hide(lookup_widget("resample_dialog"));
 }
 
 void on_button_resample_close_clicked(GtkButton *button, gpointer user_data) {
@@ -4684,7 +4630,6 @@ void on_button_rotation_ok_clicked(GtkButton *button, gpointer user_data) {
 	redraw(com.cvport, REMAP_ALL);
 	redraw_previews();
 	set_cursor_waiting(FALSE);
-	gtk_widget_hide(lookup_widget("rotation_dialog"));
 }
 
 #endif
@@ -4750,8 +4695,10 @@ void on_menuitem_stat_activate(GtkMenuItem *menuitem, gpointer user_data) {
 
 void on_menuitem_bkg_extraction_activate(GtkMenuItem *menuitem,
 		gpointer user_data) {
-	if (single_image_is_loaded())
+	if (single_image_is_loaded()) {
+		update_bkg_interface();
 		gtk_widget_show(lookup_widget("Bkg_extract_window"));
+	}
 }
 
 void on_bkgButtonManual_toggled(GtkToggleButton *togglebutton,
@@ -4886,17 +4833,17 @@ void on_button_bkg_extract_close_clicked(GtkButton *button, gpointer user_data) 
 }
 
 void on_Bkg_extract_window_hide(GtkWidget *widget, gpointer user_data) {
-	static GtkToggleButton *imgbutton = NULL, *bkgbutton = NULL, *bgkAutoButton = NULL;
+	static GtkToggleButton *imgbutton = NULL, *bkgbutton = NULL, *bgkManButton = NULL;
 	int remap_option;
 
 	if (imgbutton == NULL) {
 		imgbutton = GTK_TOGGLE_BUTTON(lookup_widget("radiobutton_bkg_img"));
 		bkgbutton = GTK_TOGGLE_BUTTON(lookup_widget("radiobutton_bkg_bkg"));
-		bgkAutoButton = GTK_TOGGLE_BUTTON(lookup_widget("bkgButtonAuto"));
+		bgkManButton = GTK_TOGGLE_BUTTON(lookup_widget("bkgButtonManual"));
 	}
 	gtk_widget_set_sensitive(lookup_widget("frame_bkg_tools"), FALSE);
 	gtk_widget_set_sensitive(lookup_widget("button_bkg_correct"), FALSE);
-	gtk_toggle_button_set_active(bgkAutoButton, TRUE);
+	gtk_toggle_button_set_active(bgkManButton, TRUE);
 	remap_option = REMAP_NONE;
 
 	set_cursor_waiting(TRUE);
@@ -4905,6 +4852,7 @@ void on_Bkg_extract_window_hide(GtkWidget *widget, gpointer user_data) {
 		remap_option = REMAP_ALL;
 	}
 	clearSamples();
+	mouse_status = MOUSE_ACTION_SELECT_REG_AREA;
 	redraw(com.cvport, remap_option);
 	redraw_previews();
 	clearfits(&wfit[0]);
@@ -5096,9 +5044,10 @@ void on_extract_channel_button_ok_clicked(GtkButton *button, gpointer user_data)
 /******************* POPUP GRAY MENU *******************************/
 
 void on_menu_gray_psf_activate(GtkMenuItem *menuitem, gpointer user_data) {
-	char msg[256];
+	char msg[512];
 	fitted_PSF *result = NULL;
 	int layer = match_drawing_area_widget(com.vport[com.cvport], FALSE);
+	char *str;
 
 	if (layer == -1)
 		return;
@@ -5114,17 +5063,22 @@ void on_menu_gray_psf_activate(GtkMenuItem *menuitem, gpointer user_data) {
 	result = psf_get_minimisation(&gfit, layer, &com.selection);
 	if (!result)
 		return;
+
+	if (com.magOffset > 0.0)
+		str = "true reduced";
+	else
+		str = "relative";
 	g_snprintf(msg, sizeof(msg),
 			"Centroid Coordinates:\n\t\tx0=%.2fpx\n\t\ty0=%.2fpx\n\n"
 					"Full Width Half Maximum:\n\t\tFWHMx=%.2f%s\n\t\tFWHMy=%.2f%s\n\n"
 					"Angle:\n\t\t%0.2fdeg\n\n"
 					"Background Value:\n\t\tB=%.6f\n\n"
 					"Maximal Intensity:\n\t\tA=%.6f\n\n"
-					"Relative Magnitude:\n\t\tm=%.2f\n\n"
+					"Magnitude (%s):\n\t\tm=%.2f\n\n"
 					"RMSE:\n\t\tRMSE=%.3e", result->x0 + com.selection.x,
 			com.selection.y + com.selection.h - result->y0, result->fwhmx,
 			result->units, result->fwhmy, result->units, result->angle, result->B,
-			result->A, result->mag, result->rmse);
+			result->A, str, result->mag + com.magOffset, result->rmse);
 	show_data_dialog(msg, "PSF Results");
 	free(result);
 }
@@ -5608,13 +5562,92 @@ void on_Median_Apply_clicked(GtkButton *button, gpointer user_data) {
 
 }
 
-/**********************************************************************/
+/****************** GUI for Cosmetic Correction *********************/
+
+void on_menuitem_cosmetic_activate(GtkMenuItem *menuitem, gpointer user_data) {
+	if (sequence_is_loaded()) {
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(lookup_widget("checkCosmeticSeq")), TRUE);
+	}
+	else if (single_image_is_loaded()) {
+		// not a processing result
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(lookup_widget("checkCosmeticSeq")), FALSE);
+	}
+	gtk_widget_show(lookup_widget("cosmetic_dialog"));
+}
+
+void on_button_cosmetic_close_clicked(GtkButton *button, gpointer user_data) {
+	gtk_widget_hide(lookup_widget("cosmetic_dialog"));
+}
+
+void on_checkSigCosme_toggled(GtkToggleButton *togglebutton, gpointer user_data) {
+	static GtkWidget *cosmeticApply = NULL;
+	static GtkToggleButton *checkCosmeSigCold = NULL;
+	static GtkToggleButton *checkCosmeSigHot = NULL;
+	gboolean checkCold, checkHot;
+
+	if (cosmeticApply == NULL) {
+		cosmeticApply = lookup_widget("button_cosmetic_ok");
+		checkCosmeSigCold = GTK_TOGGLE_BUTTON(lookup_widget("checkSigColdBox"));
+		checkCosmeSigHot = GTK_TOGGLE_BUTTON(lookup_widget("checkSigHotBox"));
+	}
+	checkCold = gtk_toggle_button_get_active(checkCosmeSigCold);
+	checkHot = gtk_toggle_button_get_active(checkCosmeSigHot);
+	gtk_widget_set_sensitive(cosmeticApply, checkCold || checkHot);
+}
+
+void on_button_cosmetic_ok_clicked(GtkButton *button, gpointer user_data) {
+	GtkEntry *cosmeticSeqEntry;
+	GtkToggleButton *CFA, *seq;
+	GtkSpinButton *sigma[2];
+	GtkAdjustment *adjCosmeAmount;
+
+	CFA = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder,"cosmCFACheckBox"));
+	sigma[0] = GTK_SPIN_BUTTON(gtk_builder_get_object(builder,"spinSigCosmeColdBox"));
+	sigma[1] = GTK_SPIN_BUTTON(gtk_builder_get_object(builder,"spinSigCosmeHotBox"));
+	seq = GTK_TOGGLE_BUTTON(lookup_widget("checkCosmeticSeq"));
+	cosmeticSeqEntry = GTK_ENTRY(lookup_widget("entryCosmeticSeq"));
+	adjCosmeAmount = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "adjCosmeAmount"));
+
+	struct cosmetic_data *args = malloc(sizeof(struct cosmetic_data));
+
+	if (gtk_toggle_button_get_active(
+			GTK_TOGGLE_BUTTON(lookup_widget("checkSigColdBox"))))
+		args->sigma[0] = gtk_spin_button_get_value(sigma[0]);
+	else
+		args->sigma[0] = -1.0;
+
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(lookup_widget("checkSigHotBox"))))
+		args->sigma[1] = gtk_spin_button_get_value(sigma[1]);
+	else
+		args->sigma[1] = -1.0;
+
+	args->is_cfa = gtk_toggle_button_get_active(CFA);
+	args->amount = gtk_adjustment_get_value(adjCosmeAmount);
+
+	args->fit = &gfit;
+	args->seqEntry = gtk_entry_get_text(cosmeticSeqEntry);
+	set_cursor_waiting(TRUE);
+
+	if (gtk_toggle_button_get_active(seq) && sequence_is_loaded()) {
+		if (args->seqEntry && args->seqEntry[0] == '\0')
+			args->seqEntry = "cc_";
+		apply_cosmetic_to_sequence(args);
+	} else {
+		start_in_new_thread(autoDetectThreaded, args);
+	}
+}
 
 /***************** GUI for Canon Banding Reduction ********************/
 
 void on_menuitem_fixbanding_activate(GtkMenuItem *menuitem, gpointer user_data) {
-	if (single_image_is_loaded())
-		gtk_widget_show(lookup_widget("canon_fixbanding_dialog"));
+	if (sequence_is_loaded()) {
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(lookup_widget("checkBandingSeq")), TRUE);
+	}
+	else if (single_image_is_loaded()) {
+		// not a processing result
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(lookup_widget("checkBandingSeq")), FALSE);
+	}
+	gtk_widget_show(lookup_widget("canon_fixbanding_dialog"));
 }
 
 void on_button_ok_fixbanding_clicked(GtkButton *button, gpointer user_data) {
@@ -5624,7 +5657,9 @@ void on_button_ok_fixbanding_clicked(GtkButton *button, gpointer user_data) {
 void on_button_apply_fixbanding_clicked(GtkButton *button, gpointer user_data) {
 	static GtkRange *range_amount = NULL;
 	static GtkRange *range_invsigma = NULL;
-	static GtkToggleButton *toggle_protect_highlights_banding = NULL;
+	static GtkToggleButton *toggle_protect_highlights_banding = NULL,
+		*vertical = NULL, *seq = NULL;
+	static GtkEntry *bandingSeqEntry = NULL;
 	double amount, invsigma;
 	gboolean protect_highlights;
 
@@ -5641,6 +5676,9 @@ void on_button_apply_fixbanding_clicked(GtkButton *button, gpointer user_data) {
 		range_invsigma = GTK_RANGE(lookup_widget("scale_fixbanding_invsigma"));
 		toggle_protect_highlights_banding = GTK_TOGGLE_BUTTON(
 				lookup_widget("checkbutton_fixbanding"));
+		vertical = GTK_TOGGLE_BUTTON(lookup_widget("checkBandingVertical"));
+		seq = GTK_TOGGLE_BUTTON(lookup_widget("checkBandingSeq"));
+		bandingSeqEntry = GTK_ENTRY(lookup_widget("entryBandingSeq"));
 	}
 	amount = gtk_range_get_value(range_amount);
 	invsigma = gtk_range_get_value(range_invsigma);
@@ -5653,26 +5691,34 @@ void on_button_apply_fixbanding_clicked(GtkButton *button, gpointer user_data) {
 		undo_save_state("Processing: Canon Banding Reduction (amount=%.2lf, Protect=TRUE, invsigma=%.2lf)",
 				amount, invsigma);
 
-
 	args->fit = &gfit;
 	args->protect_highlights = protect_highlights;
 	args->amount = amount;
 	args->sigma = invsigma;
+	args->applyRotation = gtk_toggle_button_get_active(vertical);
+	args->seqEntry = gtk_entry_get_text(bandingSeqEntry);
 	set_cursor_waiting(TRUE);
-	start_in_new_thread(BandingEngine, args);
+
+	if (gtk_toggle_button_get_active(seq) && sequence_is_loaded()) {
+		if (args->seqEntry && args->seqEntry[0] == '\0')
+			args->seqEntry = "unband_";
+		apply_banding_to_sequence(args);
+	} else {
+		start_in_new_thread(BandingEngineThreaded, args);
+	}
 }
 
 void on_checkbutton_fixbanding_toggled(GtkToggleButton *togglebutton,
 		gpointer user_data) {
-	static GtkWidget *scale_invsigma = NULL;
+	static GtkWidget *bandingHighlightBox = NULL;
 	gboolean is_active;
 
-	if (scale_invsigma == NULL) {
-		scale_invsigma = lookup_widget("scale_fixbanding_invsigma");
+	if (bandingHighlightBox == NULL) {
+		bandingHighlightBox = lookup_widget("bandingHighlightBox");
 	}
 
 	is_active = gtk_toggle_button_get_active(togglebutton);
-	gtk_widget_set_sensitive(scale_invsigma, is_active);
+	gtk_widget_set_sensitive(bandingHighlightBox, is_active);
 }
 
 /**********************************************************************
@@ -5745,13 +5791,17 @@ void on_clear_convert_button_clicked(GtkButton *button, gpointer user_data) {
 
 void on_remove_convert_button_clicked(GtkWidget *button, gpointer user_data) {
 	GtkTreeSelection *selection = GTK_TREE_SELECTION(
-			gtk_builder_get_object(builder, "treeview-selection8"));
+			gtk_builder_get_object(builder, "treeview-selection5"));
 	GtkTreeIter iter;
 	GtkTreeModel *model;
+	gchararray string;
 
 	if (gtk_tree_selection_get_selected(selection, &model, &iter)) {//get selected item
-		gtk_list_store_remove(GTK_LIST_STORE(model), &iter);
-		gtk_tree_selection_unselect_all(selection);
+		gtk_tree_model_get(model, &iter, 0, &string, -1);
+		if (string) {
+			gtk_list_store_remove(GTK_LIST_STORE(model), &iter);
+			gtk_tree_selection_unselect_all(selection);
+		}
 	}
 	check_for_conversion_form_completeness();
 }
@@ -5778,6 +5828,14 @@ void on_crop_Apply_clicked (GtkButton *button, gpointer user_data) {
 		siril_log_message(
 				"Another task is already in progress, ignoring new request.\n");
 		return;
+	}
+
+	if (com.seq.type == SEQ_AVI) {
+		siril_log_message("Crop does not work with avi film. Please, convert your file to SER first.\n");
+		return;
+	}
+	if (com.seq.type == SEQ_INTERNAL) {
+		siril_log_message("Not a valid sequence for cropping.\n");
 	}
 
 	struct crop_sequence_data *args = malloc(sizeof(struct crop_sequence_data));

@@ -57,7 +57,7 @@ void get_the_registration_area(struct registration_args *reg_args,
 void fill_comboboxregmethod();
 
 /** getter */
-int get_registration_layer(sequence *seq);
+int get_registration_layer();
 
 /* mouse behaviour */
 typedef enum {

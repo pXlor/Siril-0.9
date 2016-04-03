@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -34,7 +34,7 @@
 #include "io/ser.h"
 #include "core/proto.h"
 #include "gui/callbacks.h"
-#ifdef HAVE_FFMS2
+#if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 #include "io/films.h"
 #endif
 
@@ -187,7 +187,7 @@ sequence * readseqfile(const char *name){
 				/* sequence type (several files or a single file) */
 				if (line[1] == 'S') {
 					seq->type = SEQ_SER;
-#ifdef HAVE_FFMS2
+#if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 					seq->ext = "ser";
 #endif
 					if (seq->ser_file) break;
@@ -201,7 +201,7 @@ sequence * readseqfile(const char *name){
 					}
 					else ser_display_info(seq->ser_file);
 				}
-#ifdef HAVE_FFMS2
+#if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 				else if (line[1] == 'A') {
 					seq->type = SEQ_AVI;
 					if (seq->film_file) break;

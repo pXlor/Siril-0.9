@@ -1,7 +1,7 @@
 /*
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
- * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
+ * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
  * Reference site is http://free-astro.vinvin.tf/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
@@ -22,7 +22,7 @@
 #include <config.h>
 #endif
 
-#ifdef HAVE_FFMS2
+#if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,7 +32,7 @@
 #include "io/films.h"
 #include "core/proto.h"		// for fits_flip_top_to_bottom()
 
-static int /*pixfmt_gray, */pixfmt_rgb, pixfmt_gray16, pixfmt_rgb48;
+static int pixfmt_gray, pixfmt_rgb, pixfmt_gray16, pixfmt_rgb48;
 
 supported_film_list supported_film[] = {
 	{"avi"},
@@ -75,19 +75,39 @@ int film_open_file(const char *sourcefile, struct film_struct *film) {
 	 * present on disk.
 	 * Index is saved using this pattern for the file name "film_filename.idx" */
 	FFMS_Index *index;
+#ifdef HAVE_FFMS2_2
+	FFMS_Indexer *indexer;
+#endif
 	char *idxfilename;
 	idxfilename = malloc(strlen(sourcefile) + 5);
 	sprintf(idxfilename, "%s.idx", sourcefile);
 	index = FFMS_ReadIndex(idxfilename, &film->errinfo);
 	if (index == NULL) {
+#ifdef HAVE_FFMS2_2
+		/* we need to create the indexer */
+		indexer = FFMS_CreateIndexer(sourcefile, &film->errinfo);
+		if (indexer == NULL) {
+#else
 		/* we need to create the index */
-		index = FFMS_MakeIndex(sourcefile, 0, 0, NULL, NULL, FFMS_IEH_ABORT, NULL, NULL, &film->errinfo);
+		index = FFMS_MakeIndex(sourcefile, 0, 0, NULL, NULL,
+				FFMS_IEH_ABORT, NULL, NULL, &film->errinfo);
+		if (index == NULL) {
+#endif
+			/* handle error (print errinfo.Buffer somewhere) */
+			fprintf(stderr, "FILM error: %s\n", film->errmsg);
+			free(idxfilename);
+			return FILM_ERROR;
+		}
+#ifdef HAVE_FFMS2_2
+		/* we need to create the index */
+		index = FFMS_DoIndexing2(indexer, FFMS_IEH_ABORT, &film->errinfo);
 		if (index == NULL) {
 			/* handle error (print errinfo.Buffer somewhere) */
 			fprintf(stderr, "FILM error: %s\n", film->errmsg);
 			free(idxfilename);
 			return FILM_ERROR;
 		}
+#endif
 
 		/* write the index for future openings */
 		if (FFMS_WriteIndex(idxfilename, index, &film->errinfo)) {
@@ -141,7 +161,7 @@ int film_open_file(const char *sourcefile, struct film_struct *film) {
 	 * the same format between the black and white and the color version of a camera. This
 	 * has to be detected when reading the frames, checking values in the layers, lame and
 	 * costly. */
-	//pixfmt_gray = FFMS_GetPixFmt("gray8");		// return value is PIX_FMT_NONE
+	pixfmt_gray = FFMS_GetPixFmt("gray8");		// return value is PIX_FMT_NONE
 	pixfmt_rgb = FFMS_GetPixFmt("rgb24");
 	pixfmt_gray16 = FFMS_GetPixFmt("gray16");
 	pixfmt_rgb48 = FFMS_GetPixFmt("rgb48");
@@ -151,10 +171,10 @@ int film_open_file(const char *sourcefile, struct film_struct *film) {
 		film->pixfmt = 0;
 		fprintf(stderr, "FILM: 16-bit pixel depth films are not supported yet.\n");
 		return FILM_ERROR;
-	/*}
+	}
 	else if (propframe->EncodedPixelFormat == pixfmt_gray) {
 		film->nb_layers = 1;
-		film->pixfmt = pixfmt_gray;*/
+		film->pixfmt = pixfmt_gray;
 	} else {
 		film->nb_layers = 3;
 		film->pixfmt = pixfmt_rgb;
@@ -173,20 +193,49 @@ int film_open_file(const char *sourcefile, struct film_struct *film) {
 	pixfmts[0] = film->pixfmt;
 	pixfmts[1] = -1;
 
-	if (FFMS_SetOutputFormatV2(film->videosource, pixfmts, propframe->EncodedWidth, propframe->EncodedHeight, FFMS_RESIZER_BICUBIC, &film->errinfo)) {
+	if (FFMS_SetOutputFormatV2(film->videosource, pixfmts,
+			propframe->EncodedWidth, propframe->EncodedHeight,
+			FFMS_RESIZER_BICUBIC, &film->errinfo)) {
 		/* handle error */
 		fprintf(stderr, "FILM error: %s\n", film->errmsg);
 		return FILM_ERROR;
 	}
 
 	film->filename = strdup(sourcefile);
-	fprintf(stdout, "FILM: successfully opened the video file %s, %d frames\n", film->filename, film->frame_count);
+	fprintf(stdout, "FILM: successfully opened the video file %s, %d frames\n",
+			film->filename, film->frame_count);
 	return FILM_SUCCESS;
+}
+
+static int randPixel(int nb_pixels) {
+	return rand() % nb_pixels;
+}
+
+static int *randomIndex(int n) {
+	srand(time(NULL));
+	int *index = malloc(n * sizeof (int));
+	int i = 0;
+	int x = 0;
+	int tmp =0;
+
+	/* make index */
+	for (i = 0; i < n; i++) {
+		index[i] = i;
+	}
+
+	/* mix index */
+	for (i = 0; i < n; i++) {
+		x = randPixel(n);
+		tmp = index[i];
+		index[i] = index[x];
+		index[x] = tmp;
+	}	return index;
 }
 
 int film_read_frame(struct film_struct *film, int frame_no, fits *fit) {
 	/* now we're ready to actually retrieve the video frames */
-	int nb_pixels/*, convert_rgb_to_gray = 0*/;
+	int nb_pixels, convert_rgb_to_gray = 0;
+
 	if (film->videosource == 0x00) {
 		siril_log_message("FILM ERROR: incompatible format\n");
 		return FILM_ERROR;
@@ -198,17 +247,50 @@ int film_read_frame(struct film_struct *film, int frame_no, fits *fit) {
 		fprintf(stderr, "FILM error: %s\n", film->errmsg);
 		return FILM_ERROR;
 	}
-	/* TODO: detect gray images encoded in RGB24 movies */
-	if (frame->ConvertedPixelFormat == pixfmt_rgb) {
-		// browse the image (all pixels, first pixels or random pixels?) and check
-		// value in two or three layers
-		// convert_rgb_to_gray = 1;
-	}
 
-	/* do something with frame */
 	nb_pixels = film->width * film->height;
 
-	if((ptr = realloc(fit->data, nb_pixels * film->nb_layers * sizeof(WORD)))==NULL) {
+	/* detect gray images encoded in RGB24 movies */
+	if (frame->ConvertedPixelFormat == pixfmt_rgb) {
+		// browse random pixels in the first frame (100 pixels) and check
+		// value in two or three layers
+		// convert_rgb_to_gray = 1;
+		if (frame_no == 0) {
+			int pixel_tested = 0, n = 0;
+			int *randIndex = randomIndex(nb_pixels * 3);
+			do {
+				int px = randIndex[n];
+				px = px - (px % 3);
+				++n;
+				WORD r, g, b;
+
+				r = frame->Data[0][px + 0];
+				g = frame->Data[0][px + 1];
+				b = frame->Data[0][px + 2];
+
+				if (r == g && r == b && g == b) {
+					convert_rgb_to_gray = 1;
+				} else {
+					/* no gray image, we can go out of the loop */
+					convert_rgb_to_gray = 0;
+					break;
+				}
+				// we reject pure black and pure white in the comparison
+				if (r != 0 && r != 255)
+					++pixel_tested;
+
+			} while (pixel_tested < 100 && n < nb_pixels * 3);
+			free(randIndex);
+			printf("total n = %d et k = %d et npixel = %d\n", n, pixel_tested, nb_pixels);
+		}
+	}
+	if (convert_rgb_to_gray)
+		film->nb_layers = 1;
+
+	/* do something with frame */
+
+	if ((ptr = realloc(fit->data, nb_pixels * film->nb_layers * sizeof(WORD)))
+			== NULL) {
 		fprintf(stderr,"FILM: NULL realloc for FITS data\n");
 		free(fit->data);
 		return -1;
@@ -218,16 +300,16 @@ int film_read_frame(struct film_struct *film, int frame_no, fits *fit) {
 	fit->naxes[0] = fit->rx = film->width;
 	fit->naxes[1] = fit->ry = film->height;
 	fit->naxes[2] = film->nb_layers;
-	if (film->nb_layers == 1) {
+	if (fit->naxes[2] == 1) {
 		fit->naxis = 2;
-		fit->pdata[RLAYER]=fit->data;
-		fit->pdata[GLAYER]=fit->data;
-		fit->pdata[BLAYER]=fit->data;
+		fit->pdata[RLAYER] = fit->data;
+		fit->pdata[GLAYER] = fit->data;
+		fit->pdata[BLAYER] = fit->data;
 	} else {
 		fit->naxis = 3;
-		fit->pdata[RLAYER]=fit->data;
-		fit->pdata[GLAYER]=fit->data + nb_pixels;
-		fit->pdata[BLAYER]=fit->data + nb_pixels * 2;
+		fit->pdata[RLAYER] = fit->data;
+		fit->pdata[GLAYER] = fit->data + nb_pixels;
+		fit->pdata[BLAYER] = fit->data + nb_pixels * 2;
 	}
 	fit->bitpix = BYTE_IMG;
 	//fit->mini = 0;
@@ -235,16 +317,18 @@ int film_read_frame(struct film_struct *film, int frame_no, fits *fit) {
 	/* putting this above also requires the max[*] to be = 255. Besides, this overrides the
 	 * default min/max behavior of Siril. */
 
-	/*if (frame->ConvertedPixelFormat == pixfmt_gray) {
-		for (i=0,j=0; i<nb_pixels; i++) {
+	if (frame->ConvertedPixelFormat == pixfmt_gray || convert_rgb_to_gray) {
+		int i, j;
+		for (i = 0, j = 0; i < nb_pixels; i++) {
 			fit->pdata[RLAYER][i] = frame->Data[0][j];
 			if (convert_rgb_to_gray)
-				j+=3;
-			else ++j;
+				j += 3;
+			else
+				++j;
 		}
-	} else */if (frame->ConvertedPixelFormat == pixfmt_rgb) {
+	} else if (frame->ConvertedPixelFormat == pixfmt_rgb) {
 		int i, j;
-		for (i=0,j=0; i<nb_pixels; i++) {
+		for (i = 0, j = 0; i < nb_pixels; i++) {
 			fit->pdata[RLAYER][i] = frame->Data[0][j++];
 			fit->pdata[GLAYER][i] = frame->Data[0][j++];
 			fit->pdata[BLAYER][i] = frame->Data[0][j++];
