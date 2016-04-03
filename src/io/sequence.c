@@ -956,17 +956,18 @@ int do_fwhm_sequence_processing(sequence *seq, int layer, int print_psf, gboolea
 	siril_log_message("Starting sequence processing of PSF\n");
 	set_progress_bar_data("Computing PSF on selected star", PROGRESS_NONE);
 	retval = sequence_processing(seq, &seqprocess_fwhm, layer, run_in_thread);	// allocates regparam
-	siril_log_message("Finished sequence processing of PSF\n");
 	if (retval) {
 		set_progress_bar_data("Failed to compute PSF for the sequence. Ready.", PROGRESS_NONE);
 		set_cursor_waiting(FALSE);
 		return 1;
 	}
+	siril_log_message("Finished sequence processing of PSF\n");
 	// update the list
 	if (seq->type != SEQ_INTERNAL)
 		fill_sequence_list(seq, layer);
 
 	if (print_psf) {
+		siril_log_message("See the console for a dump of star data over the sequence (stdout)\n");
 		fprintf(stdout, "# image_no amplitude magnitude fwhm x y\n");
 		for (i = 0; i < seq->number; i++) {
 			fitted_PSF *star = seq->regparam[layer][i].fwhm_data;

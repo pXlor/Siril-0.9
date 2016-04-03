@@ -742,7 +742,6 @@ int process_seq_psf(int nb) {
 	if (sequence_is_loaded() && layer != -1) {
 		siril_log_message("Running the PSF on the loaded sequence, layer %d\n", layer);
 		siril_log_message("Results will be displayed at the end of the processing, on the console output, in the following form:\n");
-		siril_log_message("# image_no amplitude magnitude fwhm x y\n");
 		start_in_new_thread(_psf_thread, (void *)(intptr_t)layer);
 		return 0;
 	}
