@@ -1,12 +1,15 @@
 [Desktop Entry]
 Version=0.9.2
 Name=Siril
-GenericName=Image Processor
-Comment=Process astronomical images
-Type=Application
-Exec=siril %F
-Icon=pixmaps/icons/hicolor/256x256/apps/siril.png
-Categories=Education;Science;Astronomy;
+Name[fr]=Siril
+Comment=Astronomical image (pre-)processing program
+Comment[fr]=Programme de (pré-)traitement des images astronomiques
 Keywords=astronomy;stacking;registration;
-StartupNotify=true
+Keywords[fr]=astronomie;empilement;alignement;
+Exec=siril %F
+Icon=siril
 Terminal=false
+Type=Application
+StartupNotify=true
+Categories=Education;Science;Astronomy;
+MimeType=image/fits;image/bmp;image/pic;image/jpeg;image/png;image/tiff;image/x-portable-pixmap;video/ser;
