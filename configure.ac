@@ -92,8 +92,8 @@ PKG_CHECK_MODULES(LIBPNG, [libpng],
 		  AC_MSG_WARN([libpng not found. Not using PNG importer and exporter.]))
 		  
 dnl check gif lib
-AC_CHECK_LIB(gif, DGifOpenFileHandle, [])
-AS_IF([test "$ac_cv_lib_gif_DGifOpenFileHandle" != yes],
+AC_CHECK_LIB(gif, EGifGetGifVersion, [])
+AS_IF([test "$ac_cv_lib_gif_EGifGetGifVersion" != yes],
       AC_MSG_WARN([giflib not found. Not using GIF exporter.]))
 
 dnl check ffms2		  
