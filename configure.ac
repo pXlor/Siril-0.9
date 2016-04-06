@@ -100,8 +100,8 @@ dnl check ffms2
 PKG_CHECK_MODULES(FFMS2, [ffms2 < 2.21],
 		  [AC_DEFINE([HAVE_FFMS2_1], [1], [Use FFMS2 < 2.21])],
 		  [PKG_CHECK_MODULES(FFMS2, [ffms2 >= 2.21],
-				     [AC_DEFINE([HAVE_FFMS2_2], [1], [Use FFMS2 > 2.21])
-				     ])
+		  [AC_DEFINE([HAVE_FFMS2_2], [1], [Use FFMS2 > 2.21])],
+		  AC_MSG_WARN([libffms2 not found. Not using AVI importer.]))
 		  ])
 
 dnl check opencv

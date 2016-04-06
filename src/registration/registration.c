@@ -665,8 +665,10 @@ int register_star_alignment(struct registration_args *args) {
 
 			if (args->seq->type == SEQ_SER)
 				ser_write_frame_from_fit(new_ser, &fit, frame);
-			else
+			else {
+				snprintf(dest, 256, "%s%s", args->text, filename);
 				savefits(dest, &fit);
+			}
 
 			cur_nb += 1.f;
 			set_progress_bar_data(NULL, cur_nb / nb_frames);
