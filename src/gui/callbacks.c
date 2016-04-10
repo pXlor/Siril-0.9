@@ -1155,7 +1155,7 @@ int make_index_for_current_display(display_mode mode, WORD lo, WORD hi,
 		default:
 			return 1;
 		}
-		// check for maximum overflow, given that df/di > 0. Should not happend with round_to_BYTE
+		// check for maximum overflow, given that df/di > 0. Should not happen with round_to_BYTE
 		if (index[i] == UCHAR_MAX)
 			break;
 	}
@@ -4096,11 +4096,11 @@ void minisavedial(void) {
 				if (savedial(filename, "NetPBM Files", "*.ppm;*.PPM"))
 					saveppm(filename, &gfit);
 			} else
-				return;			//should not happend
+				return;			//should not happen
 			break;
 		default:
 			siril_log_message(
-					"This type of file is not handled. Should not happend");
+					"This type of file is not handled. Should not happen");
 			break;
 		}
 		gtk_widget_hide(lookup_widget("savepopup"));

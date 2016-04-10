@@ -286,7 +286,7 @@ int process_savepnm(int nb){
 			set_cursor_waiting(FALSE);
 		break;
 		
-		default:	/*Should not happend */
+		default:	/*Should not happen */
 			return 1;
 		}
 	return 0;	
@@ -531,7 +531,7 @@ int process_ls(int nb){
 			}	
 			path = strdup(filename);
 		}
-		/* Should not happend */
+		/* Should not happen */
 		else {
 			printf("Cannot list files in %s\n", filename);
 			return 1;

@@ -347,7 +347,7 @@ int savetif(const char *name, fits *fit, uint16 bitspersample){
 			}
 		_TIFFfree(buf16);
 		break;
-		default:		// Should not happend
+		default:		// Should not happen
 			retval = 1;
 	}
 	TIFFClose(tif);

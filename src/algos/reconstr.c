@@ -189,7 +189,7 @@ int wavelet_reconstruct_data (Wavelet, Imag, coef)
 			pave_2d_build (Pave, Imag, Nl, Nc, Nbr_Plan, coef);
 			break;
 		default:
-			siril_log_message ("Unknow transform\n");
+			siril_log_message ("Unknown transform\n");
 			return 1;
 			break;
 	}   

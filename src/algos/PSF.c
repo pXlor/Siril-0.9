@@ -375,7 +375,7 @@ static fitted_PSF *psf_minimiz_no_angle(gsl_matrix* z, double background,
 
 /* The function returns the fitted parameters with angle. However it returns
  * NULL if the number of parameters is => to the pixel number.
- * This should not happend because this case is already treated by the
+ * This should not happen because this case is already treated by the
  * minimiz_no_angle function */
 static fitted_PSF *psf_minimiz_angle(gsl_matrix* z, fitted_PSF *psf) {
 	size_t i, j;

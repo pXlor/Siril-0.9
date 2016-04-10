@@ -287,7 +287,7 @@ static gsl_matrix *computeBackground(newBackground *bkg) {
 				pixel_value = poly_3(c, j, i);
 				break;
 			case POLY_4:
-			default:		//default should not happend
+			default:		//default should not happen
 				pixel_value = poly_4(c, j, i);
 			}
 			gsl_matrix_set(bkgMatrix, i, j, pixel_value);

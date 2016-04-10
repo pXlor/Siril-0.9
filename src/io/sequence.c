@@ -1102,7 +1102,7 @@ gpointer crop_sequence(gpointer p) {
 				}
 				break;
 			default:
-				args->retvalue = 1;	// should not happend
+				args->retvalue = 1;	// should not happen
 			}
 
 			cur_nb += 1.f;
