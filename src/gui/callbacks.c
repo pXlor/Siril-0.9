@@ -1705,14 +1705,15 @@ void set_filters_dialog(GtkFileChooser *chooser) {
 		/* FILM FILES */
 		int nb_film;
 		char *film;
+		int j;
 
 		nb_film = get_nb_film_ext_supported();
 		film = calloc(sizeof(char), nb_film * 14 + 1);// we assume the extension size of 4 char "*.xxxx;*.XXXX;" = 14
-		for (i = 0; i < nb_film; i++) {
+		for (j = 0; j < nb_film; j++) {
 			char ext[20];
 			g_snprintf(ext, sizeof(ext), "*.%s;*.%s;",
-					supported_film[i].extension,
-					convtoupper(supported_film[i].extension));
+					supported_film[j].extension,
+					convtoupper(supported_film[j].extension));
 			strcat(film, ext);
 		}
 		gtk_filter_add(chooser, "Film Files (*.avi, *.mpg, ...)", film,
