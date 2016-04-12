@@ -1,7 +1,9 @@
-v0.9.3, Apr 11, 2016
+v0.9.3, Apr 12, 2016
 Stability update for v0.9.2.
- * Fixing bug in preprocessing
- * Fixing typos
+ * Fixed bug in preprocessing
+ * Fixed compilation error in come conditions 
+ * Fixed uninitialized values
+ * Fixed typos
 
 v0.9.2, Apr 04, 2016
 Stability update for v0.9.1.
