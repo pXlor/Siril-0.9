@@ -214,11 +214,11 @@ static gsl_matrix *computeBackground(newBackground *bkg) {
 
 	// J is the Jacobian
 	// y contains data (pixel intensity)
-	J = gsl_matrix_alloc(n, nbParam);
-	y = gsl_vector_alloc(n);
-	w = gsl_vector_alloc(n);
-	c = gsl_vector_alloc(nbParam);
-	cov = gsl_matrix_alloc(nbParam, nbParam);
+	J = gsl_matrix_calloc(n, nbParam);
+	y = gsl_vector_calloc(n);
+	w = gsl_vector_calloc(n);
+	c = gsl_vector_calloc(nbParam);
+	cov = gsl_matrix_calloc(nbParam, nbParam);
 
 	for (inc = 0; inc < n; inc++) {
 		tmpCol = gsl_vector_get(bkg->meshCol, inc);

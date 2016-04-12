@@ -43,6 +43,8 @@
 #include "core/undo.h"
 #include "io/single_image.h"
 
+#define GLADE_FILE "siril3.glade"
+
 /* the global variables of the whole project */
 cominfo com;	// the main data struct
 fits gfit;	// currently loaded image
@@ -168,20 +170,21 @@ int main(int argc, char *argv[]) {
 	do {
 		GError *err = NULL;
 		GString *pathStr = g_string_new (siril_sources[i]);
-		g_string_append(pathStr, "siril3.glade");
+		g_string_append(pathStr, GLADE_FILE);
 		gchar *path = g_string_free (pathStr, FALSE);
 
 		if (gtk_builder_add_from_file (builder, path, &err)) {
-			fprintf(stdout, "successfully loaded %s\n", siril_sources[i]);
+			fprintf(stdout, "Successfully loaded '%s%s'\n", siril_sources[i], GLADE_FILE);
 			g_free(path);
 			break;
 		}
+		fprintf (stderr, "Unable to read file: %s\n", err->message);
 		g_free(path);
 		g_error_free(err);
 		i++;
 	} while (i < sizeof(siril_sources)/sizeof(char *));
 	if (i == sizeof(siril_sources) / sizeof(char *)) {
-		fprintf(stderr, "siril3.glade was not found or contains errors, cannot render GUI. Exiting.\n");
+		fprintf(stderr, "%s was not found or contains errors, cannot render GUI. Exiting.\n", GLADE_FILE);
 		exit(EXIT_FAILURE);
 	}
 	siril_path = siril_sources[i];

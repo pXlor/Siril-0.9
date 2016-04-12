@@ -52,6 +52,8 @@
 #include "gui/callbacks.h"
 #include "io/single_image.h"
 
+#define CFG_FILE "siril.cfg"
+
 static const char *keywords[] = { "working-directory", "libraw-settings",
 		"debayer-settings", "registration-settings", "stacking-settings",
 		"misc-settings" };
@@ -211,7 +213,7 @@ int readinitfile() {
 
 	if (config_read_file(&config, com.initfile) == CONFIG_FALSE)
 		return 1;
-	siril_log_message("Loading init file: %s\n", com.initfile);
+	siril_log_message("Loading init file: '%s'\n", com.initfile);
 
 	/* Working directory */
 	if (config_lookup_string(&config, keywords[WD], &dir)) {
@@ -444,7 +446,7 @@ int checkinitfile() {
 		return 1;
 	}
 	com.initfile = malloc(strlen(home) + 20);
-	sprintf(com.initfile, "%s/.siril/siril.cfg", home);
+	sprintf(com.initfile, "%s/.siril/%s", home, CFG_FILE);
 	if (readinitfile()) {	// couldn't read it
 		char filename[255];
 
@@ -505,7 +507,7 @@ int changedir(const char *dir) {
 				return 1;
 			com.wd = getcwd(com.wd, PATH_MAX);
 		}
-		siril_log_message("Setting CWD (Current Working Directory) to `%s'\n",
+		siril_log_message("Setting CWD (Current Working Directory) to '%s'\n",
 				com.wd);
 		set_GUI_CWD();
 

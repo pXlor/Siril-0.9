@@ -182,11 +182,10 @@ int imoper(fits *a, fits *b, char oper) {
 }
 
 /* This function applies a subtraction but contrary to Sub in imoper
- * it will use int type format (signed 32-bit). Indeed, pixels values of both
- * fits are very close: if WORD is used, many pixels will be out of bounds
+ * it will use double type format.
  */
 int sub_background(fits* image, fits* background, int layer) {
-	double *pxl_image, *pxl_bkg, min = 0.;
+	double *pxl_image, *pxl_bkg, min = DBL_MAX;
 	WORD *image_buf = image->pdata[layer];
 	WORD *bkg_buf = background->pdata[layer];
 	size_t i, ndata;
