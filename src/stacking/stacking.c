@@ -2237,7 +2237,7 @@ double compute_highest_accepted_quality(double percent) {
 	}
 	// copy values
 	for (i=0; i<com.seq.number; i++) {
-		if (com.seq.imgparam[i].incl && com.seq.regparam[layer][i].quality <= 0.0) {
+		if (com.seq.imgparam[i].incl && com.seq.regparam[layer][i].quality < 0.0) {
 			siril_log_message("Error in highest quality accepted for sequence processing: some images don't have this kind of information available for channel #%d.\n", layer);
 			free(val);
 			return 0.0;
