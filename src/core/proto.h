@@ -183,6 +183,7 @@ int sub_background(fits* image, fits* background, int layer);
 int 	addmax(fits *a, fits *b);
 int	fdiv(fits *a, fits *b, float scalar);
 int ndiv(fits *a, fits *b);
+int fmul(fits *a, float coeff);
 double 	gaussienne(double sigma, int size, double *gauss);
 int 	unsharp(fits *,double sigma, double mult, gboolean verbose);
 int	crop(fits *fit, rectangle *bounds);

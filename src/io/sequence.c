@@ -595,7 +595,7 @@ int seq_open_image(sequence *seq, int index) {
 				return 1;
 
 			fit_sequence_get_image_filename(seq, index, filename, TRUE);
-			fits_open_file(&seq->fptr[index], filename, READONLY, &status);
+			fits_open_diskfile(&seq->fptr[index], filename, READONLY, &status);
 			if (status) {
 				fits_report_error(stderr, status);
 				return status;
@@ -1169,7 +1169,7 @@ struct exportseq_args {
 };
 
 gpointer export_sequence(gpointer ptr) {
-	int i, x, y, nx, ny, shiftx, shifty, layer, retval = 0, reglayer, nb_layers;
+	int i, x, y, nx, ny, shiftx, shifty, layer, retval = 0, reglayer, nb_layers, skipped;
 	float cur_nb = 0.f, nb_frames;
 	unsigned int nbdata = 0;
 	fits fit, destfit;
@@ -1226,13 +1226,16 @@ gpointer export_sequence(gpointer ptr) {
 	nb_frames = (float)args->seq->number;
 
 	set_progress_bar_data(NULL, PROGRESS_RESET);
-	for (i=0; i<args->seq->number; ++i){
+	for (i = 0, skipped = 0; i < args->seq->number; ++i) {
 		if (!get_thread_run()) {
 			retval = -1;
 			goto free_and_reset_progress_bar;
 		}
 		// XXX to remove for all images
-		if (!args->seq->imgparam[i].incl) continue;
+		if (!args->seq->imgparam[i].incl) {
+			skipped++;
+			continue;
+		}
 
 		if (!seq_get_image_filename(args->seq, i, filename)) {
 			retval = -1;
@@ -1319,7 +1322,7 @@ gpointer export_sequence(gpointer ptr) {
 				}
 				break;
 			case TYPESER:
-				if (ser_write_frame_from_fit(ser_file, &destfit, i))
+				if (ser_write_frame_from_fit(ser_file, &destfit, i - skipped))
 					siril_log_message("Error while converting to SER (no space left?)\n");
 				break;
 			case TYPEGIF:

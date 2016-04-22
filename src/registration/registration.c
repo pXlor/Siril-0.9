@@ -502,7 +502,7 @@ static void _print_result(TRANS *trans, float FWHMx, float FWHMy) {
 
 int register_star_alignment(struct registration_args *args) {
 	int frame, ref_image, ret, i;
-	int fitted_stars, failed = 0;
+	int fitted_stars, failed = 0, skipped;
 	float nb_frames, cur_nb;
 	float FWHMx, FWHMy;
 	fitted_PSF **stars;
@@ -599,11 +599,14 @@ int register_star_alignment(struct registration_args *args) {
 		ser_create_file(dest, new_ser, TRUE, args->seq->ser_file);
 	}
 
+	skipped = 0;
 	for (frame = 0, cur_nb = 0.f; frame < args->seq->number; frame++) {
 		if (args->run_in_thread && !get_thread_run())
 			break;
-		if (!args->process_all_frames && !args->seq->imgparam[frame].incl)
+		if (!args->process_all_frames && !args->seq->imgparam[frame].incl) {
+			skipped ++;
 			continue;
+		}
 
 		ret = seq_read_frame(args->seq, frame, &fit);
 		if (!ret) {
@@ -664,7 +667,7 @@ int register_star_alignment(struct registration_args *args) {
 			fit_sequence_get_image_filename(args->seq, frame, filename, TRUE);
 
 			if (args->seq->type == SEQ_SER)
-				ser_write_frame_from_fit(new_ser, &fit, frame);
+				ser_write_frame_from_fit(new_ser, &fit, frame - failed - skipped);
 			else {
 				snprintf(dest, 256, "%s%s", args->text, filename);
 				savefits(dest, &fit);

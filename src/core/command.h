@@ -33,7 +33,6 @@ int	process_savetif(int nb);
 int	process_savepnm(int nb);
 
 int	process_imoper(int nb);
-int process_mult(int nb);
 int 	process_addmax(int nb);
 #if 0
 int	process_soper(int nb);
@@ -41,6 +40,7 @@ int	process_imoper2(int nb);
 int	process_soper2(int nb);
 #endif
 int	process_fdiv(int nb);
+int	process_fmul(int nb);
 #if 0
 int	process_composit(int nb);
 int	process_shift(int nb);

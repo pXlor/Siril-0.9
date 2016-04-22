@@ -1398,7 +1398,7 @@ gpointer median_filter(gpointer p) {
 	return GINT_TO_POINTER(0);
 }
 
-static int fmul(fits *a, int layer, float coeff) {
+static int fmul_layer(fits *a, int layer, float coeff) {
 	WORD *buf;
 	int i;
 
@@ -1550,7 +1550,7 @@ int BandingEngine(fits *fit, double sigma, double amount, gboolean protect_highl
 		free(stat);
 	}
 	for (chan = 0; chan < fit->naxes[2]; chan++)
-		fmul(fiximage, chan, amount);
+		fmul_layer(fiximage, chan, amount);
 	imoper(fit, fiximage, OPER_ADD);
 
 	clearfits(fiximage);
