@@ -172,6 +172,7 @@ void on_seqlist_image_selection_toggled(GtkCellRendererToggle *cell_renderer,
 	else 	com.seq.selnum--;
 	adjust_exclude(index, TRUE);	// check or uncheck excluded checkbox in seq tab
 	update_reg_interface(FALSE);
+	update_stack_interface();
 	writeseqfile(&com.seq);
 	redraw(com.cvport, REMAP_NONE);
 }

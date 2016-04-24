@@ -291,7 +291,7 @@ void read_fits_header(fits *fit) {
 	__tryToFindKeywords(fit->fptr, TDOUBLE, Focal, &fit->focal_length);
 	if (!sequence_is_loaded() || com.seq.current == 0)
 		fprintf(stdout,
-				"Read from FITS header: pix size %gx%g, binning %hix%hi, focal %g\n",
+				"Read from FITS header: pix size %gx%g, binning %ux%u, focal %g\n",
 				fit->pixel_size_x, fit->pixel_size_y, fit->binning_x,
 				fit->binning_y, fit->focal_length);
 

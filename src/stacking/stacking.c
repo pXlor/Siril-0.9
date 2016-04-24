@@ -339,8 +339,6 @@ free_and_reset_progress_bar:
 		siril_log_message("Stacking failed.\n");
 	} else {
 		set_progress_bar_data("Stacking complete.", PROGRESS_DONE);
-		char *msg = siril_log_message("Stacking is complete, %d images have been stacked.\n", nb_frames);
-		show_dialog(msg, "Stacking", "gtk-dialog-info");
 	}
 	update_used_memory();
 	return retval;
@@ -956,8 +954,6 @@ free_and_reset_progress_bar:
 		siril_log_message("Stacking failed.\n");
 	} else {
 		set_progress_bar_data("Stacking complete.", PROGRESS_DONE);
-		char *msg = siril_log_message("Stacking is complete, %d images have been stacked.\n", nb_frames);
-		show_dialog(msg, "Stacking", "gtk-dialog-info");
 	}
 	update_used_memory();
 	return retval;
@@ -1118,8 +1114,6 @@ free_and_reset_progress_bar:
 		siril_log_message("Stacking failed.\n");
 	} else {
 		set_progress_bar_data("Stacking complete.", PROGRESS_DONE);
-		char *msg = siril_log_message("Stacking is complete, %d images have been stacked.\n", nb_frames);
-		show_dialog(msg, "Stacking", "gtk-dialog-info");
 	}
 	update_used_memory();
 	return retval;
@@ -1908,13 +1902,34 @@ static void _show_summary(struct stacking_args *args) {
 
 	siril_log_message("Integration of %d images:\n", args->nb_images_to_stack);
 
+	/* Type of algorithm */
+	if (args->method == &stack_mean_with_rejection) {
+		siril_log_message("Pixel combination ......... average\n");
+	}
+	else if (args->method == &stack_summing) {
+		siril_log_message("Pixel combination ......... normalized sum\n");
+	}
+	else if (args->method == &stack_median) {
+		siril_log_message("Pixel combination ......... median\n");
+	}
+	else if (args->method == &stack_addmin) {
+		siril_log_message("Pixel combination ......... minimum\n");
+	}
+	else if (args->method == &stack_addmax) {
+		siril_log_message("Pixel combination ......... maximum\n");
+	}
+	else {
+		siril_log_message("Pixel combination ......... none\n");
+	}
+
+	/* Normalisation */
 	if (args->method != &stack_mean_with_rejection) {
-		norm_str = "None";
+		norm_str = "none";
 	} else {
 		switch (args->normalize) {
 		default:
 		case NO_NORM:
-			norm_str = "None";
+			norm_str = "none";
 			break;
 		case ADDITIVE:
 			norm_str = "additive";
@@ -1933,16 +1948,17 @@ static void _show_summary(struct stacking_args *args) {
 
 	siril_log_message("Normalization ............. %s\n", norm_str);
 
+	/* Type of rejection */
 	if (args->method != &stack_mean_with_rejection) {
-		siril_log_message("Pixel rejection ........... None\n");
-		siril_log_message("Rejection parameters ...... None\n");
+		siril_log_message("Pixel rejection ........... none\n");
+		siril_log_message("Rejection parameters ...... none\n");
 	}
 	else {
 
 		switch (args->type_of_rejection) {
 		default:
 		case NO_REJEC:
-			rej_str = "None";
+			rej_str = "none";
 			break;
 		case PERCENTILE:
 			rej_str = "percentile clipping";
@@ -2218,7 +2234,7 @@ double compute_highest_accepted_fwhm(double percent) {
 	  fputc('\n', stdout);*/
 
 	// get highest accepted
-	highest_accepted = val[(int)(percent*(double)com.seq.number/100.0)-1];
+	highest_accepted = val[(int) (percent * (double) com.seq.number / 100.0)];
 	free(val);
 	return highest_accepted;
 }
@@ -2249,7 +2265,8 @@ double compute_highest_accepted_quality(double percent) {
 	quicksort_d(val, com.seq.number);
 
 	// get highest accepted
-	highest_accepted = val[(int)((100.0-percent)*(double)com.seq.number/100.0)-1];
+	highest_accepted = val[(int) ((100.0 - percent) * (double) com.seq.number
+			/ 100.0)];
 	free(val);
 	return highest_accepted;
 }
