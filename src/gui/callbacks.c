@@ -5634,6 +5634,7 @@ void on_button_cosmetic_ok_clicked(GtkButton *button, gpointer user_data) {
 			args->seqEntry = "cc_";
 		apply_cosmetic_to_sequence(args);
 	} else {
+		undo_save_state("Processing: Cosmetic Correction");
 		start_in_new_thread(autoDetectThreaded, args);
 	}
 }

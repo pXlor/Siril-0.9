@@ -924,18 +924,15 @@ static double goldenSectionSearch(fits *brut, fits *dark, double a, double b,
 static int preprocess(fits *brut, fits *offset, fits *dark, fits *flat, float level) {
 
 	if (com.preprostatus & USE_OFFSET) {
-		siril_log_message("offset\n");
 		imoper(brut, offset, OPER_SUB);
 	}
 
 	/* if dark optimization, the master-dark has already been subtracted */
 	if ((com.preprostatus & USE_DARK) && !(com.preprostatus & USE_OPTD)) {
-		siril_log_message("dark\n");
 		imoper(brut, dark, OPER_SUB);
 	}
 
 	if (com.preprostatus & USE_FLAT) {
-		siril_log_message("flat\n");
 		fdiv(brut, flat, level);
 	}
 
