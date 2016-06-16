@@ -1,0 +1,4 @@
+io/avi_pipp/pipp_utf8_osx.o: io/avi_pipp/pipp_utf8_osx.cpp \
+ /usr/include/stdc-predef.h
+
+/usr/include/stdc-predef.h:
