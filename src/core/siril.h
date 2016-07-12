@@ -494,7 +494,7 @@ struct cominf {
 	gboolean leveldrag;		// middle click being dragged if true
 	int preprostatus;
 	gboolean prepro_cfa;	// Use to save type of sensor for cosmetic correction in preprocessing
-	gboolean show_excluded;		// show excluded images in sequences NOT USED!
+	gboolean show_excluded;		// show excluded images in sequences
 	double zoom_value;		// 1.0 is normal zoom, use get_zoom_val() to access it
 
 	/* selection rectangle for registration, FWHM, PSF */

@@ -609,7 +609,7 @@ void apply_mtf_to_histo(gsl_histogram *histo, double norm, double m, double lo,
 	mtf_histo = gsl_histogram_alloc((size_t) norm + 1);
 	gsl_histogram_set_ranges_uniform(mtf_histo, 0, norm);
 
-// #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) // disable because of ISSUE #136 (https://free-astro.org/bugs/view.php?id=136)
+// #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) // disabled because of ISSUE #136 (https://free-astro.org/bugs/view.php?id=136)
 	for (i = 0; i < round_to_WORD(norm); i++) {
 		WORD mtf;
 		double binval = gsl_histogram_get(histo, i);
