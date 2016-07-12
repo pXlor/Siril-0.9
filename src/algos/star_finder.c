@@ -36,7 +36,7 @@
 
 #define WAVELET_SCALE 3
 
-static WORD Compute_threshold(fits *fit, double starfinder, int layer, WORD *norm) {
+static WORD Compute_threshold(fits *fit, double starfinder, int layer, WORD *norm, double *bg) {
 	WORD threshold;
 	imstats *stat;
 
@@ -45,7 +45,8 @@ static WORD Compute_threshold(fits *fit, double starfinder, int layer, WORD *nor
 	stat = statistics(fit, layer, NULL, STATS_BASIC);
 	threshold = (WORD) stat->median + starfinder * (WORD) stat->sigma;
 	*norm = (WORD) stat->normValue;
-	printf("Threshold = %d\n", threshold);
+	*bg = stat->median;
+//	printf("Threshold = %d\n", threshold);
 	free(stat);
 
 	return threshold;
@@ -95,10 +96,14 @@ static void get_structure(starFinder *sf) {
  */
 
 /* returns a NULL-ended array of FWHM info */
-fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
+fitted_PSF **peaker(fits *fit, int layer, starFinder *sf, rectangle *area) {
 	int nx = fit->rx;
 	int ny = fit->ry;
-	int y, i, nbstars = 0;
+	int areaX0 = 0;
+	int areaY0 = 0;
+	int areaX1 = nx;
+	int areaY1 = ny;
+	int y, k, nbstars = 0;
 	double bg;
 	WORD threshold, norm;
 	WORD **wave_image, **real_image;
@@ -121,14 +126,13 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
 		return NULL;
 	}
 
-	siril_log_color_message("Findstar: processing...\n", "red");
+	siril_log_color_message(_("Findstar: processing...\n"), "red");
 	gettimeofday(&t_start, NULL);
 
 	results[0] = NULL;
 	get_structure(sf);
-	threshold = Compute_threshold(fit, sf->sigma, layer, &norm);
+	threshold = Compute_threshold(fit, sf->sigma, layer, &norm, &bg);
 
-	bg = background(fit, layer, NULL);
 	copyfits(fit, wave_fit, CP_ALLOC | CP_FORMAT | CP_COPYA, 0);
 	get_wavelet_layers(wave_fit, WAVELET_SCALE, 2, TO_PAVE_BSPLINE, layer);
 
@@ -140,8 +144,8 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
 		printf("Memory allocation failed: peaker\n");
 		return NULL;
 	}
-	for (i = 0; i < ny; i++)
-		wave_image[ny - i - 1] = wave_fit->pdata[layer] + i * nx;
+	for (k = 0; k < ny; k++)
+		wave_image[ny - k - 1] = wave_fit->pdata[layer] + k * nx;
 
 	/* FILL real image upside-down */
 	real_image = malloc(ny * sizeof(WORD *));
@@ -152,13 +156,20 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
 		printf("Memory allocation failed: peaker\n");
 		return NULL;
 	}
-	for (i = 0; i < ny; i++)
-		real_image[ny - i - 1] = fit->pdata[layer] + i * nx;
+	for (k = 0; k < ny; k++)
+		real_image[ny - k - 1] = fit->pdata[layer] + k * nx;
 
-//#pragma omp parallel for num_threads(com.max_thread) private(y,i) schedule(static)
-	for (y = sf->radius; y < ny - sf->radius; y++) {
+	if (area) {
+		areaX0 = area->x;
+		areaY0 = area->y;
+		areaX1 = area->w + areaX0;
+		areaY1 = area->h + areaY0;
+	}
+
+#pragma omp parallel for num_threads(com.max_thread) private(y) schedule(static)
+	for (y = sf->radius + areaY0; y < areaY1 - sf->radius; y++) {
 		int x;
-		for (x = sf->radius; x < nx - sf->radius; x++) {
+		for (x = sf->radius + areaX0; x < areaX1 - sf->radius; x++) {
 			WORD pixel = wave_image[y][x];
 			if (pixel > threshold && pixel < norm) {
 				int yy, xx;
@@ -181,7 +192,7 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
 					}
 				}
 				if (bingo && nbstars < MAX_STARS) {
-					int ii, jj, j;
+					int ii, jj, i, j;
 					//~ fprintf(stdout, "Found a probable star at position (%d, %d) with a value of %hu\n", x, y, pixel);
 					gsl_matrix *z = gsl_matrix_alloc(sf->radius * 2, sf->radius * 2);
 					/* FILL z */
@@ -201,8 +212,8 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
 					if (cur_star) {
 						psf_update_units(fit, &cur_star);
 						if (is_star(cur_star, sf)) {
-							cur_star->xpos = x + cur_star->x0 - sf->radius;
-							cur_star->ypos = y + cur_star->y0 - sf->radius;
+							cur_star->xpos = x + cur_star->x0 - sf->radius - 1;
+							cur_star->ypos = y + cur_star->y0 - sf->radius - 1;
 #pragma omp critical
 							{
 								results[nbstars] = cur_star;
@@ -221,7 +232,7 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf) {
 		free(results);
 		results = NULL;
 	}
-	siril_log_message("Found %d stars in image, channel #%d\n", nbstars, layer);
+	siril_log_message(_("Found %d stars in image, channel #%d\n"), nbstars, layer);
 	sort_stars(results, nbstars);
 	sf->nb_stars = nbstars;
 	free(wave_image);
@@ -274,8 +285,8 @@ fitted_PSF *add_star(fits *fit, int layer, int *index) {
 	if (already_found) {
 		free(result);
 		result = NULL;
-		char *msg = siril_log_message("This star has already been picked !\n");
-		show_dialog(msg, "Peaker", "gtk-dialog-info");
+		char *msg = siril_log_message(_("This star has already been picked !\n"));
+		show_dialog(msg, _("Peaker"), "gtk-dialog-info");
 	} else {
 		if (i < MAX_STARS) {
 			result->xpos = result->x0 + com.selection.x;

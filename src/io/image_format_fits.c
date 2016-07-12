@@ -68,16 +68,16 @@ int readfits(const char *filename, fits *fit, char *realname) {
 	fit->naxes[2] = 1; //initialization of the axis numer before opening : NEED TO BE OPTIMIZED
 
 	if (stat_file(filename, &imagetype, name)) {
-		msg = siril_log_message("%s.[any_allowed_extension] not found.\n",
+		msg = siril_log_message(_("%s.[any_allowed_extension] not found.\n"),
 				filename);
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		return 1;
 	}
 	if (imagetype != TYPEFITS) {
 		msg = siril_log_message(
-						"The file %s is not a FITS file or doesn't exists with FITS extensions.\n",
+				_("The file %s is not a FITS file or doesn't exists with FITS extensions.\n"),
 						filename);
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		return 1;
 	}
 
@@ -95,8 +95,8 @@ int readfits(const char *filename, fits *fit, char *realname) {
 			&status);
 	if (status) {
 		msg = siril_log_message(
-				"FITSIO error getting image parameters, file %s.\n", filename);
-		show_dialog(msg, "Error", "gtk-dialog-error");
+				_("FITSIO error getting image parameters, file %s.\n"), filename);
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		report_fits_error(status);
 		status = 0;
 		fits_close_file(fit->fptr, &status);
@@ -108,9 +108,9 @@ int readfits(const char *filename, fits *fit, char *realname) {
 	nbdata = fit->rx * fit->ry;
 
 	if (fit->naxis == 3 && fit->naxes[2] != 3) {
-		msg = siril_log_message("Unknown FITS image format (%ld axes).\n",
+		msg = siril_log_message(_("Unknown FITS image format (%ld axes).\n"),
 				fit->naxes[2]);
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		status = 0;
 		fits_close_file(fit->fptr, &status);
 		return -1;
@@ -124,8 +124,8 @@ int readfits(const char *filename, fits *fit, char *realname) {
 	}
 	if (fit->bitpix == LONGLONG_IMG) {
 		msg = siril_log_message(
-				"FITS images with 64 bits signed integer per pixel.channel are not supported.\n");
-		show_dialog(msg, "Error", "gtk-dialog-error");
+				_("FITS images with 64 bits signed integer per pixel.channel are not supported.\n"));
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		status = 0;
 		fits_close_file(fit->fptr, &status);
 		return -1;
@@ -217,19 +217,19 @@ int readfits(const char *filename, fits *fit, char *realname) {
 		break;
 
 	default:
-		msg = siril_log_message("Unknown FITS image format.\n");
+		msg = siril_log_message(_("Unknown FITS image format.\n"));
 	}
 	if (msg) {
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		status = 0;
 		fits_close_file(fit->fptr, &status);
 		update_used_memory();
 		return -1;
 	}
 	if (status) {
-		msg = siril_log_message("Fitsio error reading data, file: %s.\n",
+		msg = siril_log_message(_("Fitsio error reading data, file: %s.\n"),
 				filename);
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		report_fits_error(status);
 	}
 
@@ -242,7 +242,7 @@ int readfits(const char *filename, fits *fit, char *realname) {
 
 	status = 0;
 	fits_close_file(fit->fptr, &status);
-	siril_log_message("Reading FITS: file %s, %ld layer(s), %ux%u pixels\n",
+	siril_log_message(_("Reading FITS: file %s, %ld layer(s), %ux%u pixels\n"),
 			filename, fit->naxes[2], fit->rx, fit->ry);
 	return 0;
 }
@@ -260,7 +260,7 @@ void read_fits_header(fits *fit) {
 	fits_read_key(fit->fptr, TINT, "BSCALE", &zero, NULL, &status);
 	if (!status && 1 != zero)
 		siril_log_message(
-				"Loaded FITS file has a BSCALE different than 1 (%d)\n", zero);
+				_("Loaded FITS file has a BSCALE different than 1 (%d)\n"), zero);
 	status = 0;
 	fits_read_key(fit->fptr, TINT, "BZERO", &zero, NULL, &status);
 
@@ -405,7 +405,7 @@ void report_fits_error(int status) {
 	if (status) {
 		char errmsg[FLEN_ERRMSG];
 		while (fits_read_errmsg(errmsg)) {
-			siril_log_message("FITS error: %s\n", errmsg);
+			siril_log_message(_("FITS error: %s\n"), errmsg);
 		}
 	}
 }
@@ -440,7 +440,7 @@ int readfits_partial(const char *filename, int layer, fits *fit,
 		fit->naxes[2] = 1;	// see readfits for the explanation
 	if (layer > fit->naxes[2] - 1) {
 		siril_log_message(
-				"FITS read partial: there is no layer %d in the image %s\n",
+				_("FITS read partial: there is no layer %d in the image %s\n"),
 				layer + 1, filename);
 		status = 0;
 		fits_close_file(fit->fptr, &status);
@@ -459,7 +459,7 @@ int readfits_partial(const char *filename, int layer, fits *fit,
 	nbdata = fit->rx * fit->ry;
 
 	if (fit->naxis == 3 && fit->naxes[2] != 3) {
-		siril_log_message("Unknown FITS image format (%ld axes).\n",
+		siril_log_message(_("Unknown FITS image format (%ld axes).\n"),
 				fit->naxes[2]);
 		status = 0;
 		fits_close_file(fit->fptr, &status);
@@ -468,7 +468,7 @@ int readfits_partial(const char *filename, int layer, fits *fit,
 	if (fit->bitpix != SHORT_IMG && fit->bitpix != USHORT_IMG
 			&& fit->bitpix != BYTE_IMG) {
 		siril_log_message(
-				"Only Siril FITS images can be used with partial image reading.\n");
+				_("Only Siril FITS images can be used with partial image reading.\n"));
 		return -1;
 	}
 	fit->naxes[2] = 1;	// force to 1 layer
@@ -499,7 +499,7 @@ int readfits_partial(const char *filename, int layer, fits *fit,
 	}
 	status = 0;
 	fits_close_file(fit->fptr, &status);
-	siril_log_message("Loaded partial FITS file %s\n", filename);
+	siril_log_message(_("Loaded partial FITS file %s\n"), filename);
 	return 0;
 }
 
@@ -515,13 +515,13 @@ int read_opened_fits_partial(sequence *seq, int layer, int index, WORD *buffer,
 	int zero = 0;
 
 	if (!seq || !seq->fptr || !seq->fptr[index]) {
-		siril_log_message("data initialization error in read fits partial\n");
+		printf("data initialization error in read fits partial\n");
 		return 1;
 	}
 	if (area->x < 0 || area->y < 0 || area->x >= seq->rx || area->y >= seq->ry
 			|| area->w <= 0 || area->h <= 0 || area->x + area->w > seq->rx
 			|| area->y + area->h > seq->ry) {
-		siril_log_message(
+		printf(
 				"partial read from FITS file has been requested outside image bounds or with invalid size\n");
 		return 1;
 	}
@@ -575,8 +575,7 @@ int savefits(const char *name, fits *f) {
 	f->naxes[1] = f->ry;
 
 	if (f->naxis == 3 && f->naxes[2] != 3) {
-		siril_log_message(
-				"Trying to save a FITS color file with more than 3 channels?");
+		printf("Trying to save a FITS color file with more than 3 channels?");
 		return 1;
 	}
 
@@ -636,9 +635,9 @@ int savefits(const char *name, fits *f) {
 	case DOUBLE_IMG:
 	default:
 		msg = siril_log_message(
-				"ERROR: trying to save a FITS image"
-				"with an unsupported format (%d).\n", f->bitpix);
-		show_dialog(msg, "Error", "gtk-dialog-error");
+				_("ERROR: trying to save a FITS image "
+				"with an unsupported format (%d).\n"), f->bitpix);
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		fits_close_file(f->fptr, &status);
 		return 1;
 	}
@@ -647,7 +646,7 @@ int savefits(const char *name, fits *f) {
 		save_fits_header(f);
 	fits_close_file(f->fptr, &status);
 	if (!status)
-		siril_log_message("Saving FITS: file %s, %ld layer(s), %ux%u pixels\n",
+		siril_log_message(_("Saving FITS: file %s, %ld layer(s), %ux%u pixels\n"),
 				filename, f->naxes[2], f->rx, f->ry);
 	return 0;
 }

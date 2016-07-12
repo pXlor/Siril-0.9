@@ -38,11 +38,17 @@
 
 #include "core/siril.h"
 #include "core/proto.h"
+#include "core/initfile.h"
+#include "core/undo.h"
 #include "gui/callbacks.h"
 #include "io/ser.h"
 #if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 #include "io/films.h"
 #endif
+#ifdef HAVE_OPENCV
+#include "opencv/opencv.h"
+#endif
+#include "io/avi_pipp/avi_writer.h"
 #include "io/single_image.h"
 #include "gui/histogram.h"
 #include "algos/PSF.h"
@@ -113,7 +119,7 @@ int check_seq(int force) {
 	int i, nb_seq = 0, max_seq = 10;
 
 	if (!com.wd) {
-		siril_log_message("Current working directory is not set, aborting.\n");
+		siril_log_message(_("Current working directory is not set, aborting.\n"));
 		return 1;
 	}
 	if ((dir = opendir(com.wd)) == NULL) {
@@ -211,7 +217,7 @@ int check_seq(int force) {
 			if (tmp)
 				sequences = tmp;
 			else {
-				siril_log_message("Could not allocate more space for the large number of sequences found.\n");
+				siril_log_message(_("Could not allocate more space for the large number of sequences found.\n"));
 				break;
 			}
 		}
@@ -222,7 +228,7 @@ int check_seq(int force) {
 		for (i=0; i<nb_seq; i++) {
 			if (sequences[i]->beg != sequences[i]->end) {
 				char msg[200];
-				sprintf(msg, "sequence %d, found: %d to %d",
+				sprintf(msg, _("sequence %d, found: %d to %d"),
 						i+1, sequences[i]->beg, sequences[i]->end);
 				set_progress_bar_data(msg, PROGRESS_NONE);
 				if (!buildseqfile(sequences[i], force) && retval)
@@ -245,7 +251,7 @@ int check_only_one_film_seq(char* name) {
 	sequence *new_seq = NULL;
 
 	if (!com.wd) {
-		siril_log_message("Current working directory is not set, aborting.\n");
+		siril_log_message(_("Current working directory is not set, aborting.\n"));
 		return 1;
 	}
 	if ((dir = opendir(com.wd)) == NULL) {
@@ -336,7 +342,7 @@ int set_seq(const char *name){
 		writeseqfile(seq);
 	}
 
-	siril_log_message("Sequence loaded: %s (%d->%d)\n", seq->seqname, seq->beg,
+	siril_log_message(_("Sequence loaded: %s (%d->%d)\n"), seq->seqname, seq->beg,
 			seq->end);
 	/* Sequence is stored in com.seq for now */
 	free_sequence(&com.seq, FALSE);
@@ -367,6 +373,10 @@ int set_seq(const char *name){
 	adjust_reginfo();		// change registration displayed/editable values
 	update_gfit_histogram_if_needed();
 	adjust_sellabel();
+	fillSeqAviExport();	// fill GtkEntry of export box
+
+	/* update menus */
+	update_MenuItem();
 
 	/* redraw and display image */
 	show_main_gray_window();
@@ -415,6 +425,11 @@ int seq_load_image(sequence *seq, int index, fits *dest, gboolean load_it) {
 	}
 	/* change the displayed value in the spin button to have the real file number
 	 * instead of the index of the adjustment */
+
+	undo_flush();
+	/* initialize menu gui */
+	update_MenuItem();
+
 	display_image_number(index);
 	sequence_list_change_current();
 	adjust_exclude(index, FALSE);	// check or uncheck excluded checkbox
@@ -439,7 +454,7 @@ char *seq_get_image_filename(sequence *seq, int index, char *name_buf) {
 			if (!name_buf || index < 0 || index > seq->end) {
 				return NULL;
 			}
-			snprintf(name_buf, 255, "%d from %s.ser", index, seq->seqname);
+			snprintf(name_buf, 255, _("%d from %s.ser"), index, seq->seqname);
 			name_buf[255] = '\0';
 			return name_buf;
 #if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
@@ -447,7 +462,6 @@ char *seq_get_image_filename(sequence *seq, int index, char *name_buf) {
 			if (!name_buf || index < 0 || index > seq->end) {
 				return NULL;
 			}
-			//snprintf(name_buf, 255, "%d from %s.avi", index, seq->seqname);
 			snprintf(name_buf, 255, "%s_%d", seq->seqname, index);
 			name_buf[255] = '\0';
 			return name_buf;
@@ -470,7 +484,7 @@ int seq_read_frame(sequence *seq, int index, fits *dest) {
 		case SEQ_REGULAR:
 			fit_sequence_get_image_filename(seq, index, filename, TRUE);
 			if (readfits(filename, dest, NULL)) {
-				siril_log_message("could not load image %d from sequence %s\n",
+				siril_log_message(_("Could not load image %d from sequence %s\n"),
 						index, seq->seqname); 
 				return 1;
 			}
@@ -478,7 +492,7 @@ int seq_read_frame(sequence *seq, int index, fits *dest) {
 		case SEQ_SER:
 			assert(seq->ser_file);
 			if (ser_read_frame(seq->ser_file, index, dest)) {
-				siril_log_message("could not load frame %d from SER sequence %s\n",
+				siril_log_message(_("Could not load frame %d from SER sequence %s\n"),
 						index, seq->seqname); 
 				return 1;
 			}
@@ -487,7 +501,7 @@ int seq_read_frame(sequence *seq, int index, fits *dest) {
 		case SEQ_AVI:
 			assert(seq->film_file);
 			if (film_read_frame(seq->film_file, index, dest)) {
-				siril_log_message("could not load frame %d from AVI sequence %s\n",
+				siril_log_message(_("Could not load frame %d from AVI sequence %s\n"),
 						index, seq->seqname); 
 				return 1;
 			}
@@ -519,7 +533,7 @@ int seq_read_frame_part(sequence *seq, int layer, int index, fits *dest, const r
 		case SEQ_REGULAR:
 			fit_sequence_get_image_filename(seq, index, filename, TRUE);
 			if (readfits_partial(filename, layer, dest, area)) {
-				siril_log_message("Could not load partial image %d from sequence %s\n",
+				siril_log_message(_("Could not load partial image %d from sequence %s\n"),
 						index, seq->seqname); 
 				return 1;
 			}
@@ -528,7 +542,7 @@ int seq_read_frame_part(sequence *seq, int layer, int index, fits *dest, const r
 			assert(seq->ser_file);
 			/* TODO: build a FITS from ser_read_opened_partial() */
 			if (ser_read_frame(seq->ser_file, index, &tmp_fit)) {
-				siril_log_message("could not load frame %d from SER sequence %s\n",
+				siril_log_message(_("Could not load frame %d from SER sequence %s\n"),
 						index, seq->seqname); 
 				return 1;
 			}
@@ -539,7 +553,7 @@ int seq_read_frame_part(sequence *seq, int layer, int index, fits *dest, const r
 		case SEQ_AVI:
 			assert(seq->film_file);
 			if (film_read_frame(seq->film_file, index, &tmp_fit)) {
-				siril_log_message("could not load frame %d from AVI sequence %s\n",
+				siril_log_message(_("Could not load frame %d from AVI sequence %s\n"),
 						index, seq->seqname); 
 				return 1;
 			}
@@ -607,11 +621,11 @@ int seq_open_image(sequence *seq, int index) {
 			break;
 #if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 		case SEQ_AVI:
-			siril_log_message("This operation is not supported on AVI sequences (seq_open_image)\n");
+			siril_log_message(_("This operation is not supported on AVI sequences (seq_open_image)\n"));
 			return 1;
 #endif
 		case SEQ_INTERNAL:
-			siril_log_message("This operation is not supported on internal sequences (seq_open_image)\n");
+			siril_log_message(_("This operation is not supported on internal sequences (seq_open_image)\n"));
 			return 1;
 	}
 	return 0;
@@ -837,6 +851,14 @@ void free_sequence(sequence *seq, gboolean free_seq_too) {
 		/* the fits in internal_fits should still be referenced somewhere */
 		free(seq->internal_fits);
 	}
+	/* Here this is a bit tricky. An internal sequence is a single image. So some
+	 * processes like RGB alignment could free sequences and load it again: we need
+	 * to keep undo history.
+	 * In the case of a standard sequence, loading a new sequence MUST remove all
+	 * undo history.
+	 */
+	if (seq->type != SEQ_INTERNAL)
+		undo_flush();
 	if (free_seq_too)	free(seq);
 }
 
@@ -871,17 +893,19 @@ gboolean sequence_is_loaded() {
  *                             SEQUENCE PROCESSING                           *
  * **************************************************************************/
 
-/* Start a processing on all images of the sequence seq, on layer layer if it applies.
+/* Start a processing on an area of all images of the sequence seq, on layer
+ * layer if it applies. Another generic processing method is available in
+ * core/processing.c, called generic_sequence.
  * The see coment in siril.h for help on process format.
  */
-int sequence_processing(sequence *seq, sequence_proc process, int layer, gboolean run_in_thread) {
+int sequence_processing(sequence *seq, sequence_proc process, int layer, gboolean run_in_thread, gboolean run_in_parallel, void *arg) {
 	int i, abort = 0;
 	float cur_nb = 0.f, nb_frames;
-	fits fit;
 	rectangle area;
+	fits fit;
 
 	if (!com.selection.w || !com.selection.h) {
-		siril_log_message("No selection was made for a selection-based sequence processing\n");
+		siril_log_message(_("No selection was made for a selection-based sequence processing\n"));
 		return 1;
 	}
 	memcpy(&area, &com.selection, sizeof(rectangle));
@@ -892,7 +916,7 @@ int sequence_processing(sequence *seq, sequence_proc process, int layer, gboolea
 
 	/* this loops could be run in parallel, but now the area depends on the previous star
 	 * detection, which makes it a bit hard to keep track of the star movement... */
-//#pragma omp parallel for private(i) schedule(dynamic)
+#pragma omp parallel for firstprivate(fit) schedule(static) if(run_in_parallel && ((seq->type == SEQ_REGULAR && fits_is_reentrant()) || seq->type == SEQ_SER))
 	for (i=0; i<seq->number; ++i) {
 		if (!abort) {
 			if (run_in_thread && !get_thread_run()) {
@@ -908,14 +932,15 @@ int sequence_processing(sequence *seq, sequence_proc process, int layer, gboolea
 			}
 
 			/* processing the image
-			 * warning: area may be modified */
-			if (process(seq, layer, i, &fit, &area) < 0) {
+			 * warning: area may be modified, only if !run_in_parallel */
+			if (process(seq, layer, i, &fit, &area, arg) < 0) {
 				abort = 1;
 				continue;
 			}
+#pragma omp atomic
+			cur_nb += 1.f;
+			set_progress_bar_data(NULL, cur_nb/nb_frames);
 		}
-		cur_nb += 1.f;
-		set_progress_bar_data(NULL, cur_nb/nb_frames);
 	}
 	return abort;
 }
@@ -925,7 +950,7 @@ int sequence_processing(sequence *seq, sequence_proc process, int layer, gboolea
  * source_area is the area from which fit was extracted from the full frame. It can be used
  * for reference, but can also be modified to help subsequent minimisations.
  */
-int seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area) {
+int seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area, void *arg) {
 	rectangle area;
 	area.x = area.y = 0;
 	area.w = fit->rx; area.h = fit->ry;
@@ -936,11 +961,12 @@ int seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, recta
 		result->ypos = source_area->y + source_area->h - result->y0;
 		seq->regparam[seq_layer][frame_no].fwhm_data = result;
 		seq->regparam[seq_layer][frame_no].fwhm = result->fwhmx;
-		//fprintf(stdout, "%d\t%f\t%f\t%f\t%f\t%f\n", frame_no, result->A, result->mag, result->fwhmx, result->xpos, result->ypos);
 
 		/* let's move source_area to center it on the star */
-		//source_area->x = round_to_int(result->xpos) - source_area->w/2;
-		//source_area->y = round_to_int(result->ypos) - source_area->h/2;
+		if (arg) {
+			source_area->x = round_to_int(result->xpos) - source_area->w/2;
+			source_area->y = round_to_int(result->ypos) - source_area->h/2;
+		}
 		return 0;
 	} else {
 		seq->regparam[seq_layer][frame_no].fwhm_data = NULL;
@@ -951,24 +977,24 @@ int seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, recta
 
 /* Computes PSF for all images in a sequence.
  * Prints PSF data if print_psf is true, only position if false. */
-int do_fwhm_sequence_processing(sequence *seq, int layer, int print_psf, gboolean run_in_thread) {
+int do_fwhm_sequence_processing(sequence *seq, int layer, gboolean print_psf, gboolean follow_star, gboolean run_in_thread) {
 	int i, retval;
-	siril_log_message("Starting sequence processing of PSF\n");
-	set_progress_bar_data("Computing PSF on selected star", PROGRESS_NONE);
-	retval = sequence_processing(seq, &seqprocess_fwhm, layer, run_in_thread);	// allocates regparam
+	siril_log_message(_("Starting sequence processing of PSF\n"));
+	set_progress_bar_data(_("Computing PSF on selected star"), PROGRESS_NONE);
+	retval = sequence_processing(seq, &seqprocess_fwhm, layer, run_in_thread, !follow_star, GINT_TO_POINTER(follow_star));	// allocates regparam
 	if (retval) {
-		set_progress_bar_data("Failed to compute PSF for the sequence. Ready.", PROGRESS_NONE);
+		set_progress_bar_data(_("Failed to compute PSF for the sequence. Ready."), PROGRESS_NONE);
 		set_cursor_waiting(FALSE);
 		return 1;
 	}
-	siril_log_message("Finished sequence processing of PSF\n");
+	siril_log_message(_("Finished sequence processing of PSF\n"));
 	// update the list
 	if (seq->type != SEQ_INTERNAL)
 		fill_sequence_list(seq, layer);
 
 	if (print_psf) {
-		siril_log_message("See the console for a dump of star data over the sequence (stdout)\n");
-		fprintf(stdout, "# image_no amplitude magnitude fwhm x y\n");
+		siril_log_message(_("See the console for a dump of star data over the sequence (stdout)\n"));
+		fprintf(stdout, _("# image_no amplitude magnitude fwhm x y\n"));
 		for (i = 0; i < seq->number; i++) {
 			fitted_PSF *star = seq->regparam[layer][i].fwhm_data;
 			if (star) {
@@ -980,7 +1006,7 @@ int do_fwhm_sequence_processing(sequence *seq, int layer, int print_psf, gboolea
 		}
 	}
 	set_fwhm_star_as_star_list_with_layer(seq, layer);
-	set_progress_bar_data("Finished computing PSF for the sequence. Ready.", PROGRESS_NONE);
+	set_progress_bar_data(_("Finished computing PSF for the sequence. Ready."), PROGRESS_NONE);
 	return 0;
 }
 
@@ -1072,8 +1098,8 @@ gpointer crop_sequence(gpointer p) {
 
 		ser_file = malloc(sizeof(struct ser_struct));
 		sprintf(dest, "%s%s.ser", args->prefix, args->seq->seqname);
-		if (ser_create_file(dest, ser_file, TRUE, NULL)) {
-			siril_log_message("Creating the SER file failed, aborting.\n");
+		if (ser_create_file(dest, ser_file, TRUE, com.seq.ser_file)) {
+			siril_log_message(_("Creating the SER file failed, aborting.\n"));
 			free(ser_file);
 			args->retvalue = 1;
 			gdk_threads_add_idle(end_crop_sequence, args);
@@ -1096,9 +1122,11 @@ gpointer crop_sequence(gpointer p) {
 				savefits(dest, &wfit[0]);
 				break;
 			case SEQ_SER:
+				ser_file->image_width = wfit[0].rx;
+				ser_file->image_height = wfit[0].ry;
 				if (ser_write_frame_from_fit(ser_file, &wfit[0], frame)) {
 					siril_log_message(
-							"Error while converting to SER (no space left?)\n");
+							_("Error while converting to SER (no space left?)\n"));
 				}
 				break;
 			default:
@@ -1110,8 +1138,6 @@ gpointer crop_sequence(gpointer p) {
 		}
 	}
 	if (args->seq->type == SEQ_SER) {
-		memcpy(&ser_file->date, &args->seq->ser_file->date, 16);
-		memcpy(&ser_file->date_utc, &args->seq->ser_file->date_utc, 16);
 		ser_write_and_close(ser_file);
 		free(ser_file);
 	}
@@ -1166,12 +1192,40 @@ struct exportseq_args {
 	int convflags;
 	gboolean normalize;
 	int gif_delay, gif_loops;
+	double avi_fps;
+	gboolean resize;
+	int32_t avi_width, avi_height;
 };
+
+/* Used for avi exporter */
+static uint8_t *fits_to_uint8(fits *fit) {
+	uint8_t *data;
+	int w, h, i, j, channel, step;
+	float pente;
+	WORD lo, hi;
+
+	w = fit->rx;
+	h = fit->ry;
+	channel = fit->naxes[2];
+	step = (channel == 3 ? 2 : 0);
+	pente = computePente(&lo, &hi);
+
+	data = malloc(w * h * channel * sizeof(uint8_t));
+	for (i = 0, j = 0; i < w * h * channel; i += channel, j++) {
+		data[i + step] = (uint8_t) round_to_BYTE(((double) fit->pdata[RLAYER][j] * pente));
+		if (channel > 1) {
+			data[i + 1] = (uint8_t) round_to_BYTE(((double) fit->pdata[GLAYER][j] * pente));
+			data[i + 2 - step] = (uint8_t) round_to_BYTE(((double) fit->pdata[BLAYER][j] * pente));
+		}
+	}
+	return data;
+}
 
 gpointer export_sequence(gpointer ptr) {
 	int i, x, y, nx, ny, shiftx, shifty, layer, retval = 0, reglayer, nb_layers, skipped;
 	float cur_nb = 0.f, nb_frames;
 	unsigned int nbdata = 0;
+	uint8_t *data;
 	fits fit, destfit;
 	char filename[256], dest[256];
 	struct ser_struct *ser_file = NULL;
@@ -1185,14 +1239,38 @@ gpointer export_sequence(gpointer ptr) {
 	norm_coeff coeff;
 
 	reglayer = get_registration_layer();
-	siril_log_message("Using registration information from layer %d to export sequence\n", reglayer);
+	siril_log_message(_("Using registration information from layer %d to export sequence\n"), reglayer);
 
 	if (args->convflags == TYPESER) {
 		ser_file = malloc(sizeof(struct ser_struct));
 		snprintf(dest, 256, "%s.ser", args->basename);
 		if (ser_create_file(dest, ser_file, TRUE, NULL))
-			siril_log_message("Creating the SER file failed, aborting.\n");
+			siril_log_message(_("Creating the SER file failed, aborting.\n"));
 	}
+	else if (args->convflags == TYPEAVI){
+		snprintf(dest, 256, "%s.avi", args->basename);
+		int32_t width;
+		int32_t height;
+		int32_t mode;
+
+		switch(args->seq->nb_layers) {
+		case 1:
+			mode = AVI_WRITER_INPUT_FORMAT_MONOCHROME;
+			break;
+		default:
+			mode = AVI_WRITER_INPUT_FORMAT_COLOUR;
+		}
+		if (args->resize) {
+			width = args->avi_width;
+			height = args->avi_height;
+		}
+		else {
+			width  = (int32_t) args->seq->rx;
+			height = (int32_t) args->seq->ry;
+		}
+
+		avi_file_create(dest, width, height, mode, AVI_WRITER_CODEC_DIB, args->avi_fps);
+}
 	else if (args->convflags == TYPEGIF) {
 #ifdef HAVE_LIBGIF
 		snprintf(giffilename, 256, "%s.gif", args->basename);
@@ -1241,14 +1319,14 @@ gpointer export_sequence(gpointer ptr) {
 			retval = -1;
 			goto free_and_reset_progress_bar;
 		}
-		char *tmpmsg = strdup("Processing image ");
+		char *tmpmsg = strdup(_("Processing image "));
 		tmpmsg = str_append(&tmpmsg, filename);
 		set_progress_bar_data(tmpmsg,
 				(double) cur_nb / ((double) nb_frames + 1.));
 		free(tmpmsg);
 
 		if (seq_read_frame(args->seq, i, &fit)) {
-			siril_log_message("Export: could not read frame, aborting\n");
+			siril_log_message(_("Export: could not read frame, aborting\n"));
 			retval = -3;
 			goto free_and_reset_progress_bar;
 		}
@@ -1262,7 +1340,7 @@ gpointer export_sequence(gpointer ptr) {
 			nb_layers = fit.naxes[2];
 			destfit.data = calloc(nbdata * fit.naxes[2], sizeof(WORD));
 			if (!destfit.data) {
-				siril_log_message("Could not allocate memory for the export, aborting\n");
+				printf("Could not allocate memory for the export, aborting\n");
 				retval = -1;
 				goto free_and_reset_progress_bar;
 			}
@@ -1277,7 +1355,7 @@ gpointer export_sequence(gpointer ptr) {
 			}
 		}
 		else if (fit.ry * fit.rx != nbdata || nb_layers != fit.naxes[2]) {
-			siril_log_message("Export: image in args->sequence doesn't has the same dimensions\n");
+			printf("Export: image in args->sequence doesn't has the same dimensions\n");
 			retval = -3;
 			goto free_and_reset_progress_bar;
 		}
@@ -1301,12 +1379,14 @@ gpointer export_sequence(gpointer ptr) {
 					nx = x + shiftx;
 					ny = y + shifty;
 					if (nx >= 0 && nx < fit.rx && ny >= 0 && ny < fit.ry) {
-						double tmp = fit.pdata[layer][x + y * fit.rx];
 						if (args->normalize) {
+							double tmp = fit.pdata[layer][x + y * fit.rx];
 							tmp *= coeff.scale[i];
 							tmp -= coeff.offset[i];
+							destfit.pdata[layer][nx + ny * fit.rx] = round_to_WORD(tmp);
+						} else {
+							destfit.pdata[layer][nx + ny * fit.rx] = fit.pdata[layer][x + y * fit.rx];
 						}
-						destfit.pdata[layer][nx + ny * fit.rx] = round_to_WORD(tmp);
 					}
 				}
 			}
@@ -1314,25 +1394,48 @@ gpointer export_sequence(gpointer ptr) {
 
 
 		switch (args->convflags) {
-			case TYPEFITS:
-				snprintf(dest, 255, "%s%05d%s", args->basename, i, com.ext);
-				if (savefits(dest, &destfit)) {
-					retval = -1;
-					goto free_and_reset_progress_bar;
-				}
-				break;
-			case TYPESER:
-				if (ser_write_frame_from_fit(ser_file, &destfit, i - skipped))
-					siril_log_message("Error while converting to SER (no space left?)\n");
-				break;
-			case TYPEGIF:
+		case TYPEFITS:
+			snprintf(dest, 255, "%s%05d%s", args->basename, i, com.ext);
+			if (savefits(dest, &destfit)) {
+				retval = -1;
+				goto free_and_reset_progress_bar;
+			}
+			break;
+		case TYPESER:
+			if (ser_write_frame_from_fit(ser_file, &destfit, i - skipped))
+				siril_log_message(
+						_("Error while converting to SER (no space left?)\n"));
+			break;
+		case TYPEGIF:
 #ifdef HAVE_LIBGIF
-				if (savegif(giffilename, &destfit, 1, &gif, args->gif_delay, args->gif_loops)) {
-					retval = -1;
-					goto free_and_reset_progress_bar;
-				}
+			if (savegif(giffilename, &destfit, 1, &gif, args->gif_delay,
+					args->gif_loops)) {
+				retval = -1;
+				goto free_and_reset_progress_bar;
+			}
 #endif
-				break;
+			break;
+		case TYPEAVI:
+			data = fits_to_uint8(&destfit);
+
+			if (args->resize) {
+#ifdef HAVE_OPENCV
+				uint8_t *newdata = malloc(
+						sizeof(uint8_t) * args->avi_width * args->avi_height
+								* destfit.naxes[2]);
+				cvResizeGaussian_data8(data, destfit.rx, destfit.ry, newdata,
+						args->avi_width, args->avi_height, destfit.naxes[2], 0);
+				avi_file_write_frame(0, newdata);
+				free(newdata);
+#else
+				siril_log_message(_("Siril needs opencv to resize images\n"));
+				avi_file_write_frame(0, data);
+#endif
+			}
+			else
+				avi_file_write_frame(0, data);
+			free(data);
+			break;
 		}
 		cur_nb += 1.f;
 		set_progress_bar_data(NULL, cur_nb / nb_frames);
@@ -1352,6 +1455,9 @@ free_and_reset_progress_bar:
 		ser_write_and_close(ser_file);
 		free(ser_file);
 	}
+	else if (args->convflags == TYPEAVI) {
+		avi_file_close(0);
+	}
 #ifdef HAVE_LIBGIF
 	else if (args->convflags == TYPEGIF) {
 		if (gif)
@@ -1360,12 +1466,12 @@ free_and_reset_progress_bar:
 #endif
 
 	if (retval) {
-		set_progress_bar_data("Sequence export failed. Check the log.", PROGRESS_RESET);
-		siril_log_message("Sequence export failed\n");
+		set_progress_bar_data(_("Sequence export failed. Check the log."), PROGRESS_RESET);
+		siril_log_message(_("Sequence export failed\n"));
 	}
 	else {
-		set_progress_bar_data("Sequence export succeeded.", PROGRESS_RESET);
-		siril_log_message("Sequence export succeeded.\n");
+		set_progress_bar_data(_("Sequence export succeeded."), PROGRESS_RESET);
+		siril_log_message(_("Sequence export succeeded.\n"));
 	}
 
 	free(args->basename);
@@ -1378,10 +1484,11 @@ void on_buttonExportSeq_clicked(GtkButton *button, gpointer user_data) {
 	int selected = gtk_combo_box_get_active(GTK_COMBO_BOX(lookup_widget("comboExport")));
 	const char *bname = gtk_entry_get_text(GTK_ENTRY(lookup_widget("entryExportSeq")));
 	struct exportseq_args *args;
-	GtkToggleButton *exportNormalize;
+	GtkToggleButton *exportNormalize, *checkResize;
 #ifdef HAVE_LIBGIF
 	GtkEntry *delayEntry, *loopsEntry;
 #endif
+	GtkEntry *fpsEntry, *widthEntry, *heightEntry;
 
 	if (bname[0] == '\0') return;
 	if (selected == -1) return;
@@ -1393,25 +1500,41 @@ void on_buttonExportSeq_clicked(GtkButton *button, gpointer user_data) {
 	args->normalize = gtk_toggle_button_get_active(exportNormalize);
 
 	switch (selected) {
-		case 0:
-			args->convflags = TYPEFITS;
-			args->basename = format_basename(args->basename);
-			break;
-		case 1:
-			args->convflags = TYPESER;
-			break;
-		case 2:
+	case 0:
+		args->convflags = TYPEFITS;
+		args->basename = format_basename(args->basename);
+		break;
+	case 1:
+		args->convflags = TYPESER;
+		break;
+	case 2:
 #ifdef HAVE_LIBGIF
-			delayEntry = GTK_ENTRY(lookup_widget("entryGifDelay"));
-			args->gif_delay = atoi(gtk_entry_get_text(delayEntry));
-			loopsEntry = GTK_ENTRY(lookup_widget("entryGifLoops"));
-			args->gif_loops = atoi(gtk_entry_get_text(loopsEntry));
-			args->convflags = TYPEGIF;
+		delayEntry = GTK_ENTRY(lookup_widget("entryGifDelay"));
+		args->gif_delay = atoi(gtk_entry_get_text(delayEntry));
+		loopsEntry = GTK_ENTRY(lookup_widget("entryGifLoops"));
+		args->gif_loops = atoi(gtk_entry_get_text(loopsEntry));
+		args->convflags = TYPEGIF;
 #else
-			siril_log_message("GIF support was not compiled, aborting.\n");
-			return;
+		siril_log_message(_("GIF support was not compiled, aborting.\n"));
+		return;
 #endif
-			break;
+		break;
+	case 3:
+		fpsEntry = GTK_ENTRY(lookup_widget("entryAviFps"));
+		args->avi_fps = atoi(gtk_entry_get_text(fpsEntry));
+		widthEntry = GTK_ENTRY(lookup_widget("entryAviWidth"));
+		args->avi_width = atof(gtk_entry_get_text(widthEntry));
+		heightEntry = GTK_ENTRY(lookup_widget("entryAviHeight"));
+		args->avi_height = atof(gtk_entry_get_text(heightEntry));
+		checkResize = GTK_TOGGLE_BUTTON(lookup_widget("checkAviResize"));
+		if (args->avi_height == 0 || args->avi_width == 0) {
+			siril_log_message(_("Width or height cannot be null. Not resizing.\n"));
+			args->resize = FALSE;
+		} else {
+			args->resize = gtk_toggle_button_get_active(checkResize);
+		}
+		args->convflags = TYPEAVI;
+		break;
 	}
 	set_cursor_waiting(TRUE);
 	start_in_new_thread(export_sequence, args);
@@ -1419,6 +1542,21 @@ void on_buttonExportSeq_clicked(GtkButton *button, gpointer user_data) {
 
 void on_comboExport_changed(GtkComboBox *box, gpointer user_data) {
 	GtkWidget *gif_options = lookup_widget("boxGifOptions");
+	GtkWidget *avi_options = lookup_widget("boxAviOptions");
+	GtkWidget *checkAviResize = lookup_widget("checkAviResize");
 	gtk_widget_set_visible(gif_options, 2 == gtk_combo_box_get_active(box));
+	gtk_widget_set_visible(avi_options, 3 == gtk_combo_box_get_active(box));
+#ifdef HAVE_OPENCV
+	gtk_widget_set_sensitive(checkAviResize, TRUE); // not available yet because resizing image crashes
+#else
+	gtk_widget_set_sensitive(checkAviResize, FALSE);
+#endif
+}
+
+void on_checkAviResize_toggled(GtkToggleButton *togglebutton, gpointer user_data) {
+	GtkWidget *heightEntry = lookup_widget("entryAviHeight");
+	GtkWidget *widthEntry = lookup_widget("entryAviWidth");
+	gtk_widget_set_sensitive(heightEntry, gtk_toggle_button_get_active(togglebutton));
+	gtk_widget_set_sensitive(widthEntry, gtk_toggle_button_get_active(togglebutton));
 }
 

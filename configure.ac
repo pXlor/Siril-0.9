@@ -1,15 +1,32 @@
 dnl Process this file with autoconf to produce a configure script.
+m4_define([siril_major_version], [0])
+m4_define([siril_minor_version], [9])
+m4_define([siril_micro_version], [4])
+m4_define([siril_prerelease_version], [alpha.0])
+m4_define([siril_version],
+          [siril_major_version.siril_minor_version.siril_micro_version])
+m4_define([siril_version_full],
+          [siril_major_version().siril_minor_version().siril_micro_version()m4_bpatsubst(siril_prerelease_version(), [^], [-])])
 
-AC_INIT(siril, 0.9.3)
+dnl change siril_version_full by siril_version for stable release
+AC_INIT([siril], [siril_version_full],
+        [https://free-astro.org/bugs/view_all_bug_page.php],
+        [siril],
+        [https://free-astro.org/index.php/Siril/fr]) 
+        
 AM_INIT_AUTOMAKE([subdir-objects])
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_SRCDIR([src/main.c])
+AC_CONFIG_MACRO_DIR([m4])
 
 remember_set_CFLAGS="$CFLAGS"
 
 AC_PROG_CC
 AC_HEADER_STDC
 AC_OPENMP
+
+AC_LANG([C])
+AC_LANG([C++])
 
 dnl remove -g flag from default CFLAGS
 if test "x$remember_set_CFLAGS" = "x"; then
@@ -110,15 +127,22 @@ if test -n "$CXX" && ( test "X$CXX" != "Xno" &&
 		      ( (test "X$CXX" = "Xg++" && `g++ -v >/dev/null 2>&1` ) ||
 		      (test "X$CXX" != "Xg++"))) ; then
 	AC_PROG_CXXCPP
+	
+	dnl check for C++11 support
+	m4_include([m4/ax_cxx_compile_stdcxx.m4])
+	AX_CXX_COMPILE_STDCXX(11, noext, mandatory)
+	
 	dnl AC_MSG_WARN(CXX is "$CXX")
 	dnl http://nerdland.net/2009/07/detecting-c-libraries-with-autotools/ solution 2
 	PKG_CHECK_MODULES([OPENCV], [opencv >= 2.0],
 			  [AC_DEFINE([HAVE_OPENCV], [1], [Using OpenCV])]
 			  [OPENCV_LIBS="-lopencv_core -lopencv_imgproc"],
 			  AC_MSG_WARN([opencv not found. Not using some image processing.]))
+
 else
-	AC_MSG_WARN([no C++ compiler found, opencv cannot be used])
+	AC_MSG_ERROR([no C++ compiler found])
 fi
+
 AM_CONDITIONAL(HAVE_OPENCV, [test "x$OPENCV_LIBS" != "x"])
 
 dnl if test "x$CXX" = "xno"; then

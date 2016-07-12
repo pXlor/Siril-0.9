@@ -126,7 +126,7 @@ int Nl, Nc, Nbr_Plan, Type_Wave_Transform;
                 Size = Nbr_Plan * Nl * Nc;
                 break;
         default : 
-		siril_log_message("wave_io_read: wrong transform type\n");
+		printf("wave_io_read: wrong transform type\n");
                 return(1);
                 break;
     }
@@ -171,7 +171,7 @@ int wave_io_read (File_Name_In, Wave_Trans)
 	/* open the file */
 	File_Des = fopen (File_Name, "r"); 
 	if (File_Des == NULL){
-		siril_log_message("wave_io_read: error opening file: %s\n", File_Name_In);
+		printf("wave_io_read: error opening file: %s\n", File_Name_In);
 		return 1;
 	}
 
@@ -179,7 +179,7 @@ int wave_io_read (File_Name_In, Wave_Trans)
 	Nbr = fread ((char *) Wave_Trans, sizeof(wave_transf_des), 1, File_Des);
 
 	if (Nbr <= 0) {
-		siril_log_message("wave_io_read: error reading data\n");
+		printf("wave_io_read: error reading data\n");
 		fclose(File_Des);
 		return 1;
 	}
@@ -197,18 +197,18 @@ int wave_io_read (File_Name_In, Wave_Trans)
 			Ptr = (char *) ((Wave_Trans -> Pave).Data);
 			Nbr = fread (Ptr, sizeof(float), Size, File_Des);
 			if (Nbr <= 0){
-				siril_log_message("wave_io_read: error reading data\n");
+				printf("wave_io_read: error reading data\n");
 				fclose(File_Des);
 				return 1;
 			}
 			break;
 		default : 
-			siril_log_message("wave_io_read: wrong transform type\n");
+			printf("wave_io_read: wrong transform type\n");
 			fclose(File_Des);
 			return 1;
 	}
 	if (fclose (File_Des) != 0) {
-		siril_log_message("wave_io_read: error closing file\n");
+		printf("wave_io_read: error closing file\n");
 		return 1;
 	}
 	return 0;
@@ -231,14 +231,14 @@ int wave_io_write (File_Name_In, Wave_Trans)
 	/* open the file */
 	File_Des = fopen (File_Name, "w");
 	if (File_Des == NULL) {
-		siril_log_message("wave_io_write: error opening file\n");
+		printf("wave_io_write: error opening file\n");
 		return 1;
 	}
 
 	/* write the descriptor */
 	Nbr = fwrite ((char *) Wave_Trans, sizeof(wave_transf_des), 1, File_Des);
 	if (Nbr <= 0) {
-		siril_log_message("wave_io_write: error writing data\n");
+		printf("wave_io_write: error writing data\n");
 		fclose(File_Des);
 		return 1;
 	}
@@ -255,18 +255,18 @@ int wave_io_write (File_Name_In, Wave_Trans)
 			Size = Nbr_Plan * Nl * Nc;
 			Nbr = fwrite (Ptr, sizeof(float), Size, File_Des);
 			if (Nbr <= 0) {
-				siril_log_message("wave_io_write: error writing data\n");
+				printf("wave_io_write: error writing data\n");
 				fclose(File_Des);
 				return 1;
 			}
 			break;
 		default : 
-			siril_log_message("wave_io_write: wrong transform type\n");
+			printf("wave_io_write: wrong transform type\n");
 			fclose(File_Des);
 			return 1;
 	}
 	if (fclose (File_Des) != 0){
-		siril_log_message("wave_io_write: error closing file\n");
+		printf("wave_io_write: error closing file\n");
 		return 1;
 	}
 	return 0;
@@ -284,7 +284,7 @@ wave_transf_des *Wave_Trans;
         	if ((Wave_Trans -> Pave).Data) free ((char *) ((Wave_Trans -> Pave).Data));
         	break;
         default : 
-		siril_log_message("wave_io_free: wrong transform type\n");
+		printf("wave_io_free: wrong transform type\n");
 			return 1;
 			break;
     }
@@ -316,7 +316,7 @@ int Nbr_Plan, Nl, Nc;
         	(Wave_Trans -> Pave).Data = f_vector_alloc(Size);
         	break;
 		default :
-			siril_log_message("wave_io_alloc: wrong transform type\n");
+			printf("wave_io_alloc: wrong transform type\n");
 			return 1;
 			break;
 	}

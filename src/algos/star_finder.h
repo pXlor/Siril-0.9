@@ -10,7 +10,7 @@ struct starFinder_struct {
 	int nb_stars;
 };
 
-fitted_PSF **peaker(fits *fit, int layer, starFinder *sf);
+fitted_PSF **peaker(fits *fit, int layer, starFinder *sf, rectangle *area);
 fitted_PSF *add_star(fits *fit, int layer, int *index);
 int remove_star(int index);
 void sort_stars(fitted_PSF **stars, int total);

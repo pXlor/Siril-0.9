@@ -4,10 +4,22 @@
 #  include <config.h>
 #endif
 
+#include <gtk/gtk.h>
+#include <fitsio.h>	// fitsfile
+#include <gsl/gsl_histogram.h>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+#include <libintl.h>
+
 // PATH_MAX is not available on Hurd at least
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
+
+#define _(String) gettext (String)
+#define gettext_noop(String) String
+#define N_(String) gettext_noop (String)
 
 #define max(a,b) \
    ({ __typeof__ (a) _a = (a); \
@@ -18,13 +30,6 @@
        __typeof__ (b) _b = (b); \
      _a < _b ? _a : _b; })
 #define SQR(x) ((x)*(x))
-
-#include <gtk/gtk.h>
-#include <fitsio.h>	// fitsfile
-#include <gsl/gsl_histogram.h>
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 #define USHRT_MAX_DOUBLE ((double)USHRT_MAX)
 #define USHRT_MAX_SINGLE ((float)USHRT_MAX)
@@ -206,7 +211,7 @@ struct imdata {
  * Returns < 0 for an error that should stop the processing on the sequence.
  * Other return values are not used.
  * Processed data should be written in the sequence data directly. */
-typedef int (*sequence_proc)(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area);
+typedef int (*sequence_proc)(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area, void *arg);
 
 /* preprocessing data from GUI */
 struct preprocessing_data {
@@ -488,6 +493,7 @@ struct cominf {
 	sliders_mode sliders;		// 0: min/max, 1: MIPS-LO/HI, 2: user
 	gboolean leveldrag;		// middle click being dragged if true
 	int preprostatus;
+	gboolean prepro_cfa;	// Use to save type of sensor for cosmetic correction in preprocessing
 	gboolean show_excluded;		// show excluded images in sequences NOT USED!
 	double zoom_value;		// 1.0 is normal zoom, use get_zoom_val() to access it
 
@@ -513,6 +519,8 @@ struct cominf {
 	int reg_settings;		// Use to save registration method in the init file
 	
 	gboolean dontShowConfirm;
+
+	gboolean have_dark_theme;	// we have a dark theme, use bright colours
 
 	stackconf stack;
 	

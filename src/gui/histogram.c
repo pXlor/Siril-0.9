@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdint.h>
+#include <math.h>
 #include "core/siril.h"
 #include "core/proto.h"
 #include "io/single_image.h"
@@ -47,14 +48,6 @@ static double histo_color_b[] = { 0.0, 0.0, 1.0, 0.0 };
 static double graph_height = 0.;
 static gsl_histogram *histCpy[MAXVPORT] = { NULL, NULL, NULL, NULL };
 static uint64_t clipped[] = { 0, 0 };
-
-const gchar stylered[] = "* {"
-		"color : red"
-		"}";
-
-const gchar stylegray[] = "* {"
-		"color : black"
-		"}";
 
 static GtkToggleToolButton *toggles[MAXVPORT] = { NULL };
 static GtkToggleToolButton *toggleGrid = NULL;
@@ -231,7 +224,6 @@ void init_toggles() {
 // the number of layers of gfit
 void set_histo_toggles_names() {
 	init_toggles();
-	GtkCssProvider *provider = gtk_css_provider_new();
 
 	if (gfit.naxis == 2) {
 		const char* test = gtk_tool_button_get_label(GTK_TOOL_BUTTON(toggles[0]));
@@ -250,11 +242,6 @@ void set_histo_toggles_names() {
 		if (toggles[3])
 			gtk_widget_set_visible(GTK_WIDGET(toggles[3]), FALSE);
 
-		gtk_css_provider_load_from_data(provider, stylegray, -1, NULL);
-		gtk_style_context_add_provider(
-				gtk_widget_get_style_context(lookup_widget("histoToolRed")),
-				GTK_STYLE_PROVIDER(provider),
-				GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 	} else {
 		const char* test = gtk_tool_button_get_label(GTK_TOOL_BUTTON(toggles[0]));
 		if (strcmp(test, "R")) {
@@ -272,11 +259,6 @@ void set_histo_toggles_names() {
 			gtk_widget_set_visible(GTK_WIDGET(toggles[3]), TRUE);
 			gtk_toggle_tool_button_set_active(toggles[3], TRUE);
 		}
-		gtk_css_provider_load_from_data(provider, stylered, -1, NULL);
-		gtk_style_context_add_provider(
-				gtk_widget_get_style_context(lookup_widget("histoToolRed")),
-				GTK_STYLE_PROVIDER(provider),
-				GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 	}
 }
 
@@ -444,6 +426,14 @@ void erase_histo_display(cairo_t *cr, int width, int height) {
 		draw_grid(cr, width, height);
 }
 
+static gboolean is_log_scale() {
+	static GtkToggleButton *HistoCheckLogButton = NULL;
+
+	if (HistoCheckLogButton == NULL)
+		HistoCheckLogButton = GTK_TOGGLE_BUTTON(lookup_widget("HistoCheckLogButton"));
+	return (gtk_toggle_button_get_active(HistoCheckLogButton));
+}
+
 void display_histo(gsl_histogram *histo, cairo_t *cr, int layer, int width,
 		int height, double zoomH, double zoomV) {
 	int current_bin;
@@ -490,14 +480,16 @@ void display_histo(gsl_histogram *histo, cairo_t *cr, int layer, int width,
 			bin_val += gsl_histogram_get(histo, i);
 			i++;
 		}
+		if (is_log_scale()) {
+			bin_val = (bin_val == 0) ? bin_val : log(bin_val);
+		}
 		displayed_values[current_bin] = bin_val;
 		if (bin_val > graph_height)	// check for maximum
 			graph_height = bin_val;
 		current_bin++;
 	} while (i < nb_orig_bins && current_bin < nb_bins_allocated);
 	for (i = 0; i < nb_bins_allocated; i++) {
-		double bin_height = height
-				- height * displayed_values[i] / graph_height;
+		double bin_height = height - height * displayed_values[i] / graph_height;
 		cairo_line_to(cr, i, bin_height);
 	}
 	cairo_stroke(cr);

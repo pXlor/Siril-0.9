@@ -17,7 +17,7 @@ struct generic_seq_args {
 	int (*prepare_hook)(struct generic_seq_args *);
 	// function called for each image with image index in sequence, number
 	// of image currently processed and the image
-	int (*image_hook)(struct generic_seq_args *, int, int, fits *);
+	int (*image_hook)(struct generic_seq_args *, int, fits *);
 	// saving the processed image, can be NULL to get default behaviour
 	int (*save_hook)(struct generic_seq_args *, int, int, fits *);
 	// function called after iterating through the sequence
