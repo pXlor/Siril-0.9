@@ -2029,12 +2029,12 @@ static gboolean end_stacking(gpointer p) {
 						com.uniq->filename = strdup(args->output_filename);
 				}
 				if (failed)
-					com.uniq->filename = strdup("Unsaved stacking result");
+					com.uniq->filename = strdup(_("Unsaved stacking result"));
 			}
 			else {
 				if (!savefits(args->output_filename, &gfit))
 					com.uniq->filename = strdup(args->output_filename);
-				else com.uniq->filename = strdup("Unsaved stacking result");
+				else com.uniq->filename = strdup(_("Unsaved stacking result"));
 			}
 			display_filename();
 		}
