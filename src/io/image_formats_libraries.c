@@ -26,7 +26,11 @@
 #include <assert.h>
 
 #ifdef HAVE_LIBTIFF
+#define uint64 uint64_hack_
+#define int64 int64_hack_
 #include <tiffio.h>
+#undef uint64
+#undef int64
 #endif
 #ifdef HAVE_LIBJPEG
 #include <jpeglib.h>
