@@ -53,10 +53,18 @@ struct ser_struct {
 	int image_height;		// 4	(30)
 	int bit_pixel_depth;		// 4	(34)
 	unsigned int frame_count;	// 4	(38)
-	char *observer;			// 40	(42)
-	char *instrument;		// 40	(82)
-	char *telescope;		// 40	(122)
-	uint64_t date, date_utc;	// 8 and 8 (162 and 170)
+	char observer[40];			// 40	(42)
+	char instrument[40];		// 40	(82)
+	char telescope[40];		// 40	(122)
+	uint64_t date;	// 8	(162)
+	uint64_t date_utc;	// 8 (170)
+
+	/* timestamps (not in the header, timestamps are in trailer) */
+	uint64_t *ts;			// total timestamps
+	uint64_t ts_min, ts_max;// min and max timestamp
+	double fps;				// frame rate
+
+	off_t filesize;			// size of the file
 
 	// internal representations of header data
 	ser_pixdepth byte_pixel_depth;	// more useful representation of the bit_pixel_depth
@@ -71,18 +79,14 @@ struct ser_struct {
 void ser_init_struct(struct ser_struct *ser_file);
 void ser_display_info(struct ser_struct *ser_file);
 int ser_open_file(char *filename, struct ser_struct *ser_file);
-int ser_write_header(struct ser_struct *ser_file);
 int ser_write_and_close(struct ser_struct *ser_file);
 int ser_create_file(const char *filename, struct ser_struct *ser_file, gboolean overwrite, struct ser_struct *copy_from);
-void ser_header_from_fit(struct ser_struct *ser_file, fits *fit);
 int ser_close_file(struct ser_struct *ser_file);
 int ser_read_frame(struct ser_struct *ser_file, int frame_no, fits *fit);
 int ser_read_opened_partial(struct ser_struct *ser_file, int layer,
 		int frame_no, WORD *buffer, const rectangle *area);
 int ser_write_frame_from_fit(struct ser_struct *ser_file, fits *fit, int frame);
 void set_combo_box_bayer_pattern(ser_color pattern);
-void ser_manage_endianess_and_depth(struct ser_struct *ser_file, WORD *data, int frame_size);
-void ser_manage_rgb_v3(struct ser_struct *ser_file, WORD *data, int frame_size);
 
 #endif
 

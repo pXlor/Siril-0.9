@@ -5,7 +5,7 @@
 #include <sys/time.h>
 #include "core/siril.h"	// for sequence
 
-void load_css_style_sheet (char *original, char *path);
+void load_css_style_sheet (char *path);
 void initialize_shortcuts();
 void fill_about_dialog();
 void refresh_GUI();
@@ -25,6 +25,8 @@ int adjust_sellabel();
 void set_GUI_CWD();
 void set_GUI_MEM(unsigned long size);
 void set_GUI_misc();
+void initialize_preprocessing();
+void update_MenuItem();
 void test_and_allocate_reference_image(int vport);
 void enable_view_reference_checkbox(gboolean status);
 gboolean redraw(int vport, int remap);
@@ -100,5 +102,8 @@ void update_statusbar_convert();
 void fill_convert_list(GSList *list);
 
 void update_spinCPU(int max);
+
+
+void fillSeqAviExport();
 
 #endif

@@ -237,7 +237,7 @@ int film_read_frame(struct film_struct *film, int frame_no, fits *fit) {
 	int nb_pixels, convert_rgb_to_gray = 0;
 
 	if (film->videosource == 0x00) {
-		siril_log_message("FILM ERROR: incompatible format\n");
+		siril_log_message(_("FILM ERROR: incompatible format\n"));
 		return FILM_ERROR;
 	}
 	const FFMS_Frame *frame = FFMS_GetFrame(film->videosource, frame_no, &film->errinfo);

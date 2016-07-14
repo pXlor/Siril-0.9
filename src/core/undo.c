@@ -176,6 +176,10 @@ int undo_save_state(char *message, ...) {
 		return 1;
 	}
 	undo_add_item(&gfit, filename, histo);
+
+	/* update menus */
+	update_MenuItem();
+
 	va_end(args);
 	return 0;
 }

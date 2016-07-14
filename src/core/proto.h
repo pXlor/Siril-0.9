@@ -6,9 +6,14 @@
 #endif
 #include <fftw3.h>
 #include <gsl/gsl_histogram.h>
+#include <stdint.h>
 
 #ifdef HAVE_LIBTIFF
+#define uint64 uint64_hack_
+#define int64 int64_hack_
 #include <tiffio.h>
+#undef uint64
+#undef int64
 #endif
 
 #ifdef HAVE_LIBGIF
@@ -111,9 +116,6 @@ int	is_readable_file(const char *filename);
 int	stat_file(const char *filename2, image_type *type, char *realname);
 const char *get_filename_ext(const char *filename);
 
-int	writeinitfile();
-int	checkinitfile();
-
 int	changedir(const char *dir);
 int	update_sequences_list(const char *sequence_name_to_select);
 void	update_used_memory();
@@ -132,6 +134,7 @@ char*	remove_ext_from_filename(const char *basename);
 char*	replace_spaces_from_filename(const char *filename);
 char*	str_append(char** data, const char* newdata);
 char*	format_basename(char *root);
+float	computePente(WORD *lo, WORD *hi);
 
 /****************** quantize.h ***************/
 int fits_img_stats_ushort(WORD *array, long nx, long ny, int nullcheck,
@@ -239,9 +242,9 @@ void	initialize_sequence(sequence *seq, gboolean is_zeroed);
 void	free_sequence(sequence *seq, gboolean free_seq_too);
 void	sequence_free_preprocessing_data(sequence *seq);
 gboolean sequence_is_loaded();
-int	sequence_processing(sequence *seq, sequence_proc process, int layer, gboolean run_in_thread);
-int	seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area);
-int	do_fwhm_sequence_processing(sequence *seq, int layer, int print_psf, gboolean run_in_thread);
+int	sequence_processing(sequence *seq, sequence_proc process, int layer, gboolean run_in_thread, gboolean run_in_parallel, void *arg);
+int	seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area, void *arg);
+int	do_fwhm_sequence_processing(sequence *seq, int layer, int print_psf, gboolean follow_star, gboolean run_in_thread);
 void	check_or_allocate_regparam(sequence *seq, int layer);
 sequence *create_internal_sequence(int size);
 void	internal_sequence_set(sequence *seq, int index, fits *fit);

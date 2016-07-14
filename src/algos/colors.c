@@ -309,13 +309,13 @@ gpointer extract_channels(gpointer p) {
 
 	if (args->fit->naxes[2] != 3) {
 		siril_log_message(
-				"Siril cannot axtract layers. Make sure your image is in RGB mode.\n");
+				_("Siril cannot extract layers. Make sure your image is in RGB mode.\n"));
 		args->process = FALSE;
 		gdk_threads_add_idle(end_extract_channels, args);
 		return GINT_TO_POINTER(1);
 	}
 
-	siril_log_color_message("%s channel extraction: processing...\n", "red",
+	siril_log_color_message(_("%s channel extraction: processing...\n"), "red",
 			args->str_type);
 	gettimeofday(&t_start, NULL);
 
@@ -408,7 +408,7 @@ gpointer enhance_saturation(gpointer p) {
 	WORD *buf[3] = { args->fit->pdata[RLAYER], args->fit->pdata[GLAYER],
 			args->fit->pdata[BLAYER] };
 
-	siril_log_color_message("Saturation enhancement: processing...\n", "red");
+	siril_log_color_message(_("Saturation enhancement: processing...\n"), "red");
 	gettimeofday(&t_start, NULL);
 
 	args->h_min /= 360.0;
@@ -479,7 +479,7 @@ gpointer scnr(gpointer p) {
 	int i;
 	struct timeval t_start, t_end;
 
-	siril_log_color_message("SCNR: processing...\n", "red");
+	siril_log_color_message(_("SCNR: processing...\n"), "red");
 	gettimeofday(&t_start, NULL);
 
 	WORD norm = get_normalized_value(args->fit);
@@ -729,7 +729,7 @@ static void get_coeff_for_wb(fits *fit, rectangle white, rectangle black,
 			kw[chan] /= (double) n;
 	}
 
-	siril_log_message("Background reference:\n");
+	siril_log_message(_("Background reference:\n"));
 	for (chan = 0; chan < 3; chan++) {
 		imstats *stat = statistics(fit, chan, &black, STATS_BASIC);
 		bg[chan] = stat->median / stat->normValue;
@@ -737,7 +737,7 @@ static void get_coeff_for_wb(fits *fit, rectangle white, rectangle black,
 		free(stat);
 	}
 
-	siril_log_message("White reference:\n");
+	siril_log_message(_("White reference:\n"));
 	for (chan = 0; chan < 3; chan++) {
 		siril_log_message("W%d : %.5e\n", chan, kw[chan]);
 		kw[chan] = fabs(kw[chan] - bg[chan]);
@@ -752,7 +752,7 @@ static void get_coeff_for_wb(fits *fit, rectangle white, rectangle black,
 			tmp[chan] = kw[rc] / kw[chan];
 	}
 
-	siril_log_message("Color calibration factors:\n");
+	siril_log_message(_("Color calibration factors:\n"));
 	for (chan = 0; chan < 3; chan++) {
 		kw[chan] = tmp[chan];
 		siril_log_message("K%d : %5.3lf\n", chan, kw[chan]);
@@ -815,7 +815,7 @@ void on_calibration_apply_button_clicked(GtkButton *button, gpointer user_data) 
 	static GtkSpinButton *selection_white_value[4] = { NULL, NULL, NULL, NULL };
 	struct timeval t_start, t_end;
 
-	siril_log_color_message("Color Calibration: processing...\n", "red");
+	siril_log_color_message(_("Color Calibration: processing...\n"), "red");
 	gettimeofday(&t_start, NULL);
 
 	GtkToggleButton *manual = GTK_TOGGLE_BUTTON(

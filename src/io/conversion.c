@@ -18,13 +18,10 @@
  * along with Siril. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef HAVE_CONFIG_H
-#  include <config.h>
-#endif
-
 #include <gdk/gdkkeysyms.h>
 #include <gtk/gtk.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
 #include <time.h>
@@ -259,18 +256,18 @@ void initialize_ser_debayer_settings() {
  * list of file types used in convflags */
 void initialize_converters() {
 	GtkLabel *label_supported;
-	gchar text[256];
+	gchar text[512];
 	gboolean has_entry;			// true if something is supported
 	sprintf(text, "\t");		// if changed, change its removal before log_message
 	//text[0] = '\0';
 	int count_ext = 0;
 	/* internal converters */
 	supported_filetypes |= TYPEBMP;
-	strcat(text, "BMP images, ");
+	strcat(text, _("BMP images, "));
 	supported_filetypes |= TYPEPIC;
-	strcat(text, "PIC images (IRIS), ");
+	strcat(text, _("PIC images (IRIS), "));
 	supported_filetypes |= TYPEPNM;
-	strcat(text, "PGM and PPM binary images");
+	strcat(text, _("PGM and PPM binary images"));
 	has_entry = TRUE;
 		
 	supported_extensions = malloc(MAX_OF_EXTENSIONS * sizeof(char*));
@@ -295,7 +292,7 @@ void initialize_converters() {
 	
 	supported_filetypes |= TYPERAW;
 	if (has_entry)	strcat(text, ", ");
-	strcat(text, "RAW images");
+	strcat(text, _("RAW images"));
 	has_entry = TRUE;
 	set_libraw_settings_menu_available(TRUE);	// enable libraw settings
 	initialize_libraw_settings();	// below in the file
@@ -312,26 +309,26 @@ void initialize_converters() {
 #endif
 	//supported_filetypes |= TYPECFA;
 	if (has_entry)	strcat(text, ", ");
-	strcat(text, "FITS-CFA images");
+	strcat(text, _("FITS-CFA images"));
 	has_entry = TRUE;
 
 #if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 	supported_filetypes |= TYPEAVI;
 	if (has_entry)	strcat(text, ", ");
-	strcat(text, "Films");
+	strcat(text, _("Films"));
 	has_entry = TRUE;
 #endif
 
 	supported_filetypes |= TYPESER;
 	if (has_entry)	strcat(text, ", ");
-	strcat(text, "SER sequences");
+	strcat(text, _("SER sequences"));
 	has_entry = TRUE;
 
 	/* library converters (detected by configure) */
 #ifdef HAVE_LIBTIFF
 	supported_filetypes |= TYPETIFF;
 	if (has_entry)	strcat(text, ", ");
-	strcat(text, "TIFF images");
+	strcat(text, _("TIFF images"));
 	supported_extensions[count_ext++] = ".tif";
 	supported_extensions[count_ext++] = ".tiff";
 	has_entry = TRUE;
@@ -339,7 +336,7 @@ void initialize_converters() {
 #ifdef HAVE_LIBJPEG
 	supported_filetypes |= TYPEJPG;
 	if (has_entry)	strcat(text, ", ");
-	strcat(text, "JPG images");
+	strcat(text, _("JPG images"));
 	supported_extensions[count_ext++] = ".jpg";
 	supported_extensions[count_ext++] = ".jpeg";
 	has_entry = TRUE;
@@ -347,18 +344,18 @@ void initialize_converters() {
 #ifdef HAVE_LIBPNG
 	supported_filetypes |= TYPEPNG;
 	if (has_entry)	strcat(text, ", ");
-	strcat(text, "PNG images");
+	strcat(text, _("PNG images"));
 	supported_extensions[count_ext++] = ".png";
 	has_entry = TRUE;
 #endif
 	supported_extensions[count_ext++] = NULL;		// NULL-terminated array
 
 	if (!has_entry)
-		sprintf(text, "ERROR: no input file type supported for conversion.");
+		sprintf(text, _("ERROR: no input file type supported for conversion."));
 	else strcat(text, ".");
 	label_supported = GTK_LABEL(gtk_builder_get_object(builder, "label_supported_types"));
 	gtk_label_set_text(label_supported, text);
-	siril_log_message("Supported file types: %s\n", text+1);
+	siril_log_message(_("Supported file types: %s\n"), text+1);
 }
 
 int check_for_raw_extensions(const char *extension) {
@@ -375,30 +372,30 @@ int check_for_raw_extensions(const char *extension) {
  * the current instance of Siril. */
 image_type get_type_for_extension(const char *extension) {
 	//convflags &= (CONV1X3 | CONV3X1 | CONV1X1);	// reset file format
-	if (supported_filetypes & TYPEBMP && !strcasecmp(extension, "bmp")) {
+	if ((supported_filetypes & TYPEBMP) && !strcasecmp(extension, "bmp")) {
 		return TYPEBMP;
-	} else if (supported_filetypes & TYPEJPG &&
+	} else if ((supported_filetypes & TYPEJPG) &&
 			(!strcasecmp(extension, "jpg") || !strcasecmp(extension, "jpeg"))) {
 		return TYPEJPG;
-	} else if (supported_filetypes & TYPETIFF &&
+	} else if ((supported_filetypes & TYPETIFF) &&
 			(!strcasecmp(extension, "tif") || !strcasecmp(extension, "tiff"))) {
 		return TYPETIFF;
-	} else if (supported_filetypes & TYPEPNG && !strcasecmp(extension, "png")) { 
+	} else if ((supported_filetypes & TYPEPNG) && !strcasecmp(extension, "png")) {
 		return TYPEPNG;
-	} else if (supported_filetypes & TYPEPNM &&
+	} else if ((supported_filetypes & TYPEPNM) &&
 			(!strcasecmp(extension, "pnm") || !strcasecmp(extension, "ppm") ||
 			 !strcasecmp(extension, "pgm"))) {
 		return TYPEPNM;
-	} else if (supported_filetypes & TYPEPIC && !strcasecmp(extension, "pic")){
+	} else if ((supported_filetypes & TYPEPIC) && !strcasecmp(extension, "pic")){
 		return TYPEPIC;
-	} else if (supported_filetypes & TYPERAW && !check_for_raw_extensions(extension)) {
+	} else if ((supported_filetypes & TYPERAW) && !check_for_raw_extensions(extension)) {
 		return TYPERAW;
 #if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 		// check_for_film_extensions is undefined without FFMS2
-	} else if (supported_filetypes & TYPEAVI && !check_for_film_extensions(extension)) {
+	} else if ((supported_filetypes & TYPEAVI) && !check_for_film_extensions(extension)) {
 		return TYPEAVI;
 #endif
-	} else if (supported_filetypes & TYPESER && !strcasecmp(extension, "ser")) {
+	} else if ((supported_filetypes & TYPESER) && !strcasecmp(extension, "ser")) {
 		return TYPESER;
 	} else if (!strcasecmp(extension, "fit") || !strcasecmp(extension, "fits") ||
 			!strcasecmp(extension, "fts")) {
@@ -460,7 +457,7 @@ void on_convert_button_clicked(GtkButton *button, gpointer user_data) {
 	struct timeval t_start;
 	
 	if (get_thread_run()) {
-		siril_log_message("Another task is already in progress, ignoring new request.\n");
+		siril_log_message(_("Another task is already in progress, ignoring new request.\n"));
 		return;
 	}
 
@@ -479,7 +476,7 @@ void on_convert_button_clicked(GtkButton *button, gpointer user_data) {
 	
 	indice = gtk_entry_get_text(startEntry);
 
-	siril_log_color_message("Conversion: processing...\n", "red");	
+	siril_log_color_message(_("Conversion: processing...\n"), "red");
 	gettimeofday(&t_start, NULL);
 	
 	set_cursor_waiting(TRUE);
@@ -490,14 +487,14 @@ void on_convert_button_clicked(GtkButton *button, gpointer user_data) {
 	set_cursor_waiting(TRUE);
 	char *tmpmsg;
 	if (!com.wd) {
-		tmpmsg = siril_log_message("Conversion: no working directory set.\n");
-		show_dialog(tmpmsg, "Warning", "gtk-dialog-warning");
+		tmpmsg = siril_log_message(_("Conversion: no working directory set.\n"));
+		show_dialog(tmpmsg, _("Warning"), "gtk-dialog-warning");
 		set_cursor_waiting(FALSE);
 		return;
 	}
 	if((dir = opendir(com.wd)) == NULL){
-		tmpmsg = siril_log_message("Conversion: error opening working directory %s.\n", com.wd);
-		show_dialog(tmpmsg, "Error", "gtk-dialog-error");
+		tmpmsg = siril_log_message(_("Conversion: error opening working directory %s.\n"), com.wd);
+		show_dialog(tmpmsg, _("Error"), "gtk-dialog-error");
 		set_cursor_waiting(FALSE);
 		return ;
 	}
@@ -527,13 +524,13 @@ static gpointer convert_thread_worker(gpointer p) {
 
 	if (convflags & CONVDSTSER) {
 		if (convflags & CONV3X1) {
-			siril_log_color_message("SER output will take precedence over the one-channel per image creation option.\n", "salmon");
+			siril_log_color_message(_("SER output will take precedence over the one-channel per image creation option.\n"), "salmon");
 			convflags &= ~CONV3X1;
 		} else {
 			ser_file = malloc(sizeof(struct ser_struct));
 			if (!(convflags & CONVMULTIPLE)) {
 				if (ser_create_file(destroot, ser_file, TRUE, NULL)) {
-					siril_log_message("Creating the SER file failed, aborting.\n");
+					siril_log_message(_("Creating the SER file failed, aborting.\n"));
 					goto clean_exit;
 				}
 			}
@@ -550,21 +547,21 @@ static gpointer convert_thread_worker(gpointer p) {
 		}
 		char *name = strrchr(src_filename, '/');
 		if (name)
-			snprintf(msg_bar, 256, "Converting %s...", name + 1);
-		else snprintf(msg_bar, 256, "Converting %s...", src_filename);
+			snprintf(msg_bar, 256, _("Converting %s..."), name + 1);
+		else snprintf(msg_bar, 256, _("Converting %s..."), src_filename);
 
 		imagetype = get_type_for_extension(src_ext);
 		if (imagetype == TYPEUNDEF) {
 			char msg[512];
-			siril_log_message("FILETYPE IS NOT SUPPORTED, CANNOT CONVERT: %s\n", src_ext);
-			snprintf(msg, 512, "File extension '%s' is not supported.\n"
+			siril_log_message(_("FILETYPE IS NOT SUPPORTED, CANNOT CONVERT: %s\n"), src_ext);
+			snprintf(msg, 512, _("File extension '%s' is not supported.\n"
 				"Verify that you typed the extension correctly.\n"
 				"If so, you may need to install third-party software to enable "
 				"this file type conversion, look at the README file.\n"
 				"If the file type you are trying to load is listed in supported "
 				"formats, you may notify the developpers that the extension you are "
-				"trying to use should be recognized for this type.", src_ext);
-			show_dialog(msg, "Error", "gtk-dialog-error");
+				"trying to use should be recognized for this type."), src_ext);
+			show_dialog(msg, _("Error"), "gtk-dialog-error");
 			break;	// avoid 100 error popups
 		}
 
@@ -576,20 +573,20 @@ static gpointer convert_thread_worker(gpointer p) {
 			fits *fit = calloc(1, sizeof(fits));
 			struct film_struct film_file;
 			if (film_open_file(src_filename, &film_file) != FILM_SUCCESS) {
-				siril_log_message("Error while opening film %s, aborting.\n", src_filename);
+				siril_log_message(_("Error while opening film %s, aborting.\n"), src_filename);
 				break;
 			}
 			if (convflags & CONVMULTIPLE) {
 				if (ser_create_file(create_sequence_filename(indice++, dest_filename, 128),
 							ser_file, TRUE, NULL)) {
-					siril_log_message("Creating the SER file failed, aborting.\n");
+					siril_log_message(_("Creating the SER file failed, aborting.\n"));
 					goto clean_exit;
 				}
 			}
 			for (frame = 0; frame < film_file.frame_count; frame++) {
 				// read frame from the film
 				if (film_read_frame(&film_file, frame, fit) != FILM_SUCCESS) {
-					siril_log_message("Error while reading frame %d from %s, aborting.\n",
+					siril_log_message(_("Error while reading frame %d from %s, aborting.\n"),
 							frame, src_filename);
 					goto clean_exit;
 				}
@@ -599,13 +596,13 @@ static gpointer convert_thread_worker(gpointer p) {
 					if (convflags & CONV1X1)
 						keep_first_channel_from_fits(fit);
 					if (ser_write_frame_from_fit(ser_file, fit, frame)) {
-						siril_log_message("Error while converting to SER (no space left?)\n");
+						siril_log_message(_("Error while converting to SER (no space left?)\n"));
 						goto clean_exit;
 					}
 				} else {
 					snprintf(dest_filename, 128, "%s%05d", destroot, indice++);
 					if (save_to_target_fits(fit, dest_filename)) {
-						siril_log_message("Error while converting to FITS (no space left?)\n");
+						siril_log_message(_("Error while converting to FITS (no space left?)\n"));
 						goto clean_exit;
 					}
 				}
@@ -618,7 +615,7 @@ static gpointer convert_thread_worker(gpointer p) {
 #endif
 		}
 		else if (imagetype == TYPESER) {
-			siril_log_message("Converting from SER is not yet supported\n");
+			siril_log_message(_("Converting from SER is not yet supported\n"));
 			break;
 		}
 		else {	// single image
@@ -627,13 +624,13 @@ static gpointer convert_thread_worker(gpointer p) {
 				if (convflags & CONV1X1)
 					keep_first_channel_from_fits(fit);
 				if (ser_write_frame_from_fit(ser_file, fit, args->nb_converted)) {
-					siril_log_message("Error while converting to SER (no space left?)\n");
+					siril_log_message(_("Error while converting to SER (no space left?)\n"));
 					break;
 				}
 			} else {
 				snprintf(dest_filename, 128, "%s%05d", destroot, indice++);
 				if (save_to_target_fits(fit, dest_filename)) {
-					siril_log_message("Error while converting to FITS (no space left?)\n");
+					siril_log_message(_("Error while converting to FITS (no space left?)\n"));
 					break;
 				}
 			}
@@ -687,32 +684,32 @@ int save_to_target_fits(fits *fit, const char *dest_filename) {
 	if (convflags & CONV3X1) {	// an RGB image to 3 fits, one for each channel
 		char filename[130];
 		if (fit->naxis != 3) {
-			siril_log_message("saving to 3 FITS files cannot be done because the source image does not have three channels\n");
+			siril_log_message(_("Saving to 3 FITS files cannot be done because the source image does not have three channels\n"));
 			return 1;
 		}
 		sprintf(filename, "r_%s", dest_filename);
 		if (save1fits16(filename, fit, RLAYER)) {
-			siril_log_message("tofits: save1fit8 error, CONV3X1\n");
+			printf("tofits: save1fit8 error, CONV3X1\n");
 			return 1;
 		}
 		sprintf(filename, "g_%s", dest_filename);
 		if (save1fits16(filename, fit, GLAYER)) {
-			siril_log_message("tofits: save1fit8 error, CONV3X1\n");
+			printf("tofits: save1fit8 error, CONV3X1\n");
 			return 1;
 		}
 		sprintf(filename, "b_%s", dest_filename);
 		if (save1fits16(filename, fit, BLAYER)) {
-			siril_log_message("tofits: save1fit8 error, CONV3X1\n");
+			printf("tofits: save1fit8 error, CONV3X1\n");
 			return 1;
 		}
 	} else if (convflags & CONV1X1) { // a single FITS to convert from an RGB grey image
 		if (save1fits16(dest_filename, fit, RLAYER)) {
-			siril_log_message("tofits: save1fit8 error, CONV1X1\n");
+			printf("tofits: save1fit8 error, CONV1X1\n");
 			return 1;
 		}
 	} else {			// normal FITS save, any format
 		if (savefits(dest_filename, fit)) {
-			siril_log_message("tofits: savefit error, CONV1X3\n");
+			printf("tofits: savefit error, CONV1X3\n");
 			return 1;
 		}
 	}
@@ -725,16 +722,16 @@ int debayer_if_needed(image_type imagetype, fits *fit) {
 	 * Siril's FITS are stored bottom to top, debayering will throw 
 	 * wrong results. So before demosacaing we need to transforme the image
 	 * with fits_flip_top_to_bottom() function */
-	if (imagetype == TYPEFITS && convflags & CONVDEBAYER) {
+	if (imagetype == TYPEFITS && (convflags & CONVDEBAYER)) {
 		if (fit->naxes[2] != 1) {
-			siril_log_message("Cannot perform debayering on image with more than one channel\n");
+			siril_log_message(_("Cannot perform debayering on image with more than one channel\n"));
 			return retval;
 		}
 		fits_flip_top_to_bottom(fit);
-		siril_log_message("Filter Pattern: %s\n",
+		siril_log_message(_("Filter Pattern: %s\n"),
 				filter_pattern[com.debayer.bayer_pattern]);
 		if (debayer(fit, com.debayer.bayer_inter)) {
-			siril_log_message("Cannot perform debayering\n");
+			siril_log_message(_("Cannot perform debayering\n"));
 			retval = -1;
 		} else {
 			fits_flip_top_to_bottom(fit);
@@ -802,12 +799,12 @@ int any_to_fits(image_type imagetype, const char *source, fits *dest) {
 #endif
 		case TYPESER:
 		case TYPEAVI:
-			siril_log_message("Requested converting a sequence file to single FITS image, should not happen\n");
+			siril_log_message(_("Requested converting a sequence file to single FITS image, should not happen\n"));
 			retval = 1;
 			break;
 		case TYPEUNDEF:
 		default:	// when the ifdefs are not compiled, default happens!
-			siril_log_message("Error opening %s: file type not supported.\n", source);
+			siril_log_message(_("Error opening %s: file type not supported.\n"), source);
 			retval = 1;
 	}
 

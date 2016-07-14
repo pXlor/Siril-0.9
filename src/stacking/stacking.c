@@ -31,6 +31,7 @@
 
 #include "core/siril.h"
 #include "core/proto.h"
+#include "core/initfile.h"
 #include "gui/callbacks.h"
 #include "io/single_image.h"
 #include "registration/registration.h"
@@ -133,7 +134,7 @@ int compute_normalization(struct stacking_args *args, norm_coeff *coeff, normali
 	if (mode == 0)
 		return 0;
 
-	tmpmsg = siril_log_message("Computing normalization...\n");
+	tmpmsg = siril_log_message(_("Computing normalization...\n"));
 	tmpmsg[strlen(tmpmsg) - 1] = '\0';
 	set_progress_bar_data(tmpmsg, PROGRESS_RESET);
 
@@ -150,7 +151,7 @@ int compute_normalization(struct stacking_args *args, norm_coeff *coeff, normali
 	// compute for the first image to have scale0 mul0 and offset0
 	if (_compute_normalization_for_image(args, 0, coeff->offset, coeff->mul, coeff->scale, mode,
 			&scale0, &mul0, &offset0)) {
-		set_progress_bar_data("Normalization failed.", PROGRESS_NONE);
+		set_progress_bar_data(_("Normalization failed."), PROGRESS_NONE);
 		return 1;
 	}
 
@@ -201,7 +202,7 @@ int stack_summing(struct stacking_args *args) {
 	reglayer = get_registration_layer();
 
 	if (nb_frames <= 1) {
-		siril_log_message("No frame selected for stacking (select at least 2). Aborting.\n");
+		siril_log_message(_("No frame selected for stacking (select at least 2). Aborting.\n"));
 		return -1;
 	}
 
@@ -222,7 +223,7 @@ int stack_summing(struct stacking_args *args) {
 			retval = -1;
 			goto free_and_reset_progress_bar;
 		}
-		tmpmsg = strdup("Processing image ");
+		tmpmsg = strdup(_("Processing image "));
 		tmpmsg = str_append(&tmpmsg, filename);
 		set_progress_bar_data(tmpmsg, (double)cur_nb/((double)nb_frames+1.));
 		free(tmpmsg);
@@ -230,7 +231,7 @@ int stack_summing(struct stacking_args *args) {
 		cur_nb++;	// only used for progress bar
 
 		if (seq_read_frame(args->seq, j, fit)) {
-			siril_log_message("Stacking: could not read frame, aborting\n");
+			siril_log_message(_("Stacking: could not read frame, aborting\n"));
 			retval = -3;
 			goto free_and_reset_progress_bar;
 		}
@@ -251,7 +252,7 @@ int stack_summing(struct stacking_args *args) {
 			nbdata = fit->ry * fit->rx;
 			somme[0] = calloc(nbdata, sizeof(unsigned long)*fit->naxes[2]);
 			if (somme[0] == NULL){
-				siril_log_message("Stacking: memory allocation failure\n");
+				printf("Stacking: memory allocation failure\n");
 				retval = -2;
 				goto free_and_reset_progress_bar;
 			}
@@ -259,10 +260,9 @@ int stack_summing(struct stacking_args *args) {
 				somme[1] = somme[0] + nbdata;	// index of green layer in somme[0]
 				somme[2] = somme[0] + nbdata*2;	// index of blue layer in somme[0]
 			}
-			//~ siril_log_message("Stacking: successfully allocated memory for "
 			//~ "stacking operation\n");
 		} else if (fit->ry * fit->rx != nbdata) {
-			siril_log_message("Stacking: image in sequence doesn't has the same dimensions\n");
+			siril_log_message(_("Stacking: image in sequence doesn't has the same dimensions\n"));
 			retval = -3;
 			goto free_and_reset_progress_bar;
 		}
@@ -308,7 +308,7 @@ int stack_summing(struct stacking_args *args) {
 			}
 		}
 	}
-	set_progress_bar_data("Finalizing stacking...", (double)nb_frames/((double)nb_frames + 1.));
+	set_progress_bar_data(_("Finalizing stacking..."), (double)nb_frames/((double)nb_frames + 1.));
 
 	copyfits(fit, &gfit, CP_ALLOC|CP_FORMAT, 0);
 	gfit.hi = maxim > USHRT_MAX ? USHRT_MAX : maxim;
@@ -335,10 +335,10 @@ int stack_summing(struct stacking_args *args) {
 free_and_reset_progress_bar:
 	if (somme[0]) free(somme[0]);
 	if (retval) {
-		set_progress_bar_data("Stacking failed. Check the log.", PROGRESS_RESET);
-		siril_log_message("Stacking failed.\n");
+		set_progress_bar_data(_("Stacking failed. Check the log."), PROGRESS_RESET);
+		siril_log_message(_("Stacking failed.\n"));
 	} else {
-		set_progress_bar_data("Stacking complete.", PROGRESS_DONE);
+		set_progress_bar_data(_("Stacking complete."), PROGRESS_DONE);
 	}
 	update_used_memory();
 	return retval;
@@ -368,12 +368,12 @@ int stack_median(struct stacking_args *args) {
 	nb_frames = args->nb_images_to_stack;
 
 	if (args->seq->type != SEQ_REGULAR && args->seq->type != SEQ_SER) {
-		char *msg = siril_log_message("Median stacking is only supported for FITS images and SER sequences.\n");
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		char *msg = siril_log_message(_("Median stacking is only supported for FITS images and SER sequences.\n"));
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		return -1;
 	}
 	if (nb_frames < 2) {
-		siril_log_message("Select at least two frames for stacking. Aborting.\n");
+		siril_log_message(_("Select at least two frames for stacking. Aborting.\n"));
 		return -1;
 	}
 
@@ -395,7 +395,7 @@ int stack_median(struct stacking_args *args) {
 			if (!fit_sequence_get_image_filename(args->seq, image_index, filename, TRUE))
 				continue;
 
-			snprintf(msg, 255, "Median stack: opening image %s", filename);
+			snprintf(msg, 255, _("Median stack: opening image %s"), filename);
 			msg[255] = '\0';
 			set_progress_bar_data(msg, PROGRESS_NONE);
 
@@ -416,8 +416,8 @@ int stack_median(struct stacking_args *args) {
 				goto free_and_close;
 			}
 			if (naxis > 3) {
-				siril_log_message("Median stack error: images with > 3 dimensions "
-						"are not supported\n");
+				siril_log_message(_("Median stack error: images with > 3 dimensions "
+						"are not supported\n"));
 				retval = -1;
 				goto free_and_close;
 			}
@@ -427,8 +427,8 @@ int stack_median(struct stacking_args *args) {
 						oldnaxes[0] != naxes[0] ||
 						oldnaxes[1] != naxes[1] ||
 						oldnaxes[2] != naxes[2]) {
-					siril_log_message("Median stack error: input images have "
-							"different sizes\n");
+					siril_log_message(_("Median stack error: input images have "
+							"different sizes\n"));
 					retval = -2;
 					goto free_and_close;
 				}
@@ -458,7 +458,7 @@ int stack_median(struct stacking_args *args) {
 	coeff.mul = malloc(nb_frames * sizeof(double));
 	coeff.scale = malloc(nb_frames * sizeof(double));
 	if (!coeff.offset || !coeff.mul || !coeff.scale) {
-		siril_log_message("allocation issue in stacking normalization\n");
+		printf("allocation issue in stacking normalization\n");
 		retval = -1;
 		goto free_and_close;
 	}
@@ -477,14 +477,14 @@ int stack_median(struct stacking_args *args) {
 		naxis = type_ser == SER_MONO ? 2 : 3;
 		/* case of Super Pixel not handled yet */
 		if (com.debayer.bayer_inter == BAYER_SUPER_PIXEL) {
-			siril_log_message("Super-pixel is not handled yet for on the fly SER stacking\n");
+			siril_log_message(_("Super-pixel is not handled yet for on the fly SER stacking\n")); /* TODO */
 			retval = -1;
 			goto free_and_close;
 		}
 	}
 	if (naxes[0] == 0) {
 		// no image has been loaded
-		siril_log_message("Median stack error: uninitialized sequence\n");
+		siril_log_message(_("Median stack error: uninitialized sequence\n"));
 		retval = -2;
 		goto free_and_close;
 	}
@@ -541,7 +541,7 @@ int stack_median(struct stacking_args *args) {
 		nb_threads = 1;
 		fprintf(stdout, "cfitsio was compiled without multi-thread support,"
 				" stacking will be executed on only one core\n");
-		siril_log_message("Your version of cfitsio does not support multi-threading\n");
+		siril_log_message(_("Your version of cfitsio does not support multi-threading\n"));
 	}
 #else
 	nb_threads = 1;
@@ -549,7 +549,7 @@ int stack_median(struct stacking_args *args) {
 
 	int nb_channels = naxes[2];
 	if (sequence_is_rgb(args->seq) && nb_channels != 3) {
-		siril_log_message("Processing the sequence as RGB\n");
+		siril_log_message(_("Processing the sequence as RGB\n"));
 		nb_channels = 3;
 	}
 
@@ -586,7 +586,7 @@ int stack_median(struct stacking_args *args) {
 		}
 		remainder = naxes[1] - (nb_parallel_stacks / nb_channels * size_of_stacks);
 	}
-	siril_log_message("We have %d parallel blocks of size %d (+%d) for stacking.\n",
+	siril_log_message(_("We have %d parallel blocks of size %d (+%d) for stacking.\n"),
 			nb_parallel_stacks, size_of_stacks, remainder);
 	struct image_block {
 		unsigned long channel, start_row, end_row, height;
@@ -597,8 +597,8 @@ int stack_median(struct stacking_args *args) {
 		long channel = 0, row = 0, end, j = 0;
 		do {
 			if (j >= nb_parallel_stacks) {
-				siril_log_message("A bug has been found. "
-						"Unable to split the image area into the correct processing blocks.\n");
+				siril_log_message(_("A bug has been found. "
+						"Unable to split the image area into the correct processing blocks.\n"));
 				retval = -1;
 				goto free_and_close;
 			}
@@ -643,8 +643,8 @@ int stack_median(struct stacking_args *args) {
 	assert(pool_size > 0);
 #endif
 	npixels_in_block = largest_block_height * naxes[0];
-	fprintf(stdout, "allocating data for %d threads (each %'zu MB)\n", pool_size,
-			nb_frames * npixels_in_block * sizeof(WORD) / 1048576L);
+	fprintf(stdout, "allocating data for %d threads (each %'lu MB)\n", pool_size,
+			(unsigned long) (nb_frames * npixels_in_block * sizeof(WORD)) / 1048576UL);
 	data_pool = malloc(pool_size * sizeof(struct _data_block));
 	for (i = 0; i < pool_size; i++) {
 		int j;
@@ -663,8 +663,8 @@ int stack_median(struct stacking_args *args) {
 	}
 	update_used_memory();
 
-	siril_log_message("Starting stacking...\n");
-	set_progress_bar_data("Median stacking in progress...", PROGRESS_RESET);
+	siril_log_message(_("Starting stacking...\n"));
+	set_progress_bar_data(_("Median stacking in progress..."), PROGRESS_RESET);
 
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) if (args->seq->type == SEQ_SER || fits_is_reentrant())
 	for (i = 0; i < nb_parallel_stacks; i++)
@@ -702,7 +702,7 @@ int stack_median(struct stacking_args *args) {
 				retval = -1;
 
 			if (retval) {
-				siril_log_message("Error reading one of the image areas\n");
+				siril_log_message(_("Error reading one of the image areas\n"));
 				break;
 			}
 		}
@@ -757,7 +757,7 @@ int stack_median(struct stacking_args *args) {
 	if (retval)
 		goto free_and_close;
 
-	set_progress_bar_data("Finalizing stacking...", PROGRESS_NONE);
+	set_progress_bar_data(_("Finalizing stacking..."), PROGRESS_NONE);
 	/* copy result to gfit if success */
 	copyfits(fit, &gfit, CP_FORMAT, 0);
 	if (gfit.data) free(gfit.data);
@@ -788,12 +788,11 @@ free_and_close:
 	if (retval) {
 		/* if retval is set, gfit has not been modified */
 		if (fit->data) free(fit->data);
-		set_progress_bar_data("Median stacking failed. Check the log.", PROGRESS_RESET);
-		siril_log_message("Stacking failed.\n");
+		set_progress_bar_data(_("Median stacking failed. Check the log."), PROGRESS_RESET);
+		siril_log_message(_("Stacking failed.\n"));
 	} else {
-		set_progress_bar_data("Median stacking complete.", PROGRESS_DONE);
-		char *msg = siril_log_message("Median stacking complete. %d have been stacked.\n", nb_frames);
-		show_dialog(msg, "Stacking", "gtk-dialog-info");
+		set_progress_bar_data(_("Median stacking complete."), PROGRESS_DONE);
+		siril_log_message(_("Median stacking complete. %d have been stacked.\n"), nb_frames);
 	}
 	update_used_memory();
 	return retval;
@@ -823,7 +822,7 @@ int stack_addmax(struct stacking_args *args) {
 	reglayer = get_registration_layer();
 
 	if (nb_frames <= 1) {
-		siril_log_message("No frame selected for stacking (select at least 2). Aborting.\n");
+		siril_log_message(_("No frame selected for stacking (select at least 2). Aborting.\n"));
 		return -1;
 	}
 
@@ -844,17 +843,15 @@ int stack_addmax(struct stacking_args *args) {
 			retval = -1;
 			goto free_and_reset_progress_bar;
 		}
-		tmpmsg = strdup("Processing image ");
+		tmpmsg = strdup(_("Processing image "));
 		tmpmsg = str_append(&tmpmsg, filename);
-//		tmpmsg = siril_log_message("Processing image %s\n", filename);
-//		tmpmsg[strlen(tmpmsg)-1] = '\0';
 		set_progress_bar_data(tmpmsg, (double)cur_nb/((double)nb_frames+1.));
 		free(tmpmsg);
 
 		cur_nb++;	// only used for progress bar
 
 		if (seq_read_frame(args->seq, j, fit)) {
-			siril_log_message("Stacking: could not read frame, aborting\n");
+			siril_log_message(_("Stacking: could not read frame, aborting\n"));
 			retval = -3;
 			goto free_and_reset_progress_bar;
 		}
@@ -867,7 +864,7 @@ int stack_addmax(struct stacking_args *args) {
 			nbdata = fit->ry * fit->rx;
 			final_pixel[0] = calloc(nbdata, sizeof(WORD)*fit->naxes[2]);
 			if (final_pixel[0] == NULL){
-				siril_log_message("Stacking: memory allocation failure\n");
+				printf("Stacking: memory allocation failure\n");
 				retval = -2;
 				goto free_and_reset_progress_bar;
 			}
@@ -878,7 +875,7 @@ int stack_addmax(struct stacking_args *args) {
 			//~ siril_log_message("Stacking: successfully allocated memory for "
 					//~ "stacking operation\n");
 		} else if (fit->ry * fit->rx != nbdata) {
-			siril_log_message("Stacking: image in sequence doesn't has the same dimensions\n");
+			siril_log_message(_("Stacking: image in sequence doesn't has the same dimensions\n"));
 			retval = -3;
 			goto free_and_reset_progress_bar;
 		}
@@ -929,7 +926,7 @@ int stack_addmax(struct stacking_args *args) {
 		retval = -1;
 		goto free_and_reset_progress_bar;
 	}
-	set_progress_bar_data("Finalizing stacking...", (double)nb_frames/((double)nb_frames+1.));
+	set_progress_bar_data(_("Finalizing stacking..."), (double)nb_frames/((double)nb_frames+1.));
 
 	copyfits(fit, &gfit, CP_ALLOC|CP_FORMAT, 0);
 	gfit.hi = maxim > USHRT_MAX ? USHRT_MAX : maxim;	// Should not be greater than USHRT_MAX with this method
@@ -950,10 +947,10 @@ int stack_addmax(struct stacking_args *args) {
 free_and_reset_progress_bar:
 	if (final_pixel[0]) free(final_pixel[0]);
 	if (retval) {
-		set_progress_bar_data("Stacking failed. Check the log.", PROGRESS_RESET);
-		siril_log_message("Stacking failed.\n");
+		set_progress_bar_data(_("Stacking failed. Check the log."), PROGRESS_RESET);
+		siril_log_message(_("Stacking failed.\n"));
 	} else {
-		set_progress_bar_data("Stacking complete.", PROGRESS_DONE);
+		set_progress_bar_data(_("Stacking complete."), PROGRESS_DONE);
 	}
 	update_used_memory();
 	return retval;
@@ -982,7 +979,7 @@ int stack_addmin(struct stacking_args *args) {
 	reglayer = get_registration_layer();
 
 	if (nb_frames <= 1) {
-		siril_log_message("No frame selected for stacking (select at least 2). Aborting.\n");
+		siril_log_message(_("No frame selected for stacking (select at least 2). Aborting.\n"));
 		return -1;
 	}
 
@@ -1003,17 +1000,15 @@ int stack_addmin(struct stacking_args *args) {
 			retval = -1;
 			goto free_and_reset_progress_bar;
 		}
-		tmpmsg = strdup("Processing image ");
+		tmpmsg = strdup(_("Processing image "));
 		tmpmsg = str_append(&tmpmsg, filename);
-//		tmpmsg = siril_log_message("Processing image %s\n", filename);
-//		tmpmsg[strlen(tmpmsg)-1] = '\0';
 		set_progress_bar_data(tmpmsg, (double)cur_nb/((double)nb_frames+1.));
 		free(tmpmsg);
 
 		cur_nb++;	// only used for progress bar
 
 		if (seq_read_frame(args->seq, j, fit)) {
-			siril_log_message("Stacking: could not read frame, aborting\n");
+			siril_log_message(_("Stacking: could not read frame, aborting\n"));
 			retval = -3;
 			goto free_and_reset_progress_bar;
 		}
@@ -1027,7 +1022,7 @@ int stack_addmin(struct stacking_args *args) {
 			final_pixel[0] = malloc(nbdata * fit->naxes[2] * sizeof(WORD));
 			memset(final_pixel[0], USHRT_MAX, nbdata * fit->naxes[2] * sizeof(WORD));
 			if (final_pixel[0] == NULL){
-				siril_log_message("Stacking: memory allocation failure\n");
+				printf("Stacking: memory allocation failure\n");
 				retval = -2;
 				goto free_and_reset_progress_bar;
 			}
@@ -1035,10 +1030,8 @@ int stack_addmin(struct stacking_args *args) {
 				final_pixel[1] = final_pixel[0] + nbdata;	// index of green layer in final_pixel[0]
 				final_pixel[2] = final_pixel[0] + nbdata*2;	// index of blue layer in final_pixel[0]
 			}
-			//~ siril_log_message("Stacking: successfully allocated memory for "
-					//~ "stacking operation\n");
 		} else if (fit->ry * fit->rx != nbdata) {
-			siril_log_message("Stacking: image in sequence doesn't has the same dimensions\n");
+			siril_log_message(_("Stacking: image in sequence doesn't has the same dimensions\n"));
 			retval = -3;
 			goto free_and_reset_progress_bar;
 		}
@@ -1089,7 +1082,7 @@ int stack_addmin(struct stacking_args *args) {
 		retval = -1;
 		goto free_and_reset_progress_bar;
 	}
-	set_progress_bar_data("Finalizing stacking...", (double)nb_frames/((double)nb_frames+1.));
+	set_progress_bar_data(_("Finalizing stacking..."), (double)nb_frames/((double)nb_frames+1.));
 
 	copyfits(fit, &gfit, CP_ALLOC|CP_FORMAT, 0);
 	gfit.hi = minim > USHRT_MAX ? USHRT_MAX : minim;
@@ -1110,10 +1103,10 @@ int stack_addmin(struct stacking_args *args) {
 free_and_reset_progress_bar:
 	if (final_pixel[0]) free(final_pixel[0]);
 	if (retval) {
-		set_progress_bar_data("Stacking failed. Check the log.", PROGRESS_RESET);
-		siril_log_message("Stacking failed.\n");
+		set_progress_bar_data(_("Stacking failed. Check the log."), PROGRESS_RESET);
+		siril_log_message(_("Stacking failed.\n"));
 	} else {
-		set_progress_bar_data("Stacking complete.", PROGRESS_DONE);
+		set_progress_bar_data(_("Stacking complete."), PROGRESS_DONE);
 	}
 	update_used_memory();
 	return retval;
@@ -1200,12 +1193,12 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 	reglayer = get_registration_layer();
 
 	if (args->seq->type != SEQ_REGULAR && args->seq->type != SEQ_SER) {
-		char *msg = siril_log_message("Rejection stacking is only supported for FITS images and SER sequences.\nUse \"Sum Stacking\" instead.\n");
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		char *msg = siril_log_message(_("Rejection stacking is only supported for FITS images and SER sequences.\nUse \"Sum Stacking\" instead.\n"));
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		return -1;
 	}
 	if (nb_frames < 2) {
-		siril_log_message("Select at least two frames for stacking. Aborting.\n");
+		siril_log_message(_("Select at least two frames for stacking. Aborting.\n"));
 		return -1;
 	}
 
@@ -1227,7 +1220,7 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 			if (!fit_sequence_get_image_filename(args->seq, image_index, filename, TRUE))
 				continue;
 
-			snprintf(msg, 255, "Rejection stack: opening image %s", filename);
+			snprintf(msg, 255, _("Rejection stack: opening image %s"), filename);
 			msg[255] = '\0';
 			set_progress_bar_data(msg, PROGRESS_NONE);
 
@@ -1248,8 +1241,8 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 				goto free_and_close;
 			}
 			if (naxis > 3) {
-				siril_log_message("Rejection stack error: images with > 3 dimensions "
-						"are not supported\n");
+				siril_log_message(_("Rejection stack error: images with > 3 dimensions "
+						"are not supported\n"));
 				retval = -1;
 				goto free_and_close;
 			}
@@ -1259,8 +1252,8 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 						oldnaxes[0] != naxes[0] ||
 						oldnaxes[1] != naxes[1] ||
 						oldnaxes[2] != naxes[2]) {
-					siril_log_message("Rejection stack error: input images have "
-							"different sizes\n");
+					siril_log_message(_("Rejection stack error: input images have "
+							"different sizes\n"));
 					retval = -2;
 					goto free_and_close;
 				}
@@ -1290,7 +1283,7 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 	coeff.mul = malloc(nb_frames * sizeof(double));
 	coeff.scale = malloc(nb_frames * sizeof(double));
 	if (!coeff.offset || !coeff.mul || !coeff.scale) {
-		siril_log_message("allocation issue in stacking normalization\n");
+		printf("allocation issue in stacking normalization\n");
 		retval = -1;
 		goto free_and_close;
 	}
@@ -1309,14 +1302,14 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 		naxis = type_ser == SER_MONO ? 2 : 3;
 		/* case of Super Pixel not handled yet */
 		if (com.debayer.bayer_inter == BAYER_SUPER_PIXEL) {
-			siril_log_message("Super-pixel is not handled yet for on the fly SER stacking\n");
+			siril_log_message(_("Super-pixel is not handled yet for on the fly SER stacking\n"));
 			retval = -1;
 			goto free_and_close;
 		}
 	}
 	if (naxes[0] == 0) {
 		// no image has been loaded
-		siril_log_message("Rejection stack error: uninitialized sequence\n");
+		siril_log_message(_("Rejection stack error: uninitialized sequence\n"));
 		retval = -2;
 		goto free_and_close;
 	}
@@ -1373,7 +1366,7 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 		nb_threads = 1;
 		fprintf(stdout, "cfitsio was compiled without multi-thread support,"
 				" stacking will be executed on only one core\n");
-		siril_log_message("Your version of cfitsio does not support multi-threading\n");
+		siril_log_message(_("Your version of cfitsio does not support multi-threading\n"));
 	}
 #else
 	nb_threads = 1;
@@ -1381,7 +1374,7 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 
 	int nb_channels = naxes[2];
 	if (sequence_is_rgb(args->seq) && nb_channels != 3) {
-		siril_log_message("Processing the sequence as RGB\n");
+		siril_log_message(_("Processing the sequence as RGB\n"));
 		nb_channels = 3;
 	}
 
@@ -1418,7 +1411,7 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 		}
 		remainder = naxes[1] - (nb_parallel_stacks / nb_channels * size_of_stacks);
 	}
-	siril_log_message("We have %d parallel blocks of size %d (+%d) for stacking.\n",
+	siril_log_message(_("We have %d parallel blocks of size %d (+%d) for stacking.\n"),
 			nb_parallel_stacks, size_of_stacks, remainder);
 	struct image_block {
 		unsigned long channel, start_row, end_row, height;
@@ -1429,8 +1422,8 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 		long channel = 0, row = 0, end, j = 0;
 		do {
 			if (j >= nb_parallel_stacks) {
-				siril_log_message("A bug has been found. "
-						"Unable to split the image area into the correct processing blocks.\n");
+				siril_log_message(_("A bug has been found. "
+						"Unable to split the image area into the correct processing blocks.\n"));
 				retval = -1;
 				goto free_and_close;
 			}
@@ -1475,8 +1468,8 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 	assert(pool_size > 0);
 #endif
 	npixels_in_block = largest_block_height * naxes[0];
-	fprintf(stdout, "allocating data for %d threads (each %'zu MB)\n", pool_size,
-			nb_frames * npixels_in_block * sizeof(WORD) / 1048576L);
+	fprintf(stdout, "allocating data for %d threads (each %'lu MB)\n", pool_size,
+			(unsigned long) (nb_frames * npixels_in_block * sizeof(WORD)) / 1048576UL);
 	data_pool = malloc(pool_size * sizeof(struct _data_block));
 	for (i = 0; i < pool_size; i++) {
 		int j;
@@ -1496,8 +1489,8 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 	}
 	update_used_memory();
 
-	siril_log_message("Starting stacking...\n");
-	set_progress_bar_data("Rejection stacking in progress...", PROGRESS_RESET);
+	siril_log_message(_("Starting stacking...\n"));
+	set_progress_bar_data(_("Rejection stacking in progress..."), PROGRESS_RESET);
 
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) if (args->seq->type == SEQ_SER || fits_is_reentrant())
 	for (i = 0; i < nb_parallel_stacks; i++)
@@ -1571,7 +1564,7 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 					retval = -1;
 
 				if (retval) {
-					siril_log_message("Error reading one of the image areas\n");
+					siril_log_message(_("Error reading one of the image areas\n"));
 					break;
 				}
 			}
@@ -1779,11 +1772,11 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 	if (retval)
 		goto free_and_close;
 
-	set_progress_bar_data("Finalizing stacking...", PROGRESS_NONE);
+	set_progress_bar_data(_("Finalizing stacking..."), PROGRESS_NONE);
 	double nb_tot = (double) naxes[0] * naxes[1] * nb_frames;
 	long channel;
 	for (channel = 0; channel < naxes[2]; channel++) {
-		siril_log_message("Pixel rejection in channel #%d: %.3lf%% - %.3lf%%\n",
+		siril_log_message(_("Pixel rejection in channel #%d: %.3lf%% - %.3lf%%\n"),
 				channel, irej[channel][0] / (nb_tot) * 100.0,
 				irej[channel][1] / (nb_tot) * 100.0);
 	}
@@ -1819,10 +1812,10 @@ free_and_close:
 	if (retval) {
 		/* if retval is set, gfit has not been modified */
 		if (fit->data) free(fit->data);
-		set_progress_bar_data("Rejection stacking failed. Check the log.", PROGRESS_RESET);
-		siril_log_message("Stacking failed.\n");
+		set_progress_bar_data(_("Rejection stacking failed. Check the log."), PROGRESS_RESET);
+		siril_log_message(_("Stacking failed.\n"));
 	} else {
-		set_progress_bar_data("Rejection stacking complete.", PROGRESS_DONE);
+		set_progress_bar_data(_("Rejection stacking complete."), PROGRESS_DONE);
 	}
 	update_used_memory();
 	return retval;
@@ -1858,7 +1851,7 @@ void start_stacking() {
 	}
 
 	if (get_thread_run()) {
-		siril_log_message("Another task is already in progress, ignoring new request.\n");
+		siril_log_message(_("Another task is already in progress, ignoring new request.\n"));
 		return;
 	}
 
@@ -1873,7 +1866,7 @@ void start_stacking() {
 	stackparam.seq = &com.seq;
 	max_memory = (int) (com.stack.memory_percent
 			* (double) get_available_memory_in_MB());
-	siril_log_message("Using %d MB memory maximum for stacking\n", max_memory);
+	siril_log_message(_("Using %d MB memory maximum for stacking\n"), max_memory);
 	uint64_t number_of_rows = (uint64_t)max_memory * 1048576L /
 		((uint64_t)com.seq.rx * stackparam.nb_images_to_stack * sizeof(WORD) * com.max_thread);
 	// this is how many rows we can load in parallel from all images of the
@@ -1885,7 +1878,7 @@ void start_stacking() {
 		stackparam.max_number_of_rows = com.seq.ry / 2;
 	else stackparam.max_number_of_rows = number_of_rows;
 
-	siril_log_color_message("Stacking: processing...\n", "red");
+	siril_log_color_message(_("Stacking: processing...\n"), "red");
 	gettimeofday(&stackparam.t_start, NULL);
 	set_cursor_waiting(TRUE);
 	siril_log_message(stackparam.description);
@@ -1898,28 +1891,28 @@ void start_stacking() {
 }
 
 static void _show_summary(struct stacking_args *args) {
-	char *norm_str, *rej_str;
+	const char *norm_str, *rej_str;
 
-	siril_log_message("Integration of %d images:\n", args->nb_images_to_stack);
+	siril_log_message(_("Integration of %d images:\n"), args->nb_images_to_stack);
 
 	/* Type of algorithm */
 	if (args->method == &stack_mean_with_rejection) {
-		siril_log_message("Pixel combination ......... average\n");
+		siril_log_message(_("Pixel combination ......... average\n"));
 	}
 	else if (args->method == &stack_summing) {
-		siril_log_message("Pixel combination ......... normalized sum\n");
+		siril_log_message(_("Pixel combination ......... normalized sum\n"));
 	}
 	else if (args->method == &stack_median) {
-		siril_log_message("Pixel combination ......... median\n");
+		siril_log_message(_("Pixel combination ......... median\n"));
 	}
 	else if (args->method == &stack_addmin) {
-		siril_log_message("Pixel combination ......... minimum\n");
+		siril_log_message(_("Pixel combination ......... minimum\n"));
 	}
 	else if (args->method == &stack_addmax) {
-		siril_log_message("Pixel combination ......... maximum\n");
+		siril_log_message(_("Pixel combination ......... maximum\n"));
 	}
 	else {
-		siril_log_message("Pixel combination ......... none\n");
+		siril_log_message(_("Pixel combination ......... none\n"));
 	}
 
 	/* Normalisation */
@@ -1929,55 +1922,55 @@ static void _show_summary(struct stacking_args *args) {
 		switch (args->normalize) {
 		default:
 		case NO_NORM:
-			norm_str = "none";
+			norm_str = _("none");
 			break;
 		case ADDITIVE:
-			norm_str = "additive";
+			norm_str = _("additive");
 			break;
 		case MULTIPLICATIVE:
-			norm_str = "multiplicative";
+			norm_str = _("multiplicative");
 			break;
 		case ADDITIVE_SCALING:
-			norm_str = "additive + scaling";
+			norm_str = _("additive + scaling");
 			break;
 		case MULTIPLICATIVE_SCALING:
-			norm_str = "multiplicative + scaling";
+			norm_str = _("multiplicative + scaling");
 			break;
 		}
 	}
 
-	siril_log_message("Normalization ............. %s\n", norm_str);
+	siril_log_message(_("Normalization ............. %s\n"), norm_str);
 
 	/* Type of rejection */
 	if (args->method != &stack_mean_with_rejection) {
-		siril_log_message("Pixel rejection ........... none\n");
-		siril_log_message("Rejection parameters ...... none\n");
+		siril_log_message(_("Pixel rejection ........... none\n"));
+		siril_log_message(_("Rejection parameters ...... none\n"));
 	}
 	else {
 
 		switch (args->type_of_rejection) {
 		default:
 		case NO_REJEC:
-			rej_str = "none";
+			rej_str = _("none");
 			break;
 		case PERCENTILE:
-			rej_str = "percentile clipping";
+			rej_str = _("percentile clipping");
 			break;
 		case SIGMA:
-			rej_str = "sigma clipping";
+			rej_str = _("sigma clipping");
 			break;
 		case SIGMEDIAN:
-			rej_str = "median sigma clipping";
+			rej_str = _("median sigma clipping");
 			break;
 		case WINSORIZED:
-			rej_str = "Winsorized sigma clipping";
+			rej_str = _("Winsorized sigma clipping");
 			break;
 		case LINEARFIT:
-			rej_str = "linear fit clipping";
+			rej_str = _("linear fit clipping");
 			break;
 		}
-		siril_log_message("Pixel rejection ........... %s\n", rej_str);
-		siril_log_message("Rejection parameters ...... low=%.3f high=%.3f\n",
+		siril_log_message(_("Pixel rejection ........... %s\n"), rej_str);
+		siril_log_message(_("Rejection parameters ...... low=%.3f high=%.3f\n"),
 				args->sig[0], args->sig[1]);
 	}
 }
@@ -1985,7 +1978,7 @@ static void _show_summary(struct stacking_args *args) {
 static void _show_bgnoise(gpointer p) {
 	if (get_thread_run()) {
 		siril_log_message(
-				"Another task is already in progress, ignoring new request.\n");
+				_("Another task is already in progress, ignoring new request.\n"));
 		return;
 	}
 
@@ -2036,12 +2029,12 @@ static gboolean end_stacking(gpointer p) {
 						com.uniq->filename = strdup(args->output_filename);
 				}
 				if (failed)
-					com.uniq->filename = strdup("Unsaved stacking result");
+					com.uniq->filename = strdup(_("Unsaved stacking result"));
 			}
 			else {
 				if (!savefits(args->output_filename, &gfit))
 					com.uniq->filename = strdup(args->output_filename);
-				else com.uniq->filename = strdup("Unsaved stacking result");
+				else com.uniq->filename = strdup(_("Unsaved stacking result"));
 			}
 			display_filename();
 		}
@@ -2056,10 +2049,14 @@ static gboolean end_stacking(gpointer p) {
 
 		set_display_mode();
 
+		/* update menus */
+		update_MenuItem();
+
 		redraw(com.cvport, REMAP_ALL);
 		redraw_previews();
 		sequence_list_change_current();
 	}
+
 	set_cursor_waiting(FALSE);
 	gettimeofday (&t_end, NULL);
 	show_time(args->t_start, t_end);
@@ -2219,7 +2216,7 @@ double compute_highest_accepted_fwhm(double percent) {
 	// copy values
 	for (i=0; i<com.seq.number; i++) {
 		if (com.seq.regparam[layer][i].fwhm <= 0.0f) {
-			siril_log_message("Error in highest FWHM accepted for sequence processing: some images don't have this kind of information available\n");
+			siril_log_message(_("Error in highest FWHM accepted for sequence processing: some images don't have this kind of information available\n"));
 			free(val);
 			return 0.0;
 		}
@@ -2254,7 +2251,7 @@ double compute_highest_accepted_quality(double percent) {
 	// copy values
 	for (i=0; i<com.seq.number; i++) {
 		if (com.seq.imgparam[i].incl && com.seq.regparam[layer][i].quality < 0.0) {
-			siril_log_message("Error in highest quality accepted for sequence processing: some images don't have this kind of information available for channel #%d.\n", layer);
+			siril_log_message(_("Error in highest quality accepted for sequence processing: some images don't have this kind of information available for channel #%d.\n"), layer);
 			free(val);
 			return 0.0;
 		}
@@ -2312,14 +2309,14 @@ void update_stack_interface() {	// was adjuststackspin
 		case 0:
 			stackparam.filtering_criterion = stack_filter_all;
 			stackparam.nb_images_to_stack = com.seq.number;
-			sprintf(stackparam.description, "Stacking all images in the sequence (%d)\n", com.seq.number);
+			sprintf(stackparam.description, _("Stacking all images in the sequence (%d)\n"), com.seq.number);
 			gtk_widget_set_sensitive(stack[0], FALSE);
 			gtk_widget_set_sensitive(stack[1], FALSE);
 			break;
 		case 1:
 			stackparam.filtering_criterion = stack_filter_included;
 			stackparam.nb_images_to_stack = com.seq.selnum;
-			sprintf(stackparam.description, "Stacking only selected images in the sequence (%d)\n", com.seq.selnum);
+			sprintf(stackparam.description, _("Stacking only selected images in the sequence (%d)\n"), com.seq.selnum);
 			gtk_widget_set_sensitive(stack[0], FALSE);
 			gtk_widget_set_sensitive(stack[1], FALSE);
 			break;
@@ -2330,15 +2327,15 @@ void update_stack_interface() {	// was adjuststackspin
 			stackparam.filtering_criterion = stack_filter_fwhm;
 			stackparam.filtering_parameter = compute_highest_accepted_fwhm(percent);
 			stackparam.nb_images_to_stack = compute_nb_filtered_images();
-			sprintf(stackparam.description, "Stacking images of the sequence with a FWHM lower or equal than %g (%d)\n",
+			sprintf(stackparam.description, _("Stacking images of the sequence with a FWHM lower or equal than %g (%d)\n"),
 					stackparam.filtering_parameter,
 					stackparam.nb_images_to_stack);
 			gtk_widget_set_sensitive(stack[0], TRUE);
 			gtk_widget_set_sensitive(stack[1], TRUE);
 			if (stackparam.filtering_parameter > 0.0)
-				sprintf(labelbuffer, "Based on FWHM < %.2f (%d images)", stackparam.filtering_parameter, stackparam.nb_images_to_stack);
+				sprintf(labelbuffer, _("Based on FWHM < %.2f (%d images)"), stackparam.filtering_parameter, stackparam.nb_images_to_stack);
 			else
-				sprintf(labelbuffer, "Based on FWHM");
+				sprintf(labelbuffer, _("Based on FWHM"));
 			gtk_label_set_text(GTK_LABEL(stack[1]), labelbuffer);
 			break;
 
@@ -2347,15 +2344,15 @@ void update_stack_interface() {	// was adjuststackspin
 			stackparam.filtering_criterion = stack_filter_quality;
 			stackparam.filtering_parameter = compute_highest_accepted_quality(percent);
 			stackparam.nb_images_to_stack = compute_nb_filtered_images();
-			sprintf(stackparam.description, "Stacking images of the sequence with a quality higher or equal than %g (%d)\n",
+			sprintf(stackparam.description, _("Stacking images of the sequence with a quality higher or equal than %g (%d)\n"),
 					stackparam.filtering_parameter,
 					stackparam.nb_images_to_stack);
 			gtk_widget_set_sensitive(stack[0], TRUE);
 			gtk_widget_set_sensitive(stack[1], TRUE);
 			if (stackparam.filtering_parameter > 0.0)
-				sprintf(labelbuffer, "Based on quality > %.2f (%d images)", stackparam.filtering_parameter, stackparam.nb_images_to_stack);
+				sprintf(labelbuffer, _("Based on quality > %.2f (%d images)"), stackparam.filtering_parameter, stackparam.nb_images_to_stack);
 			else
-				sprintf(labelbuffer, "Based on quality");
+				sprintf(labelbuffer, _("Based on quality"));
 			gtk_label_set_text(GTK_LABEL(stack[1]), labelbuffer);
 			break;
 

@@ -603,14 +603,14 @@ void psf_display_result(fitted_PSF *result, rectangle *area) {
 	else
 		str = "relative";
 
-	g_snprintf(buffer, sizeof(buffer), "PSF fit Result:\n"
+	g_snprintf(buffer, sizeof(buffer), _("PSF fit Result:\n"
 			"x0=%0.2f px, y0=%0.2f px\n"
 			"FWHM X=%0.2f%s, FWHM Y=%0.2f%s\n"
 			"Angle=%0.2f deg\n"
 			"Background value=%0.6f\n"
 			"Maximal intensity=%0.6f\n"
 			"Magnitude (%s)=%0.2f\n"
-			"RMSE=%.3e\n", result->x0 + area->x, area->y + area->h - result->y0,
+			"RMSE=%.3e\n"), result->x0 + area->x, area->y + area->h - result->y0,
 			result->fwhmx, result->units, result->fwhmy, result->units,
 			result->angle, result->B, result->A, str, result->mag + com.magOffset, result->rmse);
 

@@ -327,7 +327,7 @@ static int extractBackgroundAuto(fits *imgfit, fits *bkgfit, newBackground *bkg)
 			*tbuf++ = (WORD) gsl_matrix_get(bkgMatrix, i, j);
 	}
 
-	siril_log_message("Channel #%d: background extraction done.\n", bkg->layer);
+	siril_log_message(_("Channel #%d: background extraction done.\n"), bkg->layer);
 	gsl_matrix_free(bkgMatrix);
 	return 0;
 }
@@ -370,7 +370,7 @@ static int extractBackgroundManual(fits *imgfit, fits *bkgfit, newBackground *bk
 			*tbuf++ = (WORD) gsl_matrix_get(bkgMatrix, i, j);
 	}
 
-	siril_log_message("Channel #%d: background extraction done.\n", bkg->layer);
+	siril_log_message(_("Channel #%d: background extraction done.\n"), bkg->layer);
 	gsl_matrix_free(bkgMatrix);
 	return 0;
 }
@@ -398,7 +398,7 @@ void bkgExtractBackground(fits *fit, gboolean automatic) {
 	spinBkgDeviation = GTK_SPIN_BUTTON(lookup_widget("spinbutton_bkg_deviation"));
 	spinBkgUnbalance = GTK_SPIN_BUTTON(lookup_widget("spinbutton_bkg_unbalance"));
 
-	siril_log_color_message("Background extraction: processing...\n", "red");
+	siril_log_color_message(_("Background extraction: processing...\n"), "red");
 	gettimeofday(&t_start, NULL);
 
 	bkg.order = gtk_combo_box_get_active(comboBkgPolyOrder);
@@ -419,13 +419,13 @@ void bkgExtractBackground(fits *fit, gboolean automatic) {
 			bkg.boxPerCol = (size_t) ((double) bkg.row / ((double) bkg.box + interval - 1));
 
 			if (extractBackgroundAuto(&gfit, fit, &bkg)) {
-				siril_log_message("Insufficient background samples.\n");
+				siril_log_message(_("Insufficient background samples.\n"));
 				return;
 			}
 		}
 		else {
 			if (extractBackgroundManual(&gfit, fit, &bkg)) {
-				siril_log_message("Insufficient background samples.\n");
+				siril_log_message(_("Insufficient background samples.\n"));
 				return;
 			}
 		}

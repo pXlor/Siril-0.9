@@ -43,8 +43,8 @@ int readbmp(const char *name, fits *fit) {
 	char *msg;
 
 	if ((fd = open(name, O_RDONLY)) == -1) {
-		msg = siril_log_message("Error opening BMP.\n");
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		msg = siril_log_message(_("Error opening BMP.\n"));
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		return -1;
 	}
 
@@ -98,11 +98,11 @@ int readbmp(const char *name, fits *fit) {
 	default:
 		msg =
 				siril_log_message(
-						"Sorry but Siril cannot open this kind of BMP. Try to convert it before.\n");
-		show_dialog(msg, "Error", "gtk-dialog-error");
+						_("Sorry but Siril cannot open this kind of BMP. Try to convert it before.\n"));
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 	}
 	free(buf);
-	siril_log_message("Reading BMP: file %s, %ld layer(s), %ux%u pixels\n",
+	siril_log_message(_("Reading BMP: file %s, %ld layer(s), %ux%u pixels\n"),
 			name, fit->naxes[2], fit->rx, fit->ry);
 	return nbplane;
 }
@@ -161,8 +161,8 @@ int savebmp(const char *name, fits *fit) {
 
 	f = fopen(name, "wb");
 	if (f == NULL) {
-		char *msg = siril_log_message("Can't create BMP file.\n");
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		char *msg = siril_log_message(_("Can't create BMP file.\n"));
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		return 1;
 	}
 
@@ -198,7 +198,7 @@ int savebmp(const char *name, fits *fit) {
 		}
 	}
 	fclose(f);
-	siril_log_message("Saving BMP: file %s, %ld layer(s), %ux%u pixels\n", name,
+	siril_log_message(_("Saving BMP: file %s, %ld layer(s), %ux%u pixels\n"), name,
 			fit->naxes[2], fit->rx, fit->ry);
 	return 0;
 }
@@ -212,7 +212,7 @@ int bmp32tofits48(unsigned char *rvb, int rx, int ry, fits *fit,
 
 	olddata = fit->data;
 	if ((fit->data = realloc(fit->data, 3 * datasize * sizeof(WORD))) == NULL) {
-		siril_log_message("readbmp: could not alloc fit data\n");
+		printf("readbmp: could not alloc fit data\n");
 		if (olddata)
 			free(fit->data);
 		return 1;
@@ -252,7 +252,7 @@ int bmp24tofits48(unsigned char *rvb, int rx, int ry, fits *fit) {
 
 	olddata = fit->data;
 	if ((fit->data = realloc(fit->data, 3 * newdatasize * sizeof(WORD))) == NULL) {
-		siril_log_message("readbmp: could not alloc fit data\n");
+		printf("readbmp: could not alloc fit data\n");
 		if (olddata)
 			free(fit->data);
 		return 1;
@@ -289,7 +289,7 @@ int bmp8tofits(unsigned char *rgb, int rx, int ry, fits *fit) {
 
 	olddata = fit->data;
 	if ((fit->data = realloc(fit->data, nbdata * sizeof(WORD))) == NULL) {
-		siril_log_message("readbmp: could not alloc fit data\n");
+		printf("readbmp: could not alloc fit data\n");
 		if (olddata)
 			free(fit->data);
 		return 1;
@@ -329,8 +329,8 @@ int import_pnm_to_fits(const char *filename, fits *fit) {
 
 	if ((fd = fopen(filename, "r")) == NULL) {
 		perror("fopen pnm");
-		msg = siril_log_message("Sorry but Siril cannot open this file.\n");
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		msg = siril_log_message(_("Sorry but Siril cannot open this file.\n"));
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		return -1;
 	}
 	if (fgets(buf, 256, fd) == NULL) {
@@ -340,9 +340,9 @@ int import_pnm_to_fits(const char *filename, fits *fit) {
 	}
 	if (buf[0] != 'P' || buf[1] < '5' || buf[1] > '6' || buf[2] != '\n') {
 		msg = siril_log_message(
-				"Wrong magic cookie in PNM file, ASCII types and"
-						" b&w bitmaps are not supported.\n");
-		show_dialog(msg, "Error", "gtk-dialog-error");
+				_("Wrong magic cookie in PNM file, ASCII types and"
+						" b&w bitmaps are not supported.\n"));
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		fclose(fd);
 		return -1;
 	}
@@ -424,8 +424,8 @@ int import_pnm_to_fits(const char *filename, fits *fit) {
 			return -1;
 		}
 		if (fread(tmpbuf, stride, fit->ry, fd) < fit->ry) {
-			msg = siril_log_message("Error reading 8-bit PPM image data.\n");
-			show_dialog(msg, "Error", "gtk-dialog-error");
+			msg = siril_log_message(_("Error reading 8-bit PPM image data.\n"));
+			show_dialog(msg, _("Error"), "gtk-dialog-error");
 			fclose(fd);
 			free(tmpbuf);
 			free(fit->data);
@@ -456,8 +456,8 @@ int import_pnm_to_fits(const char *filename, fits *fit) {
 			}
 			if (fread(fit->data, stride, fit->ry, fd) < fit->ry) {
 				msg = siril_log_message(
-						"Error reading 16-bit gray PPM image data.\n");
-				show_dialog(msg, "Error", "gtk-dialog-error");
+						_("Error reading 16-bit gray PPM image data.\n"));
+				show_dialog(msg, _("Error"), "gtk-dialog-error");
 				fclose(fd);
 				free(fit->data);
 				fit->data = NULL;
@@ -489,8 +489,8 @@ int import_pnm_to_fits(const char *filename, fits *fit) {
 			}
 			if (fread(tmpbuf, stride, fit->ry, fd) < fit->ry) {
 				msg = siril_log_message(
-						"Error reading 16-bit color PPM image data.\n");
-				show_dialog(msg, "Error", "gtk-dialog-error");
+						_("Error reading 16-bit color PPM image data.\n"));
+				show_dialog(msg, _("Error"), "gtk-dialog-error");
 				fclose(fd);
 				free(tmpbuf);
 				free(fit->data);
@@ -504,14 +504,14 @@ int import_pnm_to_fits(const char *filename, fits *fit) {
 		fit->binning_x = fit->binning_y = 1;
 		fits_flip_top_to_bottom(fit);
 	} else {
-		msg = siril_log_message("Not handled max value for PNM: %d\n.",
+		msg = siril_log_message(_("Not handled max value for PNM: %d.\n"),
 				max_val);
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		fclose(fd);
 		return -1;
 	}
 	fclose(fd);
-	siril_log_message("Reading NetPBM: file %s, %ld layer(s), %ux%u pixels\n",
+	siril_log_message(_("Reading NetPBM: file %s, %ld layer(s), %ux%u pixels\n"),
 			filename, fit->naxes[2], fit->rx, fit->ry);
 	return fit->naxes[2];
 }
@@ -545,7 +545,7 @@ int saveppm(const char *name, fits *fit) {
 	}
 	fclose(fp);
 	fits_flip_top_to_bottom(fit);
-	siril_log_message("Saving NetPBM: file %s, %ld layer(s), %ux%u pixels\n",
+	siril_log_message(_("Saving NetPBM: file %s, %ld layer(s), %ux%u pixels\n"),
 			name, fit->naxes[2], fit->rx, fit->ry);
 	return 0;
 }
@@ -571,7 +571,7 @@ int savepgm(const char *name, fits *fit) {
 	fprintf(fp, "P5\n%s\n%u %u\n%u\n", comment, fit->rx, fit->ry, USHRT_MAX);
 	fwrite(data, sizeof(data), 1, fp);
 	fclose(fp);
-	siril_log_message("Saving NetPBM: file %s, %ld layer(s), %ux%u pixels\n",
+	siril_log_message(_("Saving NetPBM: file %s, %ld layer(s), %ux%u pixels\n"),
 			name, fit->naxes[2], fit->rx, fit->ry);
 	return 0;
 }
@@ -589,7 +589,7 @@ int pictofit(WORD *buf, fits *fit) {
 		return -1;
 	}
 	data = fit->pdata[BW_LAYER] = fit->data;
-#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(dynamic,1)
+#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
 	for (i = 0; i < nbdata; i++)
 		data[i] = buf[i];
 	fit->bitpix = SHORT_IMG;
@@ -614,15 +614,15 @@ int pictofitrgb(WORD *buf, fits *fit) {
 	data[RLAYER] = fit->pdata[RLAYER] = fit->data;
 	data[GLAYER] = fit->pdata[GLAYER] = fit->data + nbdata;
 	data[BLAYER] = fit->pdata[BLAYER] = fit->data + 2 * nbdata;
-#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(dynamic,1)
+#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
 	for (i = 0; i < nbdata; i++)
 		data[RLAYER][i] = buf[i + (nbdata * RLAYER)];
 
-#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(dynamic,1)
+#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
 	for (i = 0; i < nbdata; i++)
 		data[GLAYER][i] = buf[i + (nbdata * GLAYER)];
 
-#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(dynamic,1)
+#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
 	for (i = 0; i < nbdata; i++)
 		data[BLAYER][i] = buf[i + (nbdata * BLAYER)];
 
@@ -649,8 +649,8 @@ static int _pic_read_header(struct pic_struct *pic_file) {
 	if (!((pic_file->magic[0] == 0x31fc) && (pic_file->magic[1] == 0x0122))) {
 		char *msg =
 				siril_log_message(
-						"Wrong magic cookie in PIC file. This image is not supported.\n");
-		show_dialog(msg, "Error", "gtk-dialog-error");
+						_("Wrong magic cookie in PIC file. This image is not supported.\n"));
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		return -1;
 	}
 
@@ -702,20 +702,20 @@ int readpic(const char *name, fits *fit) {
 
 	if ((pic_file->fd = open(name, O_RDONLY)) == -1) {
 		msg = siril_log_message(
-				"Sorry but Siril cannot open the PIC file: %s.\n", name);
-		show_dialog(msg, "Error", "gtk-dialog-error");
+				_("Sorry but Siril cannot open the PIC file: %s.\n"), name);
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		free(pic_file);
 		return -1;
 	}
 
 	_pic_read_header(pic_file);
 
-	fit->rx = (int) pic_file->width;
-	fit->ry = (int) pic_file->height;
-	fit->binning_x = (int) pic_file->bin[4];
-	fit->binning_y = (int) pic_file->bin[5];
-	fit->hi = (int) pic_file->hi;
-	fit->lo = (int) pic_file->lo;
+	fit->rx = (unsigned int) pic_file->width;
+	fit->ry = (unsigned int) pic_file->height;
+	fit->binning_x = (unsigned int) pic_file->bin[4];
+	fit->binning_y = (unsigned int) pic_file->bin[5];
+	fit->hi = pic_file->hi;
+	fit->lo = pic_file->lo;
 
 	nbdata = fit->rx * fit->ry;
 	assert(nbdata > 0);
@@ -724,7 +724,7 @@ int readpic(const char *name, fits *fit) {
 
 	if ((read(pic_file->fd, buf, nbdata * pic_file->nbplane * sizeof(WORD)))
 			!= nbdata * pic_file->nbplane * sizeof(WORD)) {
-		siril_log_message("Cannot Read the data\n");
+		siril_log_message(_("Cannot Read the data\n"));
 		free(buf);
 		_pic_close_file(pic_file);
 		return -1;
@@ -740,20 +740,20 @@ int readpic(const char *name, fits *fit) {
 		break;
 	default:
 		retval = -1;
-		msg = siril_log_message("Sorry but Siril cannot open this file.\n");
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		msg = siril_log_message(_("Sorry but Siril cannot open this file.\n"));
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 	}
 
-	siril_log_message("Reading PIC: file %s, %ld layer(s), %ux%u pixels\n",
+	siril_log_message(_("Reading PIC: file %s, %ld layer(s), %ux%u pixels\n"),
 			name, fit->naxes[2], fit->rx, fit->ry);
 	siril_log_message("(%d,%d)-(%d,%d) - Binning %dx%d\n", pic_file->bin[0],
 			pic_file->bin[1], pic_file->bin[2], pic_file->bin[3],
 			fit->binning_x, fit->binning_y);
 
 	if (pic_file->date[0] != 0)
-		siril_log_message("Date (of observation): %s\n", pic_file->date);
+		siril_log_message(_("Date (of observation): %s\n"), pic_file->date);
 	if (pic_file->time[0] != 0)
-		siril_log_message("Time (of observation): %s\n", pic_file->time);
+		siril_log_message(_("Time (of observation): %s\n"), pic_file->time);
 
 	_pic_close_file(pic_file);
 	free(buf);

@@ -22,6 +22,7 @@ New Siril uses:
 	* The GNU Scientific Library (gsl) for FWHM implementation, histograms
 	  and background extraction
 	* libconfig++ (>= 1.4) for structured configuration file management
+	* g++ for opencv code and avi exporter
 
 Siril works internally with FITS files, but other file formats can be used as
 input and converted using the conversion tab of the control window. Some file
@@ -34,7 +35,7 @@ compilation time, or their support won't be compiled.
 	* libtiff (>= 4)
 	* libjpeg or compatible libraries like libjpeg-turbo
 	* libpng
-	* opencv and g++ for image rotation support and binned image resizing
+	* opencv
 	* giflib (>= 5) for GIF images export
 
 All these libraries are available in most Linux distributions and free systems,
@@ -43,14 +44,13 @@ to be compiled on some systems.
 
 
 The install is similar to the usual GNU/Linux package build, except that the
-configure script is not directly shipped and has to be created with the
+configure script is not directly shipped and has to be created and run with the
 following command:
 
-	$ autoreconf -fi
+	$ autogen.sh
 
 After that, it's just:
 
-	$ ./configure
 	$ make
 	$ make install (with the required privileges)
 

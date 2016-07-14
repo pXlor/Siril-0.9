@@ -53,7 +53,7 @@ gboolean redraw_preview(GtkWidget *widget, cairo_t *cr, gpointer data) {
 
 	/* display current image with shifts */
 	if (!com.preview_surface[current_preview]) {
-		gchar text[10];
+		gchar text[32];
 		cairo_set_source_rgba(cr, 0.5, 0.5, 0.5, 0.5);
 		cairo_rectangle(cr, 0, 0, area_width, area_height);
 		cairo_fill(cr);
@@ -62,7 +62,7 @@ gboolean redraw_preview(GtkWidget *widget, cairo_t *cr, gpointer data) {
 		cairo_set_font_size(cr, 15);
 		cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
 		cairo_move_to(cr, area_width / 2.0 - 30, area_height / 2.0);
-		g_snprintf(text, sizeof(text), "Preview %d", current_preview + 1);
+		g_snprintf(text, sizeof(text), _("Preview %d"), current_preview + 1);
 		cairo_show_text(cr, text);
 		return TRUE;
 	}
@@ -215,14 +215,14 @@ void on_spinbut_shift_value_change(GtkSpinButton *spinbutton, gpointer user_data
 	/* current layer: com.cvport or selected reg layer? */
 	current_layer = gtk_combo_box_get_active(cbbt_layers);
 	if (current_layer != com.cvport) {
-		siril_log_message("Switching to the registration layer\n");
+		siril_log_message(_("Switching to the registration layer\n"));
 		activate_tab(current_layer);
 	}
 	if (com.seq.regparam[current_layer] == NULL) {
-		siril_log_message("Allocating registration data for this layer\n");
+		printf("Allocating registration data for this layer\n");
 		com.seq.regparam[current_layer] = calloc(com.seq.number, sizeof(regdata));
 		if (com.seq.regparam[current_layer] == NULL) {
-			siril_log_message("FAILED: could not allocate registration data\n");
+			printf("FAILED: could not allocate registration data\n");
 			return;
 		}
 	}

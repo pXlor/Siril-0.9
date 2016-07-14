@@ -147,7 +147,7 @@ int imoper(fits *a, fits *b, char oper) {
 
 	if (a->rx != b->rx || a->ry != b->ry) {
 		siril_log_message(
-				"imoper: images don't have the same size (w = %u|%u, h = %u|%u)\n",
+				_("imoper: images don't have the same size (w = %u|%u, h = %u|%u)\n"),
 				a->rx, b->rx, a->ry, b->ry);
 		return 1;
 	}
@@ -192,7 +192,7 @@ int sub_background(fits* image, fits* background, int layer) {
 
 	if ((image->rx) != (background->rx) || ((image->ry) != (background->ry))) {
 		char *msg = siril_log_message(
-				"Images don't have the same size (w = %d|%d, h = %d|%d)\n",
+				_("Images don't have the same size (w = %d|%d, h = %d|%d)\n"),
 				image->rx, background->rx, image->ry, background->ry);
 		show_dialog(msg, "Error", "gtk-dialog-error");
 		return 1;
@@ -228,7 +228,7 @@ int addmax(fits *a, fits *b) {
 
 	if (a->rx != b->rx || a->ry != b->ry || a->naxes[2] != b->naxes[2]) {
 		siril_log_message(
-				"addmax: images don't have the same size (w = %d|%d, h = %d|%d, layers = %d|%d)\n",
+				_("addmax: images don't have the same size (w = %d|%d, h = %d|%d, layers = %d|%d)\n"),
 				a->rx, b->rx, a->ry, b->ry, a->naxes[2], b->naxes[2]);
 		return 1;
 	}
@@ -240,7 +240,6 @@ int addmax(fits *a, fits *b) {
 				gbuf[layer][i] = buf[layer][i];
 		}
 	}
-	//~ siril_log_message("addmax was applied\n");
 	return 0;
 }
 
@@ -315,7 +314,7 @@ int unsharp(fits *fit, double sigma, double amount, gboolean verbose) {
 	if (sigma <= 0.0)
 		return 1;
 	if (verbose) {
-		siril_log_color_message("Unsharp: processing...\n", "red");
+		siril_log_color_message(_("Unsharp: processing...\n"), "red");
 		gettimeofday(&t_start, NULL);
 	}
 	cvUnsharpFilter(fit, sigma, amount);
@@ -430,7 +429,7 @@ int crop(fits *fit, rectangle *bounds) {
 	int newnbdata;
 	struct timeval t_start, t_end;
 
-	siril_log_color_message("Crop: processing...\n", "red");
+	siril_log_color_message(_("Crop: processing...\n"), "red");
 	gettimeofday(&t_start, NULL);
 
 	newnbdata = bounds->w * bounds->h;
@@ -706,7 +705,7 @@ void mirrorx(fits *fit, gboolean verbose) {
 	struct timeval t_start, t_end;
 
 	if (verbose) {
-		siril_log_color_message("Horizontal mirror: processing...\n", "red");
+		siril_log_color_message(_("Horizontal mirror: processing...\n"), "red");
 		gettimeofday(&t_start, NULL);
 	}
 
@@ -734,7 +733,7 @@ void mirrory(fits *fit, gboolean verbose) {
 	struct timeval t_start, t_end;
 
 	if (verbose) {
-		siril_log_color_message("Vertical mirror: processing...\n", "red");
+		siril_log_color_message(_("Vertical mirror: processing...\n"), "red");
 		gettimeofday(&t_start, NULL);
 	}
 
@@ -951,7 +950,7 @@ static int darkOptimization(fits *brut, fits *dark, fits *offset) {
 	/* Minimization of background noise to find better k */
 	k = goldenSectionSearch(brut, dark_tmp, lo, up, 1E-3);
 
-	siril_log_message("Dark optimization: %.3lf\n", k);
+	siril_log_message(_("Dark optimization: %.3lf\n"), k);
 	/* Multiply coefficient to master-dark */
 	if (com.preprostatus & USE_OFFSET)
 		imoper(dark_tmp, offset, OPER_SUB);
@@ -987,14 +986,14 @@ gpointer seqpreprocess(gpointer p) {
 			 * Indeed, if it is image from APN, CFA picture are in black & white */
 			imstats *stat = statistics(flat, RLAYER, NULL, STATS_BASIC);
 			args->normalisation = stat->mean;
-			siril_log_message("Normalisation value auto evaluated: %.2lf\n",
+			siril_log_message(_("Normalisation value auto evaluated: %.2lf\n"),
 					args->normalisation);
 			free(stat);
 		}
 	}
 
 	if (single_image_is_loaded()) {
-		snprintf(msg, 255, "Pre-processing image %s", com.uniq->filename);
+		snprintf(msg, 255, _("Pre-processing image %s"), com.uniq->filename);
 		msg[255] = '\0';
 		set_progress_bar_data(msg, 0.5);
 
@@ -1008,21 +1007,21 @@ gpointer seqpreprocess(gpointer p) {
 			/* Cosmetic correction */
 			long icold, ihot;
 			deviant_pixel *dev = find_deviant_pixels(dark, args->sigma, &icold, &ihot);
-			siril_log_message("%ld pixels corrected (%ld + %ld)\n",
+			siril_log_message(_("%ld pixels corrected (%ld + %ld)\n"),
 					icold + ihot, icold, ihot);
 			cosmeticCorrection(com.uniq->fit, dev, icold + ihot, args->is_cfa);
 			if (dev)
 				free(dev);
 			}
 			else
-				siril_log_message("Darkmap cosmetic correction"
-						"is only supported with single channel images\n");
+				siril_log_message(_("Darkmap cosmetic correction"
+						"is only supported with single channel images\n"));
 		}
 
 		snprintf(dest_filename, 255, "%s%s", com.uniq->ppprefix,
 		basename(com.uniq->filename));
 		dest_filename[255] = '\0';
-		snprintf(msg, 255, "Saving image %s", com.uniq->filename);
+		snprintf(msg, 255, _("Saving image %s"), com.uniq->filename);
 		msg[255] = '\0';
 		set_progress_bar_data(msg, PROGRESS_NONE);
 		savefits(dest_filename, com.uniq->fit);
@@ -1044,11 +1043,11 @@ gpointer seqpreprocess(gpointer p) {
 		if ((com.preprostatus & USE_COSME) && (com.preprostatus & USE_DARK)) {
 			if (dark->naxes[2] == 1) {
 				dev = find_deviant_pixels(dark, args->sigma, &icold, &ihot);
-				siril_log_message("%ld pixels corrected (%ld + %ld)\n",
+				siril_log_message(_("%ld pixels corrected (%ld + %ld)\n"),
 						icold + ihot, icold, ihot);
 			} else
-				siril_log_message("Darkmap cosmetic correction"
-						"is only supported with single channel images\n");
+				siril_log_message(_("Darkmap cosmetic correction"
+						"is only supported with single channel images\n"));
 		}
 
 		fits *fit = calloc(1, sizeof(fits));
@@ -1057,14 +1056,14 @@ gpointer seqpreprocess(gpointer p) {
 			if (!get_thread_run())
 				break;
 			seq_get_image_filename(&com.seq, i, source_filename);
-			snprintf(msg, 255, "Loading and pre-processing image %d/%d (%s)",
+			snprintf(msg, 255, _("Loading and pre-processing image %d/%d (%s)"),
 					i + 1, com.seq.number, source_filename);
 			msg[255] = '\0';
 			set_progress_bar_data(msg,
 					(double) (i + 1) / (double) com.seq.number);
 			if (seq_read_frame(&com.seq, i, fit)) {
-				snprintf(msg, 255, "Could not read one of the raw files: %s."
-						" Aborting preprocessing.", source_filename);
+				snprintf(msg, 255, _("Could not read one of the raw files: %s."
+						" Aborting preprocessing."), source_filename);
 				msg[255] = '\0';
 				set_progress_bar_data(msg, PROGRESS_RESET);
 				args->retval = 1;
@@ -1145,31 +1144,31 @@ void show_FITS_header(fits *fit) {
  * Indeed, siril_log_message seems not working in a cpp file */
 int verbose_resize_gaussian(fits *image, int toX, int toY, int interpolation) {
 	int retvalue;
-	char *str_inter;
+	const char *str_inter;
 	struct timeval t_start, t_end;
 
 	switch (interpolation) {
 	case OPENCV_NEAREST:
-		str_inter = strdup("Nearest-Neighbor");
+		str_inter = _("Nearest-Neighbor");
 		break;
 	default:
 	case OPENCV_LINEAR:
-		str_inter = strdup("Bilinear");
+		str_inter = _("Bilinear");
 		break;
 	case OPENCV_AREA:
-		str_inter = strdup("Pixel Area Relation");
+		str_inter = _("Pixel Area Relation");
 		break;
 	case OPENCV_CUBIC:
-		str_inter = strdup("Bicubic");
+		str_inter = _("Bicubic");
 		break;
 	case OPENCV_LANCZOS4:
-		str_inter = strdup("Lanczos4");
+		str_inter = _("Lanczos4");
 		break;
 	}
 
-	siril_log_color_message("Resample (%s interpolation): processing...\n",
+	siril_log_color_message(_("Resample (%s interpolation): processing...\n"),
 			"red", str_inter);
-	free(str_inter);
+
 	gettimeofday(&t_start, NULL);
 
 	retvalue = cvResizeGaussian(&gfit, toX, toY, interpolation);
@@ -1182,33 +1181,33 @@ int verbose_resize_gaussian(fits *image, int toX, int toY, int interpolation) {
 
 int verbose_rotate_image(fits *image, double angle, int interpolation,
 		int cropped) {
-	char *str_inter;
+	const char *str_inter;
 	struct timeval t_start, t_end;
 
 	switch (interpolation) {
 	case -1:
-		str_inter = "No";
+		str_inter = _("No");
 		break;
 	case OPENCV_NEAREST:
-		str_inter = "Nearest-Neighbor";
+		str_inter = _("Nearest-Neighbor");
 		break;
 	default:
 	case OPENCV_LINEAR:
-		str_inter = "Bilinear";
+		str_inter = _("Bilinear");
 		break;
 	case OPENCV_AREA:
-		str_inter = "Pixel Area Relation";
+		str_inter = _("Pixel Area Relation");
 		break;
 	case OPENCV_CUBIC:
-		str_inter = "Bicubic";
+		str_inter = _("Bicubic");
 		break;
 	case OPENCV_LANCZOS4:
-		str_inter = "Lanczos4";
+		str_inter = _("Lanczos4");
 		break;
 	}
 
 	siril_log_color_message(
-			"Rotation (%s interpolation, angle=%g): processing...\n", "red",
+			_("Rotation (%s interpolation, angle=%g): processing...\n"), "red",
 			str_inter, angle);
 	gettimeofday(&t_start, NULL);
 
@@ -1255,7 +1254,7 @@ int get_wavelet_layers(fits *fit, int Nbr_Plan, int Plan, int Type, int reqlayer
 		strcpy(dir[chan], tmpdir);
 		strcat(dir[chan], "/");
 		strcat(dir[chan], File_Name_Transform[chan]);
-		if (wavelet_transform_file(Imag, dir[chan], Type, Nbr_Plan,
+		if (wavelet_transform_file(Imag, fit->ry, fit->rx, dir[chan], Type, Nbr_Plan,
 				fit->pdata[chan])) {
 			free((char *) Imag);
 			free(dir[chan]);
@@ -1314,17 +1313,17 @@ gpointer median_filter(gpointer p) {
 
 	struct timeval t_start, t_end;
 
-	siril_log_color_message("Median Filter: processing...\n", "red");
+	siril_log_color_message(_("Median Filter: processing...\n"), "red");
 	gettimeofday(&t_start, NULL);
 
 	do {
 		if (args->iterations != 1)
-			siril_log_message("Iteration #%d...\n", iter + 1);
+			siril_log_message(_("Iteration #%d...\n"), iter + 1);
 		for (layer = 0; layer < com.uniq->nb_layers; layer++) {
 			/* FILL image upside-down */
 			WORD **image = malloc(ny * sizeof(WORD *));
 			if (image == NULL) {
-				siril_log_message("median filter: error allocating data\n");
+				printf("median filter: error allocating data\n");
 				gdk_threads_add_idle(end_median_filter, args);
 				return GINT_TO_POINTER(1);
 			}
@@ -1338,8 +1337,7 @@ gpointer median_filter(gpointer p) {
 					WORD *data = calloc(args->ksize * args->ksize,
 							sizeof(WORD));
 					if (data == NULL) {
-						siril_log_message(
-								"median filter: error allocating data\n");
+						printf("median filter: error allocating data\n");
 						free(image);
 						gdk_threads_add_idle(end_median_filter, args);
 						return GINT_TO_POINTER(1);
@@ -1412,7 +1410,7 @@ static int fmul_layer(fits *a, int layer, float coeff) {
  *      B A N D I N G      R E D U C T I O N      M A N A G E M E N T        *
  ****************************************************************************/
 
-int banding_image_hook(struct generic_seq_args *args, int i, int j, fits *fit) {
+int banding_image_hook(struct generic_seq_args *args, int i, fits *fit) {
 	struct banding_data *banding_args = (struct banding_data *)args->user;
 	return BandingEngine(fit, banding_args->sigma, banding_args->amount,
 			banding_args->protect_highlights, banding_args->applyRotation);
@@ -1462,7 +1460,7 @@ gpointer BandingEngineThreaded(gpointer p) {
 	struct banding_data *args = (struct banding_data *) p;
 	struct timeval t_start, t_end;
 
-	siril_log_color_message("Banding Reducing: processing...\n", "red");
+	siril_log_color_message(_("Banding Reducing: processing...\n"), "red");
 	gettimeofday(&t_start, NULL);
 
 	int retval = BandingEngine(args->fit, args->sigma, args->amount, args->protect_highlights, args->applyRotation);
@@ -1491,7 +1489,7 @@ int BandingEngine(fits *fit, double sigma, double amount, gboolean protect_highl
 #ifdef HAVE_OPENCV
 		cvRotateImage(fit, 90.0, -1, 0);
 #else
-		siril_log_message("Rotation is only possible when Siril has been compiled with OpenCV support.\n");
+		siril_log_message(_("Rotation is only possible when Siril has been compiled with OpenCV support.\n"));
 		free(fiximage);
 		return 1;
 #endif
@@ -1581,7 +1579,7 @@ int backgroundnoise(fits* fit, double sigma[]) {
 	cvComputeFinestScale(waveimage);
 #else
 	if (get_wavelet_layers(waveimage, 4, 0, TO_PAVE_BSPLINE, -1)) {
-		siril_log_message("Siril cannot evaluate the noise in the image\n");
+		siril_log_message(_("Siril cannot evaluate the noise in the image\n"));
 		clearfits(waveimage);
 		return 1;
 	}
@@ -1600,7 +1598,7 @@ int backgroundnoise(fits* fit, double sigma[]) {
 		WORD *array1 = calloc(ndata, sizeof(WORD));
 		WORD *array2 = calloc(ndata, sizeof(WORD));
 		if (array1 == NULL || array2 == NULL) {
-			siril_log_message("backgroundnoise: Error allocating data\n");
+			printf("backgroundnoise: Error allocating data\n");
 			if (array1)
 				free(array1);
 			if (array2)
@@ -1634,7 +1632,7 @@ int backgroundnoise(fits* fit, double sigma[]) {
 				free(array1);
 				free(array2);
 				free(stat);
-				siril_log_message("backgroundnoise: Error, no data computed\n");
+				siril_log_message(_("backgroundnoise: Error, no data computed\n"));
 				sigma[layer] = 0.0;
 				return 1;
 			}
@@ -1644,7 +1642,7 @@ int backgroundnoise(fits* fit, double sigma[]) {
 		sigma[layer] *= SIGMA_PER_FWHM; // normalization
 		sigma[layer] /= 0.974; // correct for 2% systematic bias
 		if (n == MAX_ITER)
-			siril_log_message("backgroundnoise: does not converge\n");
+			siril_log_message(_("backgroundnoise: does not converge\n"));
 		free(array1);
 		free(array2);
 		free(stat);
@@ -1665,7 +1663,7 @@ gboolean end_noise(gpointer p) {
 	double norm = (double) get_normalized_value(args->fit);
 	for (chan = 0; chan < nb_chan; chan++)
 		siril_log_message(
-				"Background noise value (channel: #%d): %0.3lf (%.3e)\n", chan,
+				_("Background noise value (channel: #%d): %0.3lf (%.3e)\n"), chan,
 				args->bgnoise[chan], args->bgnoise[chan] / norm);
 	set_cursor_waiting(FALSE);
 	update_used_memory();
@@ -1682,7 +1680,7 @@ gpointer noise(gpointer p) {
 	int  chan;
 
 	if (args->verbose) {
-		siril_log_color_message("Noise standard deviation: calculating...\n",
+		siril_log_color_message(_("Noise standard deviation: calculating...\n"),
 				"red");
 		gettimeofday(&args->t_start, NULL);
 	}

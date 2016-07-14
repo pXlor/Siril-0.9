@@ -674,7 +674,7 @@ WORD *debayer_buffer(WORD *buf, int *width, int *height,
 		npixels = (*width) * (*height);
 		newbuf = calloc(1, 3 * npixels * sizeof(WORD));
 		if (newbuf == NULL) {
-			siril_log_message("Not enough memory for debayering\n");
+			printf("Not enough memory for debayering\n");
 			return NULL;
 		}
 		//siril_log_message("Bilinear interpolation...\n");
@@ -684,7 +684,7 @@ WORD *debayer_buffer(WORD *buf, int *width, int *height,
 		npixels = (*width) * (*height);
 		newbuf = calloc(1, 3 * npixels * sizeof(WORD));
 		if (newbuf == NULL) {
-			siril_log_message("Not enough memory for debayering\n");
+			printf("Not enough memory for debayering\n");
 			return NULL;
 		}
 		//siril_log_message("Nearest Neighbor interpolation...\n");
@@ -695,7 +695,7 @@ WORD *debayer_buffer(WORD *buf, int *width, int *height,
 		npixels = (*width) * (*height);
 		newbuf = calloc(1, 3 * npixels * sizeof(WORD));
 		if (newbuf == NULL) {
-			siril_log_message("Not enough memory for debayering\n");
+			printf("Not enough memory for debayering\n");
 			return NULL;
 		}
 		//siril_log_message("VNG interpolation...\n");
@@ -705,7 +705,7 @@ WORD *debayer_buffer(WORD *buf, int *width, int *height,
 		npixels = (*width) * (*height);
 		newbuf = calloc(1, 3 * npixels * sizeof(WORD));
 		if (newbuf == NULL) {
-			siril_log_message("Not enough memory for debayering\n");
+			printf("Not enough memory for debayering\n");
 			return NULL;
 		}
 		//siril_log_message("AHD interpolation...\n");
@@ -715,7 +715,7 @@ WORD *debayer_buffer(WORD *buf, int *width, int *height,
 		npixels = (*width / 2 + *width % 2) * (*height / 2 + *height % 2);
 		newbuf = calloc(1, 3 * npixels * sizeof(WORD));
 		if (newbuf == NULL) {
-			siril_log_message("Not enough memory for debayering\n");
+			printf("Not enough memory for debayering\n");
 			return NULL;
 		}
 		//siril_log_message("Super Pixel interpolation...\n");

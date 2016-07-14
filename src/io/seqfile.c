@@ -241,7 +241,7 @@ sequence * readseqfile(const char *name){
 		}
 	}
 	if (!allocated) {
-		siril_log_message("The file seems to be corrupted\n");
+		siril_log_message(_("The file seems to be corrupted\n"));
 		goto error;
 	}
 	fclose(seqfile);
@@ -251,7 +251,7 @@ sequence * readseqfile(const char *name){
 		if (seq->imgparam[i].incl)
 			nbsel++;
 	if (nbsel != seq->selnum) {
-		siril_log_message("fixing the selection number in the .seq file (%d) to the actual value (%d) (not saved)\n", seq->selnum, nbsel);
+		siril_log_message(_("Fixing the selection number in the .seq file (%d) to the actual value (%d) (not saved)\n"), seq->selnum, nbsel);
 		seq->selnum = nbsel;
 	}
 	update_used_memory();
@@ -262,7 +262,7 @@ error:
 	if (seq->seqname)
 		free(seq->seqname);
 	free(seq);
-	siril_log_message("Could not load sequence\n");
+	siril_log_message(_("Could not load sequence\n"));
 	update_used_memory();
 	free(seqfilename);
 	return NULL;
@@ -383,8 +383,8 @@ int buildseqfile(sequence *seq, int force_recompute) {
 		get_possible_image_filename(seq, seq->beg, filename);
 		// check if the sequence begins at first_index
 		if (stat_file(filename, &imagetype, NULL) || imagetype != TYPEFITS) {
-			siril_log_message("The sequence %s doesn't start at the frame number %d"
-					" with the specified fixed size index (%d). Cannot load.\n",
+			siril_log_message(_("The sequence %s doesn't start at the frame number %d"
+					" with the specified fixed size index (%d). Cannot load.\n"),
 					seq->seqname, seq->beg, seq->fixed);
 			free(filename);
 			return 1;

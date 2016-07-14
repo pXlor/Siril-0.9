@@ -147,7 +147,7 @@ void display_PSF(fitted_PSF **result){
 			rmse+=result[i]->rmse;
 			if (i>1){
 				if (strcmp(result[i]->units,result[i-1]->units)){
-					show_dialog("Stars must have the same units.", "Error", "gtk-dialog-error");
+					show_dialog(_("Stars must have the same units."), _("Error"), "gtk-dialog-error");
 					return;
 				}
 			}
@@ -160,9 +160,9 @@ void display_PSF(fitted_PSF **result){
 		r = FWHMy / FWHMx;
 		angle = angle / (double)i;
 		rmse = rmse / (double)i;
-		g_snprintf(msg, sizeof(msg), "Average Gaussian PSF\n\n"
+		g_snprintf(msg, sizeof(msg), _("Average Gaussian PSF\n\n"
 				"N:\t%d stars\nB:\t%.6f\nA:\t%.6f\nFWHMx:\t%.2f%s\n"
-				"FWHMy:\t%.2f%s\nr:\t%.3f\nAngle:\t%.2f deg\nrmse:\t%.3e\n",
+				"FWHMy:\t%.2f%s\nr:\t%.3f\nAngle:\t%.2f deg\nrmse:\t%.3e\n"),
 				i, B, A, FWHMx, result[0]->units, FWHMy, result[0]->units, r, angle, rmse);
 		show_data_dialog(msg, "Average Star Data");
 	}
@@ -225,6 +225,6 @@ void display_status(){
 	
 	while (com.stars && com.stars[nbstars]) nbstars++;
 	if (com.selected_star == -1) g_snprintf(text, sizeof(text), " ");
-	else g_snprintf(text, sizeof(text), "Star %d of %d", com.selected_star + 1, nbstars);
+	else g_snprintf(text, sizeof(text), _("Star %d of %d"), com.selected_star + 1, nbstars);
 	gtk_statusbar_push(statusbar, COUNT_STATE, text);
 }
