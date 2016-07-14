@@ -105,6 +105,7 @@ int	round_to_int(double x);
 WORD	round_to_WORD(double x);
 BYTE	round_to_BYTE(double x);
 BYTE	conv_to_BYTE(double x);
+uint8_t *fits_to_uint8(fits *fit);
 gboolean isrgb(fits *fit);
 gboolean ends_with(const char *str, const char *ending);
 int	get_extension_index(const char *filename);
@@ -130,7 +131,6 @@ char*	remove_ext_from_filename(const char *basename);
 char*	replace_spaces_from_filename(const char *filename);
 char*	str_append(char** data, const char* newdata);
 char*	format_basename(char *root);
-float	computePente(WORD *lo, WORD *hi);
 
 /****************** quantize.h ***************/
 int fits_img_stats_ushort(WORD *array, long nx, long ny, int nullcheck,

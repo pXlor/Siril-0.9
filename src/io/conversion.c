@@ -372,30 +372,30 @@ int check_for_raw_extensions(const char *extension) {
  * the current instance of Siril. */
 image_type get_type_for_extension(const char *extension) {
 	//convflags &= (CONV1X3 | CONV3X1 | CONV1X1);	// reset file format
-	if ((supported_filetypes & TYPEBMP) && !strcasecmp(extension, "bmp")) {
+	if (supported_filetypes & TYPEBMP && !strcasecmp(extension, "bmp")) {
 		return TYPEBMP;
-	} else if ((supported_filetypes & TYPEJPG) &&
+	} else if (supported_filetypes & TYPEJPG &&
 			(!strcasecmp(extension, "jpg") || !strcasecmp(extension, "jpeg"))) {
 		return TYPEJPG;
-	} else if ((supported_filetypes & TYPETIFF) &&
+	} else if (supported_filetypes & TYPETIFF &&
 			(!strcasecmp(extension, "tif") || !strcasecmp(extension, "tiff"))) {
 		return TYPETIFF;
-	} else if ((supported_filetypes & TYPEPNG) && !strcasecmp(extension, "png")) {
+	} else if (supported_filetypes & TYPEPNG && !strcasecmp(extension, "png")) { 
 		return TYPEPNG;
-	} else if ((supported_filetypes & TYPEPNM) &&
+	} else if (supported_filetypes & TYPEPNM &&
 			(!strcasecmp(extension, "pnm") || !strcasecmp(extension, "ppm") ||
 			 !strcasecmp(extension, "pgm"))) {
 		return TYPEPNM;
-	} else if ((supported_filetypes & TYPEPIC) && !strcasecmp(extension, "pic")){
+	} else if (supported_filetypes & TYPEPIC && !strcasecmp(extension, "pic")){
 		return TYPEPIC;
-	} else if ((supported_filetypes & TYPERAW) && !check_for_raw_extensions(extension)) {
+	} else if (supported_filetypes & TYPERAW && !check_for_raw_extensions(extension)) {
 		return TYPERAW;
 #if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 		// check_for_film_extensions is undefined without FFMS2
-	} else if ((supported_filetypes & TYPEAVI) && !check_for_film_extensions(extension)) {
+	} else if (supported_filetypes & TYPEAVI && !check_for_film_extensions(extension)) {
 		return TYPEAVI;
 #endif
-	} else if ((supported_filetypes & TYPESER) && !strcasecmp(extension, "ser")) {
+	} else if (supported_filetypes & TYPESER && !strcasecmp(extension, "ser")) {
 		return TYPESER;
 	} else if (!strcasecmp(extension, "fit") || !strcasecmp(extension, "fits") ||
 			!strcasecmp(extension, "fts")) {
@@ -722,7 +722,7 @@ int debayer_if_needed(image_type imagetype, fits *fit) {
 	 * Siril's FITS are stored bottom to top, debayering will throw 
 	 * wrong results. So before demosacaing we need to transforme the image
 	 * with fits_flip_top_to_bottom() function */
-	if (imagetype == TYPEFITS && (convflags & CONVDEBAYER)) {
+	if (imagetype == TYPEFITS && convflags & CONVDEBAYER) {
 		if (fit->naxes[2] != 1) {
 			siril_log_message(_("Cannot perform debayering on image with more than one channel\n"));
 			return retval;

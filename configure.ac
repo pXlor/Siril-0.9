@@ -17,7 +17,6 @@ AC_INIT([siril], [siril_version_full],
 AM_INIT_AUTOMAKE([subdir-objects])
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_SRCDIR([src/main.c])
-AC_CONFIG_MACRO_DIR([m4])
 
 dnl ================================================================
 dnl Gettext stuff.
@@ -30,9 +29,6 @@ remember_set_CFLAGS="$CFLAGS"
 AC_PROG_CC
 AC_HEADER_STDC
 AC_OPENMP
-
-AC_LANG([C])
-AC_LANG([C++])
 
 dnl remove -g flag from default CFLAGS
 if test "x$remember_set_CFLAGS" = "x"; then
@@ -50,6 +46,16 @@ if test `uname` != "Darwin"; then
 	LDFLAGS="$LDFLAGS -rdynamic"
 fi
 
+dnl Set PACKAGE_DATA_DIR in config.h.
+dnl if test "x${datadir}" = 'x${prefix}/share'; then
+dnl   if test "x${prefix}" = "xNONE"; then
+dnl     AC_DEFINE_UNQUOTED(PACKAGE_DATA_DIR, "${ac_default_prefix}/share/${PACKAGE}", [Package data dir1])
+dnl   else
+dnl     AC_DEFINE_UNQUOTED(PACKAGE_DATA_DIR, "${prefix}/share/${PACKAGE}", [Package data dir2])
+dnl   fi
+dnl else
+dnl   AC_DEFINE_UNQUOTED(PACKAGE_DATA_DIR, "${datadir}/${PACKAGE}", [Package data dir3])
+dnl fi[]
 
 dnl Set PACKAGE_SOURCE_DIR in config.h.
 packagesrcdir=`cd $srcdir && pwd`
@@ -123,10 +129,7 @@ if test -n "$CXX" && ( test "X$CXX" != "Xno" &&
 		      ( (test "X$CXX" = "Xg++" && `g++ -v >/dev/null 2>&1` ) ||
 		      (test "X$CXX" != "Xg++"))) ; then
 	AC_PROG_CXXCPP
-	
-	dnl check for C++11 support
-	m4_include([m4/ax_cxx_compile_stdcxx.m4])
-	AX_CXX_COMPILE_STDCXX(11, noext, mandatory)
+	AX_CHECK_COMPILE_FLAG([-std=c++11], [CXXFLAGS="$CXXFLAGS -std=c++11"], AC_MSG_ERROR([Compiler does not accept ISO C++11]))
 	
 	dnl AC_MSG_WARN(CXX is "$CXX")
 	dnl http://nerdland.net/2009/07/detecting-c-libraries-with-autotools/ solution 2
@@ -136,7 +139,7 @@ if test -n "$CXX" && ( test "X$CXX" != "Xno" &&
 			  AC_MSG_WARN([opencv not found. Not using some image processing.]))
 
 else
-	AC_MSG_ERROR([no C++ compiler found])
+	AC_MSG_WARN([no C++ compiler found, opencv cannot be used])
 fi
 
 AM_CONDITIONAL(HAVE_OPENCV, [test "x$OPENCV_LIBS" != "x"])

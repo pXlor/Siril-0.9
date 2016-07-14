@@ -34,31 +34,29 @@
 #include <libgen.h>
 
 #include "core/siril.h"
-#include "core/proto.h"
-#include "core/initfile.h"
-#include "core/undo.h"
-#include "gui/callbacks.h"
-#include "gui/PSF_list.h"
-#include "gui/histogram.h"
-#include "algos/colors.h"
-#include "algos/PSF.h"
-#include "algos/star_finder.h"
-#include "algos/fft.h"
-#include "algos/Def_Wavelet.h"
-#include "algos/cosmetic_correction.h"
-#include "algos/gradient.h"
 #include "io/conversion.h"
+#include "gui/callbacks.h"
+#include "core/proto.h"
+#include "algos/colors.h"
 #include "io/films.h"
-#include "io/ser.h"
-#include "io/single_image.h"
 #include "core/command.h"	// for processcommand()
+#include "algos/PSF.h"
+#include "gui/PSF_list.h"
+#include "algos/star_finder.h"
+#include "gui/histogram.h"
+#include "io/single_image.h"
+#include "algos/gradient.h"
 #include "registration/registration.h"
 #include "stacking/stacking.h"
+#include "algos/fft.h"
+#include "algos/cosmetic_correction.h"
 #include "compositing/compositing.h"
 #include "compositing/align_rgb.h"
 #ifdef HAVE_OPENCV
 #include "opencv/opencv.h"
 #endif
+#include "algos/Def_Wavelet.h"
+#include "core/undo.h"
 
 static enum {
 	CD_NULL, CD_INCALL, CD_EXCALL, CD_QUIT
@@ -5862,75 +5860,25 @@ void on_darkThemeCheck_toggled(GtkToggleButton *togglebutton, gpointer user_data
 	com.have_dark_theme = gtk_toggle_button_get_active(togglebutton);
 }
 
-void fillSeqAviExport() {
-	char width[6], height[6], fps[7];
-	GtkEntry *heightEntry = GTK_ENTRY(lookup_widget("entryAviHeight"));
-	GtkEntry *widthEntry = GTK_ENTRY(lookup_widget("entryAviWidth"));
+void on_button_reset_css_clicked (GtkButton *button, gpointer user_data) {
+	gchar *homepath, *cssfile;
+	GString *homeStr;
+	const gchar *css_filename;
 
-	g_snprintf(width, sizeof(width), "%d", com.seq.rx);
-	g_snprintf(height, sizeof(width), "%d", com.seq.ry);
-	gtk_entry_set_text(widthEntry, width);
-	gtk_entry_set_text(heightEntry, height);
-	if (com.seq.type == SEQ_SER) {
-		GtkEntry *entryAviFps = GTK_ENTRY(lookup_widget("entryAviFps"));
-
-		if (com.seq.ser_file && com.seq.ser_file->fps <= 0.0) {
-			g_snprintf(fps, sizeof(fps), "10.000");
-		} else {
-			g_snprintf(fps, sizeof(fps), "%2.3lf", com.seq.ser_file->fps);
-		}
-		gtk_entry_set_text(entryAviFps, fps);
-
+	css_filename = checking_css_filename();
+	if (css_filename == NULL) {
+		printf("The version of GTK does not match requirements: (GTK-%d.%d)\n",
+				GTK_MAJOR_VERSION, GTK_MINOR_VERSION);
+		exit(1);
 	}
 }
 
-void on_entryAviHeight_changed(GtkEditable *editable, gpointer user_data);
-
-void on_entryAviWidth_changed(GtkEditable *editable, gpointer user_data) {
-	double ratio, width, height;
-	char c_height[6];
-	GtkEntry *heightEntry = GTK_ENTRY(lookup_widget("entryAviHeight"));
-
-	ratio = (double) com.seq.ry / (double) com.seq.rx;
-	width = atof(gtk_entry_get_text(GTK_ENTRY(editable)));
-	height = ratio * width;
-	g_snprintf(c_height, sizeof(c_height), "%d", (int)(height));
-
-	g_signal_handlers_block_by_func(heightEntry, on_entryAviHeight_changed, NULL);
-	gtk_entry_set_text(heightEntry, c_height);
-	g_signal_handlers_unblock_by_func(heightEntry, on_entryAviHeight_changed, NULL);
+	homepath = getenv("HOME");
+	homeStr = g_string_new(homepath);
+	g_string_append(homeStr, "/."PACKAGE"/");
+	g_string_append(homeStr, css_filename);
+	cssfile = g_string_free(homeStr, FALSE);
+	remove(cssfile);
+	g_free(cssfile);
 }
 
-void on_entryAviHeight_changed(GtkEditable *editable, gpointer user_data) {
-	double ratio, width, height;
-	char c_width[6];
-	GtkEntry *widthEntry = GTK_ENTRY(lookup_widget("entryAviWidth"));
-
-	ratio = (double) com.seq.rx / (double) com.seq.ry;
-	height = atof(gtk_entry_get_text(GTK_ENTRY(editable)));
-	width = ratio * height;
-	g_snprintf(c_width, sizeof(c_width), "%d", (int)(width));
-
-	g_signal_handlers_block_by_func(widthEntry, on_entryAviWidth_changed, NULL);
-	gtk_entry_set_text(widthEntry, c_width);
-	g_signal_handlers_unblock_by_func(widthEntry, on_entryAviWidth_changed, NULL);
-
-}
-
-
-void on_menu_rgb_align_select(GtkMenuItem *menuitem, gpointer user_data) {
-	gboolean sel_is_drawn = ((com.selection.w > 0.0) && (com.selection.h > 0.0));
-
-	gtk_widget_set_sensitive(lookup_widget("rgb_align_dft"), sel_is_drawn);
-	gtk_widget_set_sensitive(lookup_widget("rgb_align_psf"), sel_is_drawn);
-}
-
-void on_rgb_align_dft_activate(GtkMenuItem *menuitem, gpointer user_data) {
-	undo_save_state("Processing: RGB alignment (DFT)");
-	rgb_align(1);
-}
-
-void on_rgb_align_psf_activate(GtkMenuItem *menuitem, gpointer user_data) {
-	undo_save_state("Processing: RGB alignment (PSF)");
-	rgb_align(0);
-}

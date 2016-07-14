@@ -102,10 +102,8 @@ void initialize_registration_methods() {
 #ifdef HAVE_OPENCV
 	reg_methods[i++] = new_reg_method(_("Global Star Alignment (deep-sky)"),
 			&register_star_alignment, REQUIRES_NO_SELECTION, REGTYPE_DEEPSKY);
-#endif
 	reg_methods[i++] = new_reg_method(_("Image Pattern Alignment (planetary - full disk)"),
 			&register_shift_dft, REQUIRES_SQUARED_SELECTION, REGTYPE_PLANETARY);
-#ifdef HAVE_OPENCV
 	reg_methods[i++] = new_reg_method(_("Enhanced Correlation Coefficient (planetary - surfaces)"),
 			&register_ecc, REQUIRES_NO_SELECTION, REGTYPE_PLANETARY);
 #endif
@@ -489,14 +487,14 @@ static void _print_result(TRANS *trans, float FWHMx, float FWHMy) {
 		shift.x = trans->a;
 		shift.y = -trans->d;
 		scale = sqrt(trans->b * trans->b + trans->c * trans->c);
-		siril_log_color_message(_("Matching stars: done\n"), "green");
-		siril_log_message(_("%d pair matches.\n"), trans->nr);
-		siril_log_message(_("scale:%*.3f\n"), 13, scale);
-		siril_log_message(_("rotation:%+*.2f deg\n"), 9, rotation * 180 / M_PI);
-		siril_log_message(_("dx:%+*.2f px\n"), 15, shift.x);
-		siril_log_message(_("dy:%+*.2f px\n"), 15, shift.y);
-		siril_log_message(_("FWHMx:%*.2f px\n"), 12, FWHMx);
-		siril_log_message(_("FWHMy:%*.2f px\n"), 12, FWHMy);
+		siril_log_color_message("Matching stars: done\n", "green");
+		siril_log_message("%d pair matches.\n", trans->nr);
+		siril_log_message("scale:%*.3f\n", 13, scale);
+		siril_log_message("rotation:%*.2f deg\n", 9, rotation * 180 / M_PI);
+		siril_log_message("dx:%*.2f px\n", 15, shift.x);
+		siril_log_message("dy:%*.2f px\n", 15, shift.y);
+		siril_log_message("FWHMx:%*.2f px\n", 12, FWHMx);
+		siril_log_message("FWHMy:%*.2f px\n", 12, FWHMy);
 		break;
 	default:
 		siril_log_color_message(_("Not handled yet\n"), "red");

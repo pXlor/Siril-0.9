@@ -85,6 +85,29 @@ BYTE conv_to_BYTE(double x) {
 	return((BYTE) (x));
 }
 
+uint8_t *fits_to_uint8(fits *fit) {
+	uint8_t *data;
+	double norm = 0.00390625;
+	int w, h, i, j, channel, step;
+
+	w = fit->rx;
+	h = fit->ry;
+	channel = fit->naxes[2];
+	step = (channel == 3 ? 2 : 0);
+
+	if (fit->bitpix == BYTE_IMG)
+		norm = 1.0;
+	data = malloc(w * h * channel * sizeof(uint8_t));
+	for (i = 0, j = 0; i < w * h * channel; i += channel, j++) {
+		data[i + step] = (uint8_t) ((double) fit->pdata[RLAYER][j] * norm);
+		if (channel > 1) {
+			data[i + 1] = (uint8_t) ((double) fit->pdata[GLAYER][j] * norm);
+			data[i + 2 - step] = (uint8_t) ((double) fit->pdata[BLAYER][j] * norm);
+		}
+	}
+	return data;
+}
+
 /* returns TRUE if fit has 3 layers */
 gboolean isrgb(fits *fit) {
 	return (fit->naxis == 3);
@@ -635,21 +658,4 @@ char *format_basename(char *root) {
 	sprintf(appended, "%s_", root);
 	free(root);
 	return appended;
-}
-
-float computePente(WORD *lo, WORD *hi) {
-	float pente;
-
-	if (sequence_is_loaded() && !single_image_is_loaded()) {
-		*hi = com.seq.layers[RLAYER].hi;
-		*lo = com.seq.layers[RLAYER].lo;
-	}
-	else {
-		*hi = com.uniq->layers[RLAYER].hi;
-		*lo = com.uniq->layers[RLAYER].lo;
-	}
-
-	pente = UCHAR_MAX_SINGLE / (float) (*hi - *lo);
-
-	return pente;
 }

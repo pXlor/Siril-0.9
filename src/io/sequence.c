@@ -373,7 +373,6 @@ int set_seq(const char *name){
 	adjust_reginfo();		// change registration displayed/editable values
 	update_gfit_histogram_if_needed();
 	adjust_sellabel();
-	fillSeqAviExport();	// fill GtkEntry of export box
 
 	/* update menus */
 	update_MenuItem();
@@ -1098,7 +1097,7 @@ gpointer crop_sequence(gpointer p) {
 
 		ser_file = malloc(sizeof(struct ser_struct));
 		sprintf(dest, "%s%s.ser", args->prefix, args->seq->seqname);
-		if (ser_create_file(dest, ser_file, TRUE, com.seq.ser_file)) {
+		if (ser_create_file(dest, ser_file, TRUE, NULL)) {
 			siril_log_message(_("Creating the SER file failed, aborting.\n"));
 			free(ser_file);
 			args->retvalue = 1;
@@ -1122,8 +1121,6 @@ gpointer crop_sequence(gpointer p) {
 				savefits(dest, &wfit[0]);
 				break;
 			case SEQ_SER:
-				ser_file->image_width = wfit[0].rx;
-				ser_file->image_height = wfit[0].ry;
 				if (ser_write_frame_from_fit(ser_file, &wfit[0], frame)) {
 					siril_log_message(
 							_("Error while converting to SER (no space left?)\n"));
@@ -1138,6 +1135,8 @@ gpointer crop_sequence(gpointer p) {
 		}
 	}
 	if (args->seq->type == SEQ_SER) {
+		memcpy(&ser_file->date, &args->seq->ser_file->date, 16);
+		memcpy(&ser_file->date_utc, &args->seq->ser_file->date_utc, 16);
 		ser_write_and_close(ser_file);
 		free(ser_file);
 	}
@@ -1197,30 +1196,6 @@ struct exportseq_args {
 	int32_t avi_width, avi_height;
 };
 
-/* Used for avi exporter */
-static uint8_t *fits_to_uint8(fits *fit) {
-	uint8_t *data;
-	int w, h, i, j, channel, step;
-	float pente;
-	WORD lo, hi;
-
-	w = fit->rx;
-	h = fit->ry;
-	channel = fit->naxes[2];
-	step = (channel == 3 ? 2 : 0);
-	pente = computePente(&lo, &hi);
-
-	data = malloc(w * h * channel * sizeof(uint8_t));
-	for (i = 0, j = 0; i < w * h * channel; i += channel, j++) {
-		data[i + step] = (uint8_t) round_to_BYTE(((double) fit->pdata[RLAYER][j] * pente));
-		if (channel > 1) {
-			data[i + 1] = (uint8_t) round_to_BYTE(((double) fit->pdata[GLAYER][j] * pente));
-			data[i + 2 - step] = (uint8_t) round_to_BYTE(((double) fit->pdata[BLAYER][j] * pente));
-		}
-	}
-	return data;
-}
-
 gpointer export_sequence(gpointer ptr) {
 	int i, x, y, nx, ny, shiftx, shifty, layer, retval = 0, reglayer, nb_layers, skipped;
 	float cur_nb = 0.f, nb_frames;
@@ -1263,6 +1238,11 @@ gpointer export_sequence(gpointer ptr) {
 		if (args->resize) {
 			width = args->avi_width;
 			height = args->avi_height;
+			if ((width > args->seq->rx) || (height > args->seq->ry)) {
+				siril_log_message("Size cannot be larger than original\n");
+				retval = -4;
+				goto free_and_reset_progress_bar;
+			}
 		}
 		else {
 			width  = (int32_t) args->seq->rx;
@@ -1416,24 +1396,15 @@ gpointer export_sequence(gpointer ptr) {
 #endif
 			break;
 		case TYPEAVI:
-			data = fits_to_uint8(&destfit);
-
 			if (args->resize) {
 #ifdef HAVE_OPENCV
-				uint8_t *newdata = malloc(
-						sizeof(uint8_t) * args->avi_width * args->avi_height
-								* destfit.naxes[2]);
-				cvResizeGaussian_data8(data, destfit.rx, destfit.ry, newdata,
-						args->avi_width, args->avi_height, destfit.naxes[2], 0);
-				avi_file_write_frame(0, newdata);
-				free(newdata);
+				cvResizeGaussian(&destfit, args->avi_width, args->avi_height, 0);
 #else
 				siril_log_message(_("Siril needs opencv to resize images\n"));
-				avi_file_write_frame(0, data);
 #endif
 			}
-			else
-				avi_file_write_frame(0, data);
+			data = fits_to_uint8(&destfit);
+			avi_file_write_frame(0, data);
 			free(data);
 			break;
 		}
@@ -1547,15 +1518,15 @@ void on_comboExport_changed(GtkComboBox *box, gpointer user_data) {
 	gtk_widget_set_visible(gif_options, 2 == gtk_combo_box_get_active(box));
 	gtk_widget_set_visible(avi_options, 3 == gtk_combo_box_get_active(box));
 #ifdef HAVE_OPENCV
-	gtk_widget_set_sensitive(checkAviResize, TRUE); // not available yet because resizing image crashes
+	gtk_widget_set_sensitive(checkAviResize, FALSE); // not available yet because resizing image crashes
 #else
 	gtk_widget_set_sensitive(checkAviResize, FALSE);
 #endif
 }
 
 void on_checkAviResize_toggled(GtkToggleButton *togglebutton, gpointer user_data) {
-	GtkWidget *heightEntry = lookup_widget("entryAviHeight");
-	GtkWidget *widthEntry = lookup_widget("entryAviWidth");
+	GtkWidget *heightEntry = lookup_widget("entryAviWidth");
+	GtkWidget *widthEntry = lookup_widget("entryAviHeight");
 	gtk_widget_set_sensitive(heightEntry, gtk_toggle_button_get_active(togglebutton));
 	gtk_widget_set_sensitive(widthEntry, gtk_toggle_button_get_active(togglebutton));
 }

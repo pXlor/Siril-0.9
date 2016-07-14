@@ -48,23 +48,6 @@ static WORD *fits_to_bgrbgr(fits *image) {
 	return bgrbgr;
 }
 
-int cvResizeGaussian_data8(uint8_t *dataIn, int rx, int ry, uint8_t *dataOut,
-		int toX, int toY, int chan, int interpolation) {
-	int mode = (chan == 1 ? CV_8UC1 : CV_8UC3);
-
-	Mat in(ry, rx, mode, dataIn);
-	Mat out(toY, toX, mode);
-
-	resize(in, out, out.size(), 0, 0, interpolation);
-
-	for (int i = 0; i < toX * toY * chan; i++)
-		dataOut[i] = (uint8_t) out.data[i];
-
-	in = Mat();
-	out = Mat();
-	return 0;
-}
-
 /* resizes image to the sizes toX * toY, and stores it back in image */
 int cvResizeGaussian(fits *image, int toX, int toY, int interpolation) {
 	assert(image->data);

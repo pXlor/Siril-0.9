@@ -80,7 +80,7 @@ static int layers_count = 1;		// the glade has only luminance
 
 static int luminance_mode = 0;		// 0 if luminance is not used
 
-static struct registration_method *reg_methods[3];
+static struct registration_method *reg_methods[4];
 
 static sequence *seq = NULL;		// the sequence of layers, for alignments and normalization
 static norm_coeff *coeff = NULL;	// the normalization coefficients
@@ -356,10 +356,9 @@ void open_compositing_window() {
 		/* the list below depends on the content of the glade file. It
 		 * should be done in the same way as in registration.c, but it
 		 * woud be easier if the two glades are merged. */
-		reg_methods[0] = new_reg_method(_("One star registration (deep-sky)"), &register_shift_fwhm, REQUIRES_ANY_SELECTION, REGTYPE_DEEPSKY);
-		reg_methods[1] = new_reg_method(_("Image pattern alignment (planetary/deep-sky)"), &register_shift_dft, REQUIRES_SQUARED_SELECTION, REGTYPE_PLANETARY);
-
-		reg_methods[2] = NULL;
+		reg_methods[0] = new_reg_method("Image pattern alignment (planetary/deep-sky)", &register_shift_dft, REQUIRES_SQUARED_SELECTION, REGTYPE_PLANETARY);
+		reg_methods[1] = new_reg_method("One star registration (deep-sky)", &register_shift_fwhm, REQUIRES_ANY_SELECTION, REGTYPE_DEEPSKY);
+		reg_methods[3] = NULL;
 		update_compositing_interface();
 		/* fill compositing_align_method_combo */
 		GtkComboBoxText *aligncombo = GTK_COMBO_BOX_TEXT(gtk_builder_get_object(builder, "compositing_align_method_combo"));
@@ -693,14 +692,10 @@ void update_compositing_interface() {
 	/*} else if (ref_layer == -1 || (!luminance_mode && ref_layer == 0)) {
 		gtk_label_set_text(label, "A reference layer must be selected for align");
 		gtk_widget_set_sensitive(lookup_widget("button_align"), FALSE);*/
-	} else if (number_of_images_loaded() < 2) {
-		gtk_label_set_text(label, _("At least 2 channels must be loaded for align"));
-		gtk_widget_set_sensitive(lookup_widget("button_align"), FALSE);
 	} else {
 		gtk_label_set_text(label, "");
 		gtk_widget_set_sensitive(lookup_widget("button_align"), TRUE);
 	}
-
 }
 
 /* callback for changes of the selected reference layer */
@@ -1183,10 +1178,68 @@ void coeff_clear() {
 		coeff = NULL;
 	}
 }
+#if 0
+
+void coeff_alloc(int nb_images) {
+	if (!coeff)
+		coeff = calloc(1, sizeof(norm_coeff));
+	coeff->offset = realloc(coeff->offset, nb_images * sizeof(double));
+	// mul is not used in ADDITIVE_SCALING but needed to avoid crash in compute_normalization
+	coeff->mul = realloc(coeff->mul, nb_images * sizeof(double));
+	coeff->scale = realloc(coeff->scale, nb_images * sizeof(double));
+}
+
+gboolean end_normalization(gpointer args) {
+	struct stacking_args *stackargs = (struct stacking_args *)args;
+	GtkWidget *norm_button = lookup_widget("composition_layers_normalize");
+	siril_log_message("Normalization information collected, readjusting and redrawing...\n");
+	if (!stackargs->retval) {
+		autoadjust(1);	// update colours and result
+		gtk_widget_set_sensitive(norm_button, TRUE);
+		int i;
+		for (i = 0; i < seq->number; i++)
+			siril_log_message("  layer %d - offset: %g, scale: %g\n", i, coeff->offset[i], coeff->scale[i]);
+		siril_log_message("Normalization finished successfully.\n");
+	} else {
+		siril_log_message("Normalization encountered errors and was aborted.\n");
+	}
+	free(args);
+	return end_generic(NULL);
+}
+
+gpointer normalization_thread(gpointer args) {
+	struct stacking_args *stackargs = (struct stacking_args *)args;
+	if (compute_normalization(stackargs, coeff, ADDITIVE_SCALING))
+		stackargs->retval = 1;
+	free(stackargs->image_indices);
+	gdk_threads_add_idle(end_normalization, args);
+	return NULL;
+}
+
+void on_composition_layers_normalize_clicked(GtkButton *button, gpointer user_data){
+	create_the_internal_sequence();
+	if (!seq) return;
+	gtk_widget_set_sensitive(GTK_WIDGET(button), FALSE);
+	coeff_alloc(seq->number);
+
+	struct stacking_args *stackargs = malloc(sizeof(struct stacking_args));
+
+	stackargs->force_norm = TRUE;
+	stackargs->seq = seq;
+	stackargs->filtering_criterion = stack_filter_all;
+	stackargs->nb_images_to_stack = seq->number;
+	stackargs->retval = 0;
+
+	stackargs->image_indices = malloc(stackargs->nb_images_to_stack * sizeof(int));
+	fill_list_of_unfiltered_images(stackargs);
+	set_cursor_waiting(TRUE);
+
+	start_in_new_thread(normalization_thread, stackargs);
+}
+#endif
 
 void on_composition_rgbcolor_clicked(GtkButton *button, gpointer user_data){
 	initialize_calibration_interface();
 	gtk_widget_show(lookup_widget("color_calibration"));
 }
-
 

@@ -22,7 +22,6 @@
 #include <assert.h>
 #include <string.h>
 #include <stdint.h>
-#include <math.h>
 #include "core/siril.h"
 #include "core/proto.h"
 #include "io/single_image.h"
@@ -426,14 +425,6 @@ void erase_histo_display(cairo_t *cr, int width, int height) {
 		draw_grid(cr, width, height);
 }
 
-static gboolean is_log_scale() {
-	static GtkToggleButton *HistoCheckLogButton = NULL;
-
-	if (HistoCheckLogButton == NULL)
-		HistoCheckLogButton = GTK_TOGGLE_BUTTON(lookup_widget("HistoCheckLogButton"));
-	return (gtk_toggle_button_get_active(HistoCheckLogButton));
-}
-
 void display_histo(gsl_histogram *histo, cairo_t *cr, int layer, int width,
 		int height, double zoomH, double zoomV) {
 	int current_bin;
@@ -480,16 +471,14 @@ void display_histo(gsl_histogram *histo, cairo_t *cr, int layer, int width,
 			bin_val += gsl_histogram_get(histo, i);
 			i++;
 		}
-		if (is_log_scale()) {
-			bin_val = (bin_val == 0) ? bin_val : log(bin_val);
-		}
 		displayed_values[current_bin] = bin_val;
 		if (bin_val > graph_height)	// check for maximum
 			graph_height = bin_val;
 		current_bin++;
 	} while (i < nb_orig_bins && current_bin < nb_bins_allocated);
 	for (i = 0; i < nb_bins_allocated; i++) {
-		double bin_height = height - height * displayed_values[i] / graph_height;
+		double bin_height = height
+				- height * displayed_values[i] / graph_height;
 		cairo_line_to(cr, i, bin_height);
 	}
 	cairo_stroke(cr);
@@ -609,7 +598,7 @@ void apply_mtf_to_histo(gsl_histogram *histo, double norm, double m, double lo,
 	mtf_histo = gsl_histogram_alloc((size_t) norm + 1);
 	gsl_histogram_set_ranges_uniform(mtf_histo, 0, norm);
 
-// #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) // disabled because of ISSUE #136 (https://free-astro.org/bugs/view.php?id=136)
+#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
 	for (i = 0; i < round_to_WORD(norm); i++) {
 		WORD mtf;
 		double binval = gsl_histogram_get(histo, i);
