@@ -29,7 +29,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <locale.h>
 #if (defined(__APPLE__) && defined(__MACH__))
 #include <stdlib.h>
 #include <libproc.h>
@@ -37,7 +36,6 @@
 
 #include "core/siril.h"
 #include "core/proto.h"
-#include "core/initfile.h"
 #include "io/conversion.h"
 #include "gui/callbacks.h"
 #include "registration/registration.h"
@@ -84,7 +82,8 @@ int main(int argc, char *argv[]) {
 	int i;
 	extern char *optarg;
 	extern int opterr;
-	gchar *siril_path;
+	GString *homeStr;
+	gchar *homepath, *csspath, *siril_path;
 	char *cwd_orig = NULL;
 	struct sigaction sigIntHandler;
 #if (defined(__APPLE__) && defined(__MACH__))
@@ -94,13 +93,10 @@ int main(int argc, char *argv[]) {
 #endif
 	
 	setenv("LC_NUMERIC", "C", 1);		// avoid possible bugs using french separator ","
+	setenv("LANG", "C", 1);				// on french (or other) system, it avoids the mix between languages
 	opterr = 0;
 	memset(&com, 0, sizeof(struct cominf));	// needed?
 	com.initfile = NULL;
-
-	/* for translation */
-	bindtextdomain(PACKAGE, LOCALEDIR);
-	textdomain(PACKAGE);
 
 	/* Caught signals */
 	sigIntHandler.sa_handler = signal_handled;
@@ -108,17 +104,17 @@ int main(int argc, char *argv[]) {
 	sigIntHandler.sa_flags = 0;
 	sigaction(SIGINT, &sigIntHandler, NULL);
 
-	while (1) {
+	while(1) {
 		signed char c = getopt(argc, argv, "i:hfv");
-		if (c == '?') {
-			for (i = 1; i < argc; i++) {
-				if (argv[i][1] == '-') {
-					if (!strcmp(argv[i], "--version"))
-						c = 'v';
-					else if (!strcmp(argv[i], "--help"))
-						c = 'h';
-					else if (!strcmp(argv[i], "--format"))
-						c = 'f';
+		if (c=='?') {
+			for(i=1; i<argc; i++) {
+				if(argv[i][1] == '-') {
+					if(!strcmp(argv[i], "--version"))
+						c='v';
+					else if(!strcmp(argv[i], "--help"))
+						c='h';				
+					else if(!strcmp(argv[i], "--format"))
+						c='f';					
 					else {
 						usage(argv[0]);
 						exit(EXIT_FAILURE);
@@ -127,26 +123,25 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		if (c == -1)
-			break;
-		switch (c) {
-		case 'i':
-			com.initfile = strdup(optarg);
-			break;
-		case 'v':
-			fprintf(stdout, "%s %s\n", PACKAGE, VERSION);
-			exit(EXIT_SUCCESS);
-			break;
-		case 'f':
-			list_format_available();
-			exit(EXIT_SUCCESS);
-			break;
-		default:
-			fprintf(stderr, _("unknown command line parameter '%c'\n"), argv[argc - 1][1]);
-			/* no break */
-		case 'h':
-			usage(argv[0]);
-			exit(EXIT_SUCCESS);
+		if (c==-1) break;
+		switch(c) {
+			case 'i':
+				com.initfile = strdup(optarg);
+				break;
+			case 'v':
+				fprintf(stdout, "%s %s\n", PACKAGE, VERSION);
+				exit(EXIT_SUCCESS);
+				break;
+			case 'f':
+				list_format_available();
+				exit(EXIT_SUCCESS);
+				break;
+			default:
+				fprintf(stderr, "unknown command line parameter `%c'\n", c);
+				/* no break */
+			case 'h':
+				usage(argv[0]);
+				exit(EXIT_SUCCESS);
 		}
 	}
 
@@ -179,17 +174,17 @@ int main(int argc, char *argv[]) {
 		gchar *path = g_string_free (pathStr, FALSE);
 
 		if (gtk_builder_add_from_file (builder, path, &err)) {
-			fprintf(stdout, _("Successfully loaded '%s%s'\n"), siril_sources[i], GLADE_FILE);
+			fprintf(stdout, "Successfully loaded '%s%s'\n", siril_sources[i], GLADE_FILE);
 			g_free(path);
 			break;
 		}
-		fprintf (stderr, _("Unable to read file: %s\n"), err->message);
+		fprintf (stderr, "Unable to read file: %s\n", err->message);
 		g_free(path);
 		g_error_free(err);
 		i++;
 	} while (i < sizeof(siril_sources)/sizeof(char *));
 	if (i == sizeof(siril_sources) / sizeof(char *)) {
-		fprintf(stderr, _("%s was not found or contains errors, cannot render GUI. Exiting.\n"), GLADE_FILE);
+		fprintf(stderr, "%s was not found or contains errors, cannot render GUI. Exiting.\n", GLADE_FILE);
 		exit(EXIT_FAILURE);
 	}
 	siril_path = siril_sources[i];
@@ -209,7 +204,7 @@ int main(int argc, char *argv[]) {
 	gtk_text_buffer_create_tag (tbuf, "blue", "foreground", "#7a7af8", NULL);
 	gtk_text_buffer_create_tag (tbuf, "plum", "foreground", "#8e4585", NULL);
 	
-	siril_log_color_message(_("Welcome to %s v%s\n"), "bold", PACKAGE, VERSION);
+	siril_log_color_message("Welcome to %s v%s\n", "bold", PACKAGE, VERSION);
 
 	/* initialize converters (utilities used for different image types importing) */
 	initialize_converters();
@@ -263,9 +258,6 @@ int main(int argc, char *argv[]) {
 	/* initialize sequence-related stuff */
 	initialize_sequence(&com.seq, TRUE);
 	adjust_sellabel();
-	
-	/* load the css sheet for general style */
-	load_css_style_sheet (siril_path);
 
 	/* set default CWD and load init file */
 	com.wd = malloc(PATH_MAX + 1);// PATH_MAX may not be available on all systems
@@ -276,15 +268,19 @@ int main(int argc, char *argv[]) {
 		cwd_orig = strdup(com.wd);
 
 	if (checkinitfile()) {
-		siril_log_message(_("Could not load or create settings file in ~/.siril, exiting.\n"));
+		siril_log_message("could not load or create settings file in ~/.siril, exiting.\n");
 		exit(1);
 	}
+	
+	/* load the css sheet for general style */
+	homepath = getenv("HOME");
+	homeStr = g_string_new (homepath);
+	g_string_append(homeStr, "/.siril");
+	csspath = g_string_free (homeStr, FALSE);
 
-	/* initialize menu gui */
-	update_MenuItem();
+	load_css_style_sheet (siril_path, csspath);
 
-	/* initialize preprocessing */
-	initialize_preprocessing();
+	g_free(csspath);
 
 	/* initialize registration methods */
 	initialize_registration_methods();
@@ -315,25 +311,14 @@ int main(int argc, char *argv[]) {
 #endif
 	
 	/* Get CPU number and set the number of threads */
-	siril_log_message(_("Parallel processing %s: Using %d logical processor%s"),
+	siril_log_message("Parallel processing %s: Using %d logical processor%s",
 #ifdef _OPENMP
-			_("enabled"), com.max_thread = omp_get_num_procs(), "s.\n"
+			"enabled", com.max_thread = omp_get_num_procs(), "s.\n"
 #else
-			_("disabled"), com.max_thread = 1, ".\n"
+			"disabled", com.max_thread = 1, ".\n"
 #endif
 			);
 	update_spinCPU(com.max_thread);
-
-	if (com.have_dark_theme) {
-		/* Put dark icons */
-		printf("Loading dark theme...\n");
-		gtk_tool_button_set_label_widget(GTK_TOOL_BUTTON(lookup_widget("rotate90_anticlock_button")), lookup_widget("rotate90-acw_dark"));
-		gtk_tool_button_set_label_widget(GTK_TOOL_BUTTON(lookup_widget("rotate90_clock_button")), lookup_widget("rotate90-cw_dark"));
-		gtk_tool_button_set_label_widget(GTK_TOOL_BUTTON(lookup_widget("mirrorx_button")), lookup_widget("image_mirrorx_dark"));
-		gtk_tool_button_set_label_widget(GTK_TOOL_BUTTON(lookup_widget("mirrory_button")), lookup_widget("image_mirrory_dark"));
-		gtk_tool_button_set_label_widget(GTK_TOOL_BUTTON(lookup_widget("histogram_button")), lookup_widget("image_histogram_dark"));
-		gtk_tool_button_set_label_widget(GTK_TOOL_BUTTON(lookup_widget("seqlist_button")), lookup_widget("image_seqlist_dark"));
-	}
 
 	/* start Siril */
 	update_used_memory();

@@ -182,19 +182,13 @@ int cvTransformImage(fits *image, TRANS trans, int interpolation) {
 	Mat in(image->ry, image->rx, CV_16UC3, bgrbgr);
 	Mat out(image->ry, image->rx, CV_16UC3);
 
-	double angle = -atan2(trans.c, trans.b);
-	double s = sqrt(trans.b * trans.b + trans.c * trans.c);
+	Point2f pt(0, in.rows);
+	double angle = atan(trans.c / trans.b) * 180 / M_PI;
+	Mat r = getRotationMatrix2D(pt, -angle, 1.0);
+	warpAffine(in, out, r, in.size(), interpolation);
 
-    // http://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations
-	Mat transform = Mat::eye(2, 3, CV_64FC1);
-	transform.at<double>(0, 0) = s * cos(angle);
-	transform.at<double>(0, 1) = -s * sin(angle);
-	transform.at<double>(1, 0) = s * sin(angle);
-	transform.at<double>(1, 1) = s * cos(angle);
-	transform.at<double>(0, 2) = trans.a;	// shift dx
-	transform.at<double>(1, 2) = trans.d;	// shift dy
-
-	warpAffine(in, out, transform, in.size(), interpolation);
+	r = (Mat_<double>(2, 3) << 1, 0, trans.a, 0, 1, -trans.d);
+	warpAffine(out, out, r, in.size(), interpolation);
 
 	Mat channel[3];
 	split(out, channel);
@@ -223,7 +217,7 @@ int cvTransformImage(fits *image, TRANS trans, int interpolation) {
 	delete[] bgrbgr;
 	in = Mat();
 	out = Mat();
-	transform = Mat();
+	r = Mat();
 	return 0;
 }
 

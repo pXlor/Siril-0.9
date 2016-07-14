@@ -261,7 +261,7 @@ int ser_create_file(const char *filename, struct ser_struct *ser_file, gboolean 
 #ifdef _OPENMP
 	omp_init_lock(&ser_file->fd_lock);
 #endif
-	siril_log_message(_("Created SER file %s\n"), filename);
+	siril_log_message("Created SER file %s\n", filename);
 	return 0;
 }
 
@@ -452,7 +452,7 @@ int ser_read_frame(struct ser_struct *ser_file, int frame_no, fits *fit) {
 	case SER_BAYER_YMCY:
 	case SER_BAYER_MYYC:
 	default:
-		siril_log_message(_("This type of Bayer pattern is not handled yet.\n"));
+		siril_log_message("This type of Bayer pattern is not handled yet.\n");
 		return -1;
 	}
 	fits_flip_top_to_bottom(fit);
@@ -518,7 +518,7 @@ int ser_read_opened_partial(struct ser_struct *ser_file, int layer,
 		if (com.debayer.ser_use_bayer_header)
 			set_combo_box_bayer_pattern(type_ser);
 		if (layer < 0 || layer >= 3) {
-			siril_log_message(_("For a demosaiced image, layer has to be R, G or B (0 to 2).\n"));
+			siril_log_message("For a demosaiced image, layer has to be R, G or B (0 to 2).\n");
 			return -1;
 		}
 
@@ -545,7 +545,7 @@ int ser_read_opened_partial(struct ser_struct *ser_file, int layer,
 #ifdef _OPENMP
 			omp_unset_lock(&ser_file->fd_lock);
 #endif
-			siril_log_message(_("Out of memory - aborting\n"));
+			siril_log_message("Out of memory - aborting\n");
 			return -1;
 		}
 		read_size = debayer_area.w * debayer_area.h * ser_file->byte_pixel_depth;
@@ -583,6 +583,8 @@ int ser_read_opened_partial(struct ser_struct *ser_file, int layer,
 		break;
 	case SER_BGR:
 	case SER_RGB:
+		//siril_log_message("Work in progress... Available soon !!\n");
+		//return -1;
 		assert(ser_file->number_of_planes == 3);
 
 		offset = SER_HEADER_LEN + frame_size * frame_no +	// requested frame
@@ -605,7 +607,7 @@ int ser_read_opened_partial(struct ser_struct *ser_file, int layer,
 #ifdef _OPENMP
 			omp_unset_lock(&ser_file->fd_lock);
 #endif
-			siril_log_message(_("Out of memory - aborting\n"));
+			siril_log_message("Out of memory - aborting\n");
 			return -1;
 		}
 		retval = read(ser_file->fd, rgb_buf, read_size);
@@ -633,7 +635,7 @@ int ser_read_opened_partial(struct ser_struct *ser_file, int layer,
 		free(rgb_buf);
 		break;
 	default:
-		siril_log_message(_("This type of Bayer pattern is not handled yet.\n"));
+		siril_log_message("This type of Bayer pattern is not handled yet.\n");
 		return -1;
 	}
 
@@ -654,7 +656,7 @@ int ser_write_frame_from_fit(struct ser_struct *ser_file, fits *fit, int frame_n
 		ser_header_from_fit(ser_file, fit);
 	}
 	if (fit->rx != ser_file->image_width || fit->ry != ser_file->image_height) {
-		siril_log_message(_("Trying to add an image of different size in a SER\n"));
+		siril_log_message("Trying to add an image of different size in a SER\n");
 		return 1;
 	}
 

@@ -36,7 +36,7 @@ void fft_to_spectra(fits* fit, fftw_complex *frequency_repr, double *as,
 		double *ps) {
 	unsigned int i;
 	int nbdata = fit->rx * fit->ry;
-#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) if(nbdata > 3000)
+#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(dynamic,1)
 	for (i = 0; i < nbdata; i++) {
 		as[i] = hypot(creal(frequency_repr[i]), cimag(frequency_repr[i]));
 		ps[i] = atan2(cimag(frequency_repr[i]), creal(frequency_repr[i]));
@@ -46,7 +46,7 @@ void fft_to_spectra(fits* fit, fftw_complex *frequency_repr, double *as,
 void fft_to_fr(fits* fit, fftw_complex *frequency_repr, double *as, double *ps) {
 	unsigned int i;
 	int nbdata = fit->rx * fit->ry;
-#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) if(nbdata > 3000)
+#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(dynamic,1)
 	for (i = 0; i < nbdata; i++) {
 		frequency_repr[i] = as[i] * (cos(ps[i]) + I * sin(ps[i]));
 	}
@@ -127,7 +127,7 @@ void FFTD(fits *fit, fits *x, fits *y, int type_order, int layer) {
 			sizeof(fftw_complex) * nbdata);
 
 	/* copying image selection into the fftw data */
-#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) if(nbdata > 15000)
+#pragma omp parallel for num_threads(com.max_thread) private(i) schedule(dynamic,1)
 	for (i = 0; i < nbdata; i++)
 		spatial_repr[i] = (double) gbuf[i];
 
@@ -231,7 +231,7 @@ gpointer fourier_transform(gpointer p) {
 	struct timeval t_start, t_end;
 	WORD *from[3], *to[3];
 
-	siril_log_color_message(_("Fourier Transform: processing...\n"), "red");
+	siril_log_color_message("Fourier Transform: processing...\n", "red");
 	gettimeofday(&t_start, NULL);
 
 	//type must be either "ffti" or "fftd"
@@ -286,7 +286,7 @@ gpointer fourier_transform(gpointer p) {
 		else if (wfit[0].dft_ord[0] == 'R')	// REGULAR
 			args->type_order = 1;
 		else {
-			siril_log_message(_("There is something wrong in your files\n"));
+			siril_log_message("There is something wrong in your files\n");
 			gdk_threads_add_idle(end_fourier_transform, args);
 			return GINT_TO_POINTER(1);
 		}

@@ -17,10 +17,8 @@ struct registration_args {
 	struct timeval t_start;		// start time of func
 	int retval;			// retval of func
 	gboolean run_in_thread;		// true if the registration was run in a thread
-	const gchar *prefix;		// prefix of the created sequence if any
-	gboolean follow_star;		// follow star position between frames
-	gboolean load_new_sequance; // load a new sequence if success
-	gboolean matchSelection;	// Match stars found in the seleciton of reference image
+	GtkEntry *entry;
+	const gchar *text;
 };
 
 typedef enum {
@@ -45,7 +43,7 @@ struct registration_method {
 	registration_type type;
 };
 
-struct registration_method *new_reg_method(const char *name, registration_function f,
+struct registration_method *new_reg_method(char *name, registration_function f,
 		selection_type s, registration_type t); // for compositing
 void initialize_registration_methods();
 struct registration_method * get_selected_registration_method();

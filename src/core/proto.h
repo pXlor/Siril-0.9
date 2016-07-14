@@ -6,7 +6,6 @@
 #endif
 #include <fftw3.h>
 #include <gsl/gsl_histogram.h>
-#include <stdint.h>
 
 #ifdef HAVE_LIBTIFF
 #include <tiffio.h>
@@ -105,13 +104,15 @@ int	round_to_int(double x);
 WORD	round_to_WORD(double x);
 BYTE	round_to_BYTE(double x);
 BYTE	conv_to_BYTE(double x);
-uint8_t *fits_to_uint8(fits *fit);
 gboolean isrgb(fits *fit);
 gboolean ends_with(const char *str, const char *ending);
 int	get_extension_index(const char *filename);
 int	is_readable_file(const char *filename);
 int	stat_file(const char *filename2, image_type *type, char *realname);
 const char *get_filename_ext(const char *filename);
+
+int	writeinitfile();
+int	checkinitfile();
 
 int	changedir(const char *dir);
 int	update_sequences_list(const char *sequence_name_to_select);
@@ -238,9 +239,9 @@ void	initialize_sequence(sequence *seq, gboolean is_zeroed);
 void	free_sequence(sequence *seq, gboolean free_seq_too);
 void	sequence_free_preprocessing_data(sequence *seq);
 gboolean sequence_is_loaded();
-int	sequence_processing(sequence *seq, sequence_proc process, int layer, gboolean run_in_thread, gboolean run_in_parallel, void *arg);
-int	seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area, void *arg);
-int	do_fwhm_sequence_processing(sequence *seq, int layer, int print_psf, gboolean follow_star, gboolean run_in_thread);
+int	sequence_processing(sequence *seq, sequence_proc process, int layer, gboolean run_in_thread);
+int	seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area);
+int	do_fwhm_sequence_processing(sequence *seq, int layer, int print_psf, gboolean run_in_thread);
 void	check_or_allocate_regparam(sequence *seq, int layer);
 sequence *create_internal_sequence(int size);
 void	internal_sequence_set(sequence *seq, int index, fits *fit);

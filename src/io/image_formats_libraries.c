@@ -63,7 +63,7 @@ int readtif(const char *name, fits *fit) {
 	
 	TIFF* tif = TIFFOpen(name, "r");
 	if (!tif) {
-		siril_log_message(_("Could not open the TIFF file %s\n"), name);
+		siril_log_message("Could not open the TIFF file %s\n", name);
 		return -1;
 	}
 	data = NULL;
@@ -92,8 +92,8 @@ int readtif(const char *name, fits *fit) {
 			break;
 
 		default :
-			msg = siril_log_message(_("Siril only works with 8/16-bit TIFF format.\n"));
-			show_dialog(msg, _("Warning"), "gtk-dialog-warning");
+			msg = siril_log_message("Siril only works with 8/16-bit TIFF format.\n");
+			show_dialog(msg, "Warning", "gtk-dialog-warning");
 			retval = -1;
 	}
 	TIFFClose(tif);
@@ -125,7 +125,7 @@ int readtif(const char *name, fits *fit) {
 		retval = nsamples;
 	}
 	if (nbits==16) mirrorx(fit, FALSE);
-	siril_log_message(_("Reading TIFF: %d-bit file %s, %ld layer(s), %ux%u pixels\n"),
+	siril_log_message("Reading TIFF: %d-bit file %s, %ld layer(s), %ux%u pixels\n",
 						nbits, name, fit->naxes[2], fit->rx, fit->ry);
 	return retval;
 }
@@ -146,8 +146,8 @@ int readtifstrip(TIFF* tif, uint32 width, uint32 height, uint16 nsamples, WORD *
 	*data = malloc(npixels * sizeof(WORD) * nsamples);
 	WORD *gbuf[3] = {*data, *data, *data};	
 	if (nsamples == 4) {
-		msg = siril_log_message(_("Alpha channel is ignored.\n"));
-		show_dialog(msg, _("Warning"), "gtk-dialog-warning");
+		msg = siril_log_message("Alpha channel is ignored.\n");
+		show_dialog(msg, "Warning", "gtk-dialog-warning");
 	}
 	if ((nsamples == 3) || (nsamples == 4)) {
 		gbuf[1] = *data + npixels;
@@ -162,8 +162,8 @@ int readtifstrip(TIFF* tif, uint32 width, uint32 height, uint16 nsamples, WORD *
 		switch(config){
 			case PLANARCONFIG_CONTIG:
 				if (TIFFReadEncodedStrip(tif, TIFFComputeStrip(tif, row, 0), buf, nrow*scanline) < 0){
-					msg = siril_log_message(_("An unexpected error was encountered while trying to read the file.\n"));
-					show_dialog(msg, _("Error"), "gtk-dialog-error");
+					msg = siril_log_message("An unexpected error was encountered while trying to read the file.\n");
+					show_dialog(msg, "Error", "gtk-dialog-error");
 					retval = -1;
 					break;
 				}
@@ -180,8 +180,8 @@ int readtifstrip(TIFF* tif, uint32 width, uint32 height, uint16 nsamples, WORD *
 					nsamples = 3;
 				for (j=0; j<nsamples; j++){	//loop on the layer
 					if (TIFFReadEncodedStrip(tif, TIFFComputeStrip(tif, row, j), buf, nrow*scanline) < 0){
-						msg = siril_log_message(_("An unexpected error was encountered while trying to read the file.\n"));
-						show_dialog(msg, _("Error"), "gtk-dialog-error");
+						msg = siril_log_message("An unexpected error was encountered while trying to read the file.\n");
+						show_dialog(msg, "Error", "gtk-dialog-error");
 						retval = -1;
 						break;
 					}
@@ -190,8 +190,8 @@ int readtifstrip(TIFF* tif, uint32 width, uint32 height, uint16 nsamples, WORD *
 				}
 				break;
 			default:
-				msg = siril_log_message(_("Unknown TIFF file.\n"));
-				show_dialog(msg, _("Error"), "gtk-dialog-error");
+				msg = siril_log_message("Unknown TIFF file.\n");
+				show_dialog(msg, "ERROR", "gtk-dialog-error");
 				retval = -1;
 		}
 	}
@@ -207,7 +207,8 @@ int readtif8bits(TIFF* tif, uint32 width, uint32 height, uint16 nsamples, WORD *
 	*data = malloc(npixels * sizeof(WORD) * nsamples);
 	WORD *gbuf[3] = {*data, *data, *data};
 	if (nsamples == 4) {
-		siril_log_message(_("Alpha channel is ignored.\n"));
+		msg = siril_log_message("Alpha channel is ignored.\n");
+		show_dialog(msg, "Warning", "gtk-dialog-warning");
 	}
 	if ((nsamples == 3) || (nsamples == 4)) {
 		gbuf[1] = *data + npixels;
@@ -231,8 +232,8 @@ int readtif8bits(TIFF* tif, uint32 width, uint32 height, uint16 nsamples, WORD *
 			}
 		}
 		else {
-			msg = siril_log_message(_("An unexpected error was encountered while trying to read the file.\n"));
-			show_dialog(msg, _("Error"), "gtk-dialog-error");
+			msg = siril_log_message("An unexpected error was encountered while trying to read the file.\n");
+			show_dialog(msg, "Error", "gtk-dialog-error");
 			retval = -1;
 		}
 		_TIFFfree(raster);
@@ -256,8 +257,8 @@ int savetif(const char *name, fits *fit, uint16 bitspersample){
 	TIFF* tif = TIFFOpen(name, "w");
 
 	if (tif == NULL) {
-		msg = siril_log_message(_("Siril cannot create TIFF file.\n"));
-		show_dialog(msg, _("Error"), "gtk-dialog-error");
+		msg = siril_log_message("Siril cannot create TIFF file.\n");
+		show_dialog(msg, "Error", "gtk-dialog-error");
 		return 1;
 	}
 	nsamples	=(uint16)fit->naxes[2];
@@ -312,8 +313,8 @@ int savetif(const char *name, fits *fit, uint16 bitspersample){
 		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
 	else {
 		TIFFClose(tif);
-		msg = siril_log_message(_("TIFF file has unexpected number of channels (not 1 or 3).\n"));
-		show_dialog(msg, _("Error"), "gtk-dialog-error");
+		msg = siril_log_message("TIFF file has unexpected number of channels (not 1 or 3).\n");
+		show_dialog(msg, "Error", "gtk-dialog-error");
 		return 1;
 	}
 
@@ -351,7 +352,7 @@ int savetif(const char *name, fits *fit, uint16 bitspersample){
 	}
 	TIFFClose(tif);
 	mirrorx(fit, FALSE);
-	siril_log_message(_("Saving TIFF: %d-bit file %s, %ld layer(s), %ux%u pixels\n"),
+	siril_log_message("Saving TIFF: %d-bit file %s, %ld layer(s), %ux%u pixels\n",
 						bitspersample, name, fit->naxes[2], fit->rx, fit->ry);
 	return retval;
 }
@@ -370,8 +371,8 @@ int readjpg(const char* name, fits *fit){
 	JSAMPARRAY pJpegBuffer;
 	int row_stride;
 	if ((f = fopen(name, "rb")) == NULL){
-		char *msg = siril_log_message(_("Sorry but Siril cannot open the file: %s.\n"), name);
-		show_dialog(msg, _("Error"), "gtk-dialog-error");
+		char *msg = siril_log_message("Sorry but Siril cannot open the file: %s.\n", name);
+		show_dialog(msg, "Error", "gtk-dialog-error");
 		return -1;
 	}
 	cinfo.err = jpeg_std_error(&jerr);
@@ -415,7 +416,7 @@ int readjpg(const char* name, fits *fit){
 		fit->binning_x=fit->binning_y=1;
 	}
 	mirrorx(fit, FALSE);
-	siril_log_message(_("Reading JPG: file %s, %ld layer(s), %ux%u pixels\n"),
+	siril_log_message("Reading JPG: file %s, %ld layer(s), %ux%u pixels\n",
 						name, fit->naxes[2], fit->rx, fit->ry);
 	return cinfo.output_components;
 }
@@ -435,8 +436,8 @@ int savejpg(char *name, fits *fit, int quality){
 
 	//## OPEN FILE FOR DATA DESTINATION:
 	if ((f = fopen(name, "wb")) == NULL) {
-		char *msg = siril_log_message(_("Siril cannot create JPG file.\n"));
-		show_dialog(msg, _("Error"), "gtk-dialog-error");
+		char *msg = siril_log_message("Siril cannot create JPG file.\n");
+		show_dialog(msg, "Error", "gtk-dialog-error");
 		return 1;
 	}
 	jpeg_stdio_dest(&cinfo, f);
@@ -499,7 +500,7 @@ int savejpg(char *name, fits *fit, int quality){
 	fclose(f);
 	jpeg_destroy_compress(&cinfo);
 	free(image_buffer);
-	siril_log_message(_("Saving JPG: file %s, quality=%d%%, %ld layer(s), %ux%u pixels\n"),
+	siril_log_message("Saving JPG: file %s, quality=%d%%, %ld layer(s), %ux%u pixels\n",
 						name, quality, fit->naxes[2], fit->rx, fit->ry);
 	return 0;
 }
@@ -521,8 +522,8 @@ int readpng(const char *name, fits* fit) {
 
 	png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 	if(!png) {
-		char *msg = siril_log_message(_("Sorry but Siril cannot open the file: %s.\n"), name);
-		show_dialog(msg, _("Error"), "gtk-dialog-error");
+		char *msg = siril_log_message("Sorry but Siril cannot open the file: %s.\n", name);
+		show_dialog(msg, "Error", "gtk-dialog-error");
 		return -1;
 	}
 
@@ -636,7 +637,7 @@ int readpng(const char *name, fits* fit) {
 
 	}
 	mirrorx(fit, FALSE);
-	siril_log_message(_("Reading PNG: %d-bit file %s, %ld layer(s), %ux%u pixels\n"),
+	siril_log_message("Reading PNG: %d-bit file %s, %ld layer(s), %ux%u pixels\n",
 						bit_depth, name, fit->naxes[2], fit->rx, fit->ry);
 
 	return nbplanes;
@@ -654,17 +655,17 @@ int readraw(const char *name, fits *fit) {
 	libraw_processed_image_t *image = NULL;
 	int ret = libraw_open_file(raw, name);
 	if (ret) {
-		siril_log_message(_("Error in libraw %s\n"), libraw_strerror(ret));
+		siril_log_message("ERROR libraw %s\n", libraw_strerror(ret));
 		libraw_recycle(raw);
 		libraw_close(raw);	
 		return -1;
 	}
 	
 	if (raw->other.shutter > 1.0)
-		siril_log_message(_("Decoding %s %s file (ISO=%g, Exposure=%gs)\n"),
+		siril_log_message("Decoding %s %s file (ISO=%g, Exposure=%gs)\n", 
 				raw->idata.make, raw->idata.model, raw->other.iso_speed, raw->other.shutter);
 	else
-		siril_log_message(_("Decoding %s %s file (ISO=%g, Exposure=1/%gs)\n"),
+		siril_log_message("Decoding %s %s file (ISO=%g, Exposure=1/%gs)\n", 
 				raw->idata.make, raw->idata.model, raw->other.iso_speed, 1/raw->other.shutter);
 		
 	raw->params.output_bps = 16;						/* 16-bits files                           */
@@ -684,7 +685,7 @@ int readraw(const char *name, fits *fit) {
 		raw->params.user_mul[0] = (float)com.raw_set.mul[0];
 		raw->params.user_mul[1] = raw->params.user_mul[3] = 1.0f;
 		raw->params.user_mul[2] = (float)com.raw_set.mul[2];
-		siril_log_message(_("Daylight multipliers: %f, %f, %f\n"),
+		siril_log_message("Daylight multipliers: %f, %f, %f\n", 
 				raw->params.user_mul[0], raw->params.user_mul[1], raw->params.user_mul[2]);
 	}
 	else {
@@ -693,26 +694,26 @@ int readraw(const char *name, fits *fit) {
 		mul[1] = 1.0; /* raw->color.pre_mul[1]/raw->color.pre_mul[1]; */
 		mul[2] = raw->color.pre_mul[2]/raw->color.pre_mul[1];
 		mul[3] = raw->color.pre_mul[3]/raw->color.pre_mul[1];
-		siril_log_message(_("Daylight multipliers: %f, %f, %f\n"), mul[0], mul[1], mul[2]);
+		siril_log_message("Daylight multipliers: %f, %f, %f\n", mul[0], mul[1], mul[2]);
 	}
 
 	switch(com.raw_set.user_qual) {		/* Set interpolation                                        */
 		case 0:		/* bilinear interpolaton */
 			raw->params.user_qual = 0;
-			siril_log_message(_("Bilinear interpolation...\n"));
+			siril_log_message("Bilinear interpolation...\n");
 			break;
 		case 2:		/* VNG interpolaton */
 			raw->params.user_qual = 1;
-			siril_log_message(_("VNG interpolation...\n"));
+			siril_log_message("VNG interpolation...\n");
 			break;
 		case 3:		/* PPG interpolaton */
 			raw->params.user_qual = 2;
-			siril_log_message(_("PPG interpolation...\n"));
+			siril_log_message("PPG interpolation...\n");
 			break;
 		default:
 		case 1:		/* AHD interpolaton */
 			raw->params.user_qual = 3;
-			siril_log_message(_("AHD interpolation...\n"));
+			siril_log_message("AHD interpolation...\n");
 			break;
 	}
 	
@@ -725,7 +726,7 @@ int readraw(const char *name, fits *fit) {
 	WORD *buf[3] = {data, data + npixels, data + npixels * 2};
 	ret = libraw_unpack(raw);
 	if (ret) {
-		printf("Error in libraw %s\n", libraw_strerror(ret));
+		siril_log_message("ERROR libraw %s\n", libraw_strerror(ret));
 		free(data);
 		libraw_recycle(raw);
 		libraw_close(raw);
@@ -734,7 +735,7 @@ int readraw(const char *name, fits *fit) {
 	
 	ret = libraw_dcraw_process(raw);
 	if (ret) {
-		printf("Error in libraw %s\n", libraw_strerror(ret));
+		siril_log_message("ERROR libraw %s\n", libraw_strerror(ret));
 		free(data);
 		libraw_recycle(raw);
 		libraw_close(raw);
@@ -742,7 +743,7 @@ int readraw(const char *name, fits *fit) {
 	}
 	image = libraw_dcraw_make_mem_image(raw, &ret);
 	if (ret) {
-		printf("Error in libraw %s\n", libraw_strerror(ret));
+		siril_log_message("ERROR libraw %s\n", libraw_strerror(ret));
 		free(data);
 		libraw_dcraw_clear_mem(image);
 		libraw_recycle(raw);
@@ -805,20 +806,20 @@ int readraw_in_cfa(const char *name, fits *fit) {
 	int ret = libraw_open_file(raw, name);
 	
 	if (ret) {
-		printf("Error in libraw %s\n", libraw_strerror(ret));
+		siril_log_message("ERROR libraw %s\n", libraw_strerror(ret));
 		return -1;
 	}
 	
 	ret = libraw_unpack(raw);
 	if (ret) {
-		printf("Error in libraw %s\n", libraw_strerror(ret));
+		siril_log_message("ERROR libraw %s\n", libraw_strerror(ret));
 		return -1;
 	}
 	
 	/* This test checks if raw data exist. Sometimes it doesn't. This is
 	 * the case for DNG built from lightroom for example */
 	if ((void*)raw->rawdata.raw_image != raw->rawdata.raw_alloc || raw->rawdata.raw_alloc == 0x00){
-		siril_log_message(_("Siril cannot open this file in CFA mode (no data available). Try to switch into RGB.\n"));
+		siril_log_message("Siril cannot open this file in CFA mode (no data available). Try to switch into RGB.\n");
 		return -1;
 	}
 		
@@ -833,10 +834,10 @@ int readraw_in_cfa(const char *name, fits *fit) {
 	top_margin = raw->rawdata.sizes.top_margin;
 	
 	if (raw->other.shutter > 1.0)
-		siril_log_message(_("Decoding %s %s file (ISO=%g, Exposure=%gs)\n"),
+		siril_log_message("Decoding %s %s file (ISO=%g, Exposure=%gs)\n", 
 				raw->idata.make, raw->idata.model, raw->other.iso_speed, raw->other.shutter);
 	else
-		siril_log_message(_("Decoding %s %s file (ISO=%g, Exposure=1/%gs)\n"),
+		siril_log_message("Decoding %s %s file (ISO=%g, Exposure=1/%gs)\n", 
 				raw->idata.make, raw->idata.model, raw->other.iso_speed, 1/raw->other.shutter);
 
 	data = (WORD*) calloc(1, npixels * sizeof(WORD));
@@ -892,7 +893,7 @@ int open_raw_files(const char *name, fits *fit, int type) {
 			break;
 	}
 	mirrorx(fit, FALSE);
-	siril_log_message(_("Reading RAW: file %s, %ld layer(s), %ux%u pixels\n"),
+	siril_log_message("Reading RAW: file %s, %ld layer(s), %ux%u pixels\n",
 						name, fit->naxes[2], fit->rx, fit->ry);		
 	return retvalue;
 }
@@ -923,7 +924,7 @@ int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int de
 	float pente;
 
 	if (anim && gif == NULL) {
-		printf("Gif should not be NULL in anim mode\n");
+		siril_log_message("gif should not be NULL in anim mode\n");
 		return 1;
 	}
 
@@ -933,7 +934,7 @@ int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int de
 		 *  linear grey palette are the same as the pixel values */
 		gif_buffer = malloc(nb_pixels);
 		if (!gif_buffer) {
-			printf("Failed to allocate memory required, aborted.\n");
+			siril_log_message("Failed to allocate memory required, aborted.\n");
 			return 1;
 		}
 	} else {
@@ -942,19 +943,19 @@ int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int de
 
 		rgb[0] = malloc(nb_pixels);
 		if (rgb[0] == NULL) {
-			printf("Failed to allocate memory required, aborted.\n");
+			siril_log_message("Failed to allocate memory required, aborted.\n");
 			if (anim) *gif = NULL;
 			return 1;
 		}
 		rgb[1] = malloc(nb_pixels);
 		if (rgb[1] == NULL) {
-			printf("Failed to allocate memory required, aborted.\n");
+			siril_log_message("Failed to allocate memory required, aborted.\n");
 			if (anim) *gif = NULL;
 			return 1;
 		}
 		rgb[2] = malloc(nb_pixels);
 		if (rgb[2] == NULL) {
-			printf("Failed to allocate memory required, aborted.\n");
+			siril_log_message("Failed to allocate memory required, aborted.\n");
 			if (anim) *gif = NULL;
 			return 1;
 		}
@@ -1030,7 +1031,7 @@ int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int de
 
 		if ((OutputColorMap = GifMakeMapObject(ColorMapSize, gif_colors)) == NULL) {
 			free(gif_buffer);
-			printf("Failed to allocate memory required, aborted.\n");
+			siril_log_message("Failed to allocate memory required, aborted.\n");
 			if (anim) *gif = NULL;
 			return 1;
 		}
@@ -1039,7 +1040,7 @@ int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int de
 		if ((OutputColorMap = GifMakeMapObject(ColorMapSize, NULL)) == NULL ||
 				(gif_buffer = malloc(nb_pixels * sizeof(GifByteType))) == NULL) {
 			free(rgb[0]); free(rgb[1]); free(rgb[2]);
-			printf("Failed to allocate memory required, aborted.\n");
+			siril_log_message("Failed to allocate memory required, aborted.\n");
 			if (anim) *gif = NULL;
 			return 1;
 		}
@@ -1048,7 +1049,7 @@ int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int de
 					rgb[0], rgb[1], rgb[2],
 					gif_buffer, OutputColorMap->Colors) == GIF_ERROR) {
 			free(rgb[0]); free(rgb[1]); free(rgb[2]); free(gif_buffer);
-			siril_log_message(_("Failed to convert data into GIF data format\n"));
+			siril_log_message("Failed to convert data into GIF data format\n");
 			if (anim) *gif = NULL;
 			GifFreeMapObject(OutputColorMap);
 			return 1;
@@ -1062,14 +1063,14 @@ int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int de
 	GifFileType *GifFile;
 	if (!anim || *gif == NULL) {
 		if ((GifFile = EGifOpenFileName(filename, FALSE, &error)) == NULL) {
-			siril_log_message(_("Error opening GIF file: %s\n"), GifErrorString(error));
+			siril_log_message("Error opening GIF file: %s\n", GifErrorString(error));
 			free(gif_buffer);
 			GifFreeMapObject(OutputColorMap);
 			return 1;
 		}
 
 		if (EGifPutScreenDesc(GifFile, fit->rx, fit->ry, 256, 0, OutputColorMap) == GIF_ERROR) {
-			siril_log_message(_("Error describing GIF file: %s\n"), GifErrorString(error));
+			siril_log_message("Error describing GIF file: %s\n", GifErrorString(error));
 			EGifCloseFile(GifFile, NULL);
 			free(gif_buffer);
 			GifFreeMapObject(OutputColorMap);
@@ -1077,7 +1078,7 @@ int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int de
 		}
 
 		if (EGifPutComment(GifFile, "Made with Siril, for free astronomy") == GIF_ERROR) {
-			siril_log_message(_("Error adding comment in GIF file\n"));
+			siril_log_message("Error adding comment in GIF file\n");
 		}
 
 		/* add loop, optional */
@@ -1091,7 +1092,7 @@ int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int de
 					EGifPutExtensionBlock(GifFile, 11, nsle) == GIF_ERROR ||
 					EGifPutExtensionBlock(GifFile, 3, subblock) == GIF_ERROR ||
 					EGifPutExtensionTrailer(GifFile) == GIF_ERROR) {
-				siril_log_message(_("Error adding the loop in GIF file\n"));
+				siril_log_message("Error adding the loop in GIF file\n");
 			}
 		}
 	} else {
@@ -1106,12 +1107,12 @@ int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int de
 		ExtStr[1] = delay % 256;
 		ExtStr[2] = delay / 256;
 		if (EGifPutExtension(GifFile, GRAPHICS_EXT_FUNC_CODE, 4, ExtStr) == GIF_ERROR) {
-			siril_log_message(_("Error adding the delay in GIF file\n"));
+			siril_log_message("Error adding the delay in GIF file\n");
 		}
 	}
 
 	if (EGifPutImageDesc(GifFile, 0, 0, fit->rx, fit->ry, FALSE, OutputColorMap) == GIF_ERROR) {
-		siril_log_message(_("Error describing GIF file: %s\n"), GifErrorString(error));
+		siril_log_message("Error describing GIF file: %s\n", GifErrorString(error));
 		EGifCloseFile(GifFile, NULL);
 		free(gif_buffer);
 		if (anim) *gif = NULL;
@@ -1137,7 +1138,7 @@ int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int de
 
 	if (!anim) {
 		if (EGifCloseFile(GifFile, &error) == GIF_ERROR) {
-			siril_log_message(_("Error closing GIF file: %s\n"), GifErrorString(error));
+			siril_log_message("Error closing GIF file: %s\n", GifErrorString(error));
 			return 1;
 		}
 	} else {
@@ -1152,7 +1153,7 @@ void closegif(GifFileType **gif) {
 		return;
 
 	if (EGifCloseFile(*gif, &error) == GIF_ERROR) {
-		siril_log_message(_("Error closing GIF file: %s\n"), GifErrorString(error));
+		siril_log_message("Error closing GIF file: %s\n", GifErrorString(error));
 	}
 	*gif = NULL;
 }

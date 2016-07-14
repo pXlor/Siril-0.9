@@ -246,7 +246,7 @@ int cosmeticCorrection(fits *fit, deviant_pixel *dev, int size, gboolean is_cfa)
 }
 
 /**** Autodetect *****/
-int cosmetic_image_hook(struct generic_seq_args *args, int i, fits *fit) {
+int cosmetic_image_hook(struct generic_seq_args *args, int i, int j, fits *fit) {
 	struct cosmetic_data *c_args = (struct cosmetic_data *) args->user;
 	int retval, chan;
 	/* Count variables, icold and ihot, need to be local in order to be parallelized */
@@ -259,7 +259,7 @@ int cosmetic_image_hook(struct generic_seq_args *args, int i, fits *fit) {
 		if (retval)
 			return retval;
 	}
-	siril_log_color_message(_("Image %d: %ld pixels corrected (%ld + %ld)\n"),
+	siril_log_color_message("Image %d: %ld pixels corrected (%ld + %ld)\n",
 			"bold", i, icold + ihot, icold, ihot);
 	return 0;
 }
@@ -292,7 +292,7 @@ gboolean end_autoDetect(gpointer p) {
 	struct cosmetic_data *args = (struct cosmetic_data *) p;
 
 	stop_processing_thread();// can it be done here in case there is no thread?
-	siril_log_message(_("%ld pixels corrected (%ld + %ld)\n"),
+	siril_log_message("%ld pixels corrected (%ld + %ld)\n",
 			args->icold + args->ihot, args->icold, args->ihot);
 	set_cursor_waiting(FALSE);
 	adjust_cutoff_from_updated_gfit();
@@ -310,7 +310,7 @@ gpointer autoDetectThreaded(gpointer p) {
 	int retval, chan;
 	long icold, ihot;
 
-	siril_log_color_message(_("Cosmetic Correction: processing...\n"), "red");
+	siril_log_color_message("Cosmetic Correction: processing...\n", "red");
 	gettimeofday(&t_start, NULL);
 
 	icold = ihot = 0L;

@@ -2,12 +2,11 @@
 
 bin_PROGRAMS = siril
 
-AM_CPPFLAGS = -DPACKAGE_DATA_DIR='"$(datadir)/${PACKAGE}"' -DPACKAGE_DOC_DIR='"${datarootdir}/doc/${PACKAGE}"' -DLOCALEDIR='"${localedir}"' $(GTK_CFLAGS) $(LIBTIFF_CFLAGS) $(LIBPNG_CFLAGS) $(FFTW_CFLAGS) $(CFITSIO_CFLAGS) $(GSL_CFLAGS) $(FFMS2_CFLAGS) $(LIBCONFIGXX_CFLAGS)
+AM_CPPFLAGS = -DPACKAGE_DATA_DIR='"$(datadir)/${PACKAGE}"' -DPACKAGE_DOC_DIR='"${datarootdir}/doc/${PACKAGE}"' $(GTK_CFLAGS) $(LIBRAW_LIBS) $(LIBTIFF_CFLAGS) $(LIBPNG_CFLAGS) $(FFTW_CFLAGS) $(CFITSIO_CFLAGS) $(GSL_CFLAGS) $(FFMS2_CFLAGS) $(LIBCONFIGXX_CFLAGS)
 
 siril_SOURCES = \
 	main.c \
 	core/siril.c core/siril.h core/command.c core/command.h core/proto.h core/undo.c core/undo.h core/utils.c core/processing.c \
-	core/initfile.c core/initfile.h \
 	io/conversion.c io/conversion.h io/ser.c io/ser.h io/films.c io/films.h \
 	io/image_formats_libraries.c io/image_formats_internal.c io/image_format_fits.c \
 	io/sequence.c io/seqfile.c io/single_image.c io/single_image.h \
@@ -27,12 +26,9 @@ siril_SOURCES = \
 	algos/PSF.c algos/PSF.h algos/star_finder.c algos/star_finder.h \
 	algos/cosmetic_correction.c algos/cosmetic_correction.h \
 	algos/quantize.c \
-	compositing/compositing.c compositing/compositing.h compositing/filters.c compositing/filters.h compositing/align_rgb.c compositing/align_rgb.h
+	compositing/compositing.c compositing/compositing.h compositing/filters.c compositing/filters.h
 	
-siril_LDADD = $(GTK_LIBS) $(LIBRAW_LIBS) $(LIBTIFF_LIBS) $(LIBPNG_LIBS) $(FFTW_LIBS) $(CFITSIO_LIBS) $(GSL_LIBS) $(FFMS2_LIBS) $(LIBCONFIGXX_LIBS) $(LIBINTL)
-
-siril_SOURCES += io/avi_pipp/pipp_avi_write.cpp io/avi_pipp/pipp_avi_write.h io/avi_pipp/pipp_avi_write_dib.cpp io/avi_pipp/pipp_avi_write_dib.h io/avi_pipp/pipp_buffer.cpp io/avi_pipp/pipp_buffer.h \
-	io/avi_pipp/pipp_utf8.h io/avi_pipp/pipp_utf8_linux.cpp io/avi_pipp/pipp_utf8_osx.cpp io/avi_pipp/pipp_video_write.h io/avi_pipp/avi_writer.cpp io/avi_pipp/avi_writer.h
+siril_LDADD = $(GTK_LIBS) $(LIBRAW_LIBS) $(LIBTIFF_LIBS) $(LIBPNG_LIBS) $(FFTW_LIBS) $(CFITSIO_LIBS) $(GSL_LIBS) $(FFMS2_LIBS) $(LIBCONFIGXX_LIBS)
 
 if HAVE_OPENCV
 siril_SOURCES += opencv/opencv.cpp opencv/opencv.h opencv/ecc/ecc.cpp opencv/ecc/ecc.h

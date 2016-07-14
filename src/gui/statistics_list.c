@@ -26,8 +26,6 @@
 
 static GtkListStore *list_store = NULL;
 
-static const char *first_colour[] = { "WhiteSmoke", "#1B1B1B" };
-static const char *second_colour[] = { "Powder Blue", "#39394A" };
 
 enum {
 	COLUMN_NAME,		// string
@@ -95,7 +93,7 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, first_colour[com.have_dark_theme],
+			COLUMN_COLOR, "White Smoke",
 			-1);
 
 	/** Mean */
@@ -113,7 +111,7 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, second_colour[com.have_dark_theme],
+			COLUMN_COLOR, "Powder Blue",
 			-1);
 
 	/* median */
@@ -131,7 +129,7 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, first_colour[com.have_dark_theme],
+			COLUMN_COLOR, "White Smoke",
 			-1);
 
 	/* sigma */
@@ -149,7 +147,7 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, second_colour[com.have_dark_theme],
+			COLUMN_COLOR, "Powder Blue",
 			-1);
 
 	/* avgDev */
@@ -167,7 +165,7 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, first_colour[com.have_dark_theme],
+			COLUMN_COLOR, "White Smoke",
 			-1);
 
 	/* MAD */
@@ -185,7 +183,7 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, second_colour[com.have_dark_theme],
+			COLUMN_COLOR, "Powder Blue",
 			-1);
 
 	/* sqrt(BWMV) */
@@ -203,7 +201,7 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, first_colour[com.have_dark_theme],
+			COLUMN_COLOR, "White Smoke",
 			-1);
 
 	/* min */
@@ -221,7 +219,7 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, second_colour[com.have_dark_theme],
+			COLUMN_COLOR, "Powder Blue",
 			-1);
 
 	/* max */
@@ -239,7 +237,7 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, first_colour[com.have_dark_theme],
+			COLUMN_COLOR, "White Smoke",
 			-1);
 
 }
@@ -264,19 +262,19 @@ void computeStat() {
 	if (single_image_is_loaded())
 		g_snprintf(name, sizeof(name), "%s", com.uniq->filename);
 	else if (sequence_is_loaded())
-		g_snprintf(name, sizeof(name), _("Image %d/%d from the sequence %s"),
+		g_snprintf(name, sizeof(name), "Image %d/%d from the sequence %s",
 				com.seq.current, com.seq.number, com.seq.seqname);
 	else
-		g_snprintf(name, sizeof(name), _("unknown image"));
+		g_snprintf(name, sizeof(name), "unknown image");
 
 	gtk_label_set_text(statNameLabel, name);
 
 	if (com.selection.h && com.selection.w) {
 		g_snprintf(selection, sizeof(selection),
-				_("Size of selection in pixel: (%d,%d)"), com.selection.w,
+				"Size of selection in pixel: (%d,%d)", com.selection.w,
 				com.selection.h);
 	} else {
-		g_snprintf(selection, sizeof(selection), _("No selection"));
+		g_snprintf(selection, sizeof(selection), "No selection");
 	}
 
 	gtk_label_set_text(statSelecLabel, selection);

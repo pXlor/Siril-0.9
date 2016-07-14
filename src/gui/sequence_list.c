@@ -27,10 +27,6 @@
 
 static gboolean fill_sequence_list_idle(gpointer p);
 
-static const char *bg_colour[] = { "WhiteSmoke", "#1B1B1B" };
-static const char *ref_bg_colour[] = { "Beige", "#4A4A39" };
-
-
 static GtkListStore *list_store = NULL;
 
 enum {
@@ -86,8 +82,7 @@ void add_image_to_sequence_list(sequence *seq, int index, int layer) {
 			COLUMN_CURRENT, index == seq->current ? 800 : 400,
 			// weight value is 400 by default "normal":
 			// http://developer.gnome.org/gtk3/stable/GtkCellRendererText.html#GtkCellRendererText--weight
-			COLUMN_REFERENCE, index == seq->reference_image ?
-			ref_bg_colour[com.have_dark_theme] : bg_colour[com.have_dark_theme],
+			COLUMN_REFERENCE, index == seq->reference_image ? "Beige" : "WhiteSmoke",
 			COLUMN_INDEX, index,
 			-1);
 	/* see example at http://developer.gnome.org/gtk3/3.5/GtkListStore.html */
@@ -136,11 +131,11 @@ void show_seqlist(GtkWidget *widget, gboolean show) {
 	gtk_paned_set_position(GTK_PANED(widget), show ? 200 : 0);
 }
 
-void on_toggle_show_seqlist_toggled(GtkToggleToolButton *togglebutton, gpointer user_data) {
+void on_toggle_show_seqlist_toggled(GtkToggleButton *togglebutton, gpointer user_data) {
 	static GtkWidget *paned = NULL;
 	if (!paned)
 		paned = lookup_widget("paned1");
-	show_seqlist(paned, gtk_toggle_tool_button_get_active(togglebutton));
+	show_seqlist(paned, gtk_toggle_button_get_active(togglebutton));
 }
 
 int get_image_index_from_path(GtkTreePath *path) {
@@ -167,8 +162,8 @@ void on_seqlist_image_selection_toggled(GtkCellRendererToggle *cell_renderer,
 	}*/
 
 	sequence_list_change_selection(path, !com.seq.imgparam[index].incl);
-	siril_log_message(_("%s image %d in sequence %s\n"),
-			com.seq.imgparam[index].incl ? _("excluding") : _("including"),
+	siril_log_message("%s image %d in sequence %s\n",
+			com.seq.imgparam[index].incl ? "excluding" : "including",
 			index, com.seq.seqname);
 
 	com.seq.imgparam[index].incl = !com.seq.imgparam[index].incl;
@@ -232,8 +227,7 @@ void sequence_list_change_reference() {
 	while (valid) {
 		gtk_list_store_set(list_store, &iter,
 				COLUMN_REFERENCE,
-				(row_count == com.seq.reference_image) ?
-				ref_bg_colour[com.have_dark_theme] : bg_colour[com.have_dark_theme],
+				(row_count == com.seq.reference_image) ? "Beige" : "WhiteSmoke",
 				-1);
 		row_count++;
 		valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(list_store), &iter);

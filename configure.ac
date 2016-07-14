@@ -1,28 +1,9 @@
 dnl Process this file with autoconf to produce a configure script.
-m4_define([siril_major_version], [0])
-m4_define([siril_minor_version], [9])
-m4_define([siril_micro_version], [4])
-m4_define([siril_prerelease_version], [beta.0])
-m4_define([siril_version],
-          [siril_major_version.siril_minor_version.siril_micro_version])
-m4_define([siril_version_full],
-          [siril_major_version().siril_minor_version().siril_micro_version()m4_bpatsubst(siril_prerelease_version(), [^], [-])])
 
-dnl change siril_version_full by siril_version for stable release
-AC_INIT([siril], [siril_version_full],
-        [https://free-astro.org/bugs/view_all_bug_page.php],
-        [siril],
-        [https://free-astro.org/index.php/Siril/fr]) 
-        
+AC_INIT(siril, 0.9.3)
 AM_INIT_AUTOMAKE([subdir-objects])
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_SRCDIR([src/main.c])
-
-dnl ================================================================
-dnl Gettext stuff.
-dnl ================================================================
-IT_PROG_INTLTOOL([0.50])
-AC_SUBST([GETTEXT_PACKAGE], [siril])
 
 remember_set_CFLAGS="$CFLAGS"
 
@@ -55,7 +36,7 @@ dnl     AC_DEFINE_UNQUOTED(PACKAGE_DATA_DIR, "${prefix}/share/${PACKAGE}", [Pack
 dnl   fi
 dnl else
 dnl   AC_DEFINE_UNQUOTED(PACKAGE_DATA_DIR, "${datadir}/${PACKAGE}", [Package data dir3])
-dnl fi[]
+dnl fi
 
 dnl Set PACKAGE_SOURCE_DIR in config.h.
 packagesrcdir=`cd $srcdir && pwd`
@@ -113,9 +94,9 @@ PKG_CHECK_MODULES(LIBPNG, [libpng],
 dnl check gif lib
 AC_CHECK_LIB(gif, EGifGetGifVersion, [])
 AS_IF([test "$ac_cv_lib_gif_EGifGetGifVersion" != yes],
-      AC_MSG_WARN([giflib not found or too old. Not using GIF exporter.]))
+      AC_MSG_WARN([giflib not found. Not using GIF exporter.]))
 
-dnl check ffms2
+dnl check ffms2		  
 PKG_CHECK_MODULES(FFMS2, [ffms2 < 2.21],
 		  [AC_DEFINE([HAVE_FFMS2_1], [1], [Use FFMS2 < 2.21])],
 		  [PKG_CHECK_MODULES(FFMS2, [ffms2 >= 2.21],
@@ -129,21 +110,41 @@ if test -n "$CXX" && ( test "X$CXX" != "Xno" &&
 		      ( (test "X$CXX" = "Xg++" && `g++ -v >/dev/null 2>&1` ) ||
 		      (test "X$CXX" != "Xg++"))) ; then
 	AC_PROG_CXXCPP
-	AX_CHECK_COMPILE_FLAG([-std=c++11], [CXXFLAGS="$CXXFLAGS -std=c++11"], AC_MSG_ERROR([Compiler does not accept ISO C++11]))
-	
 	dnl AC_MSG_WARN(CXX is "$CXX")
 	dnl http://nerdland.net/2009/07/detecting-c-libraries-with-autotools/ solution 2
 	PKG_CHECK_MODULES([OPENCV], [opencv >= 2.0],
 			  [AC_DEFINE([HAVE_OPENCV], [1], [Using OpenCV])]
 			  [OPENCV_LIBS="-lopencv_core -lopencv_imgproc"],
 			  AC_MSG_WARN([opencv not found. Not using some image processing.]))
-
 else
 	AC_MSG_WARN([no C++ compiler found, opencv cannot be used])
 fi
-
 AM_CONDITIONAL(HAVE_OPENCV, [test "x$OPENCV_LIBS" != "x"])
 
-AC_CONFIG_FILES([Makefile src/Makefile po/Makefile.in])
+dnl if test "x$CXX" = "xno"; then
+dnl 	dnl TODO: is it possible to require CXX only when there is opencv?
+dnl 	AC_MSG_WARN([no C++ compiler found, opencv cannot be used])
+dnl else
+dnl 	AC_MSG_WARN(CXX is "$CXX")
+dnl 	dnl http://nerdland.net/2009/07/detecting-c-libraries-with-autotools/ solution 2
+dnl PKG_CHECK_MODULES([OPENCV], [opencv >= 2.0],
+dnl  		  [AC_DEFINE([HAVE_OPENCV], [1], [Using OpenCV])]
+dnl 		  [OPENCV_LIBS="-lopencv_core -lopencv_imgproc"],
+dnl 		  AC_MSG_WARN([opencv not found. Not using image resizing.]))
+dnl fi
+
+dnl checking several ffmpeg libraries - replaced by ffms2
+dnl can replace ffms2, but cannot have both enabled at the same time
+dnl PKG_CHECK_MODULES(FFMPEG, [libavformat libavutil libavcodec libswscale],
+dnl 		  [AC_DEFINE([HAVE_FFMPEG], [1], [Using AVI files natively])],
+dnl 		  AC_MSG_WARN([ffmpeg libav libraries not found. Not using AVI format.]))
+
+dnl netpbm is not used anymore, it is replaced by an internal PPM/PNM loader
+dnl AC_CHECK_LIB(netpbm, pgm_init, netpbm="true",
+dnl   AC_MSG_WARN([libnetpbm not found. jpeg and png conversions will not be available.]))
+dnl AM_CONDITIONAL(HAVE_NETPBM, test x$netpbm = xtrue)
+dnl ====================================================== 
+
+AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT
 

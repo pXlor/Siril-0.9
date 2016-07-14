@@ -178,7 +178,7 @@ layer *create_layer(int index) {
 	g_signal_connect(ret->chooser, "file-set", G_CALLBACK(on_filechooser_file_set), NULL);
 	g_object_ref(G_OBJECT(ret->chooser));	// don't destroy it on removal from grid
 
-	ret->label = GTK_LABEL(gtk_label_new(_("not loaded")));
+	ret->label = GTK_LABEL(gtk_label_new("not loaded"));
 	g_object_ref(G_OBJECT(ret->label));	// don't destroy it on removal from grid
 
 	ret->spinbutton_x = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(-1000.0, 1000.0, 1.0));
@@ -443,7 +443,7 @@ void on_filechooser_file_set(GtkFileChooserButton *widget, gpointer user_data) {
 	filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(widget));
 	if (!filename) return;
 	if ((retval = read_single_image(filename, &layers[layer]->the_fit, NULL))) {
-		gtk_label_set_text(layers[layer]->label, _("ERROR"));
+		gtk_label_set_text(layers[layer]->label, "ERROR");
 	} else {
 		if (number_of_images_loaded() > 1 &&
 				(gfit.rx != layers[layer]->the_fit.rx ||
@@ -455,30 +455,30 @@ void on_filechooser_file_set(GtkFileChooserButton *widget, gpointer user_data) {
 #ifdef HAVE_OPENCV
 			if (gfit.rx < layers[layer]->the_fit.rx ||
 					gfit.ry < layers[layer]->the_fit.ry) {
-				siril_log_message(_("The first loaded image should have the greatest sizes for now\n"));
-				sprintf(buf, _("NOT OK %ux%u"), layers[layer]->the_fit.rx, layers[layer]->the_fit.ry);
+				siril_log_message("The first loaded image should have the greatest sizes for now\n");
+				sprintf(buf, "NOT OK %ux%u", layers[layer]->the_fit.rx, layers[layer]->the_fit.ry);
 				gtk_label_set_text(layers[layer]->label, buf);
 				retval = 1;
 			} else {
-				siril_log_message(_("Resizing the loaded image from %dx%d to %dx%d\n"),
+				siril_log_message("Resizing the loaded image from %dx%d to %dx%d\n",
 						layers[layer]->the_fit.rx,
 						layers[layer]->the_fit.ry, gfit.rx, gfit.ry);
-				sprintf(buf, _("OK upscaled from %ux%u"),
+				sprintf(buf, "OK upscaled from %ux%u",
 						layers[layer]->the_fit.rx, layers[layer]->the_fit.ry);
 				cvResizeGaussian(&layers[layer]->the_fit, gfit.rx, gfit.ry, OPENCV_LINEAR); // BILINEAR
 				image_find_minmax(&layers[layer]->the_fit, 0);
 				gtk_label_set_text(layers[layer]->label, buf);
 			}
 #else
-			siril_log_message(_("You need to install opencv to compose images with different sizes\n"));
-			sprintf(buf, _("NOT OK %ux%u"), layers[layer]->the_fit.rx, layers[layer]->the_fit.ry);
+			siril_log_message("You need to install opencv to compose images with different sizes\n");
+			sprintf(buf, "NOT OK %ux%u", layers[layer]->the_fit.rx, layers[layer]->the_fit.ry);
 			gtk_label_set_text(layers[layer]->label, buf);
 			retval = 1;
 #endif
 		}
 		else if (!retval) {
 			image_find_minmax(&layers[layer]->the_fit, 0);
-			sprintf(buf, _("OK %ux%u"), layers[layer]->the_fit.rx, layers[layer]->the_fit.ry);
+			sprintf(buf, "OK %ux%u", layers[layer]->the_fit.rx, layers[layer]->the_fit.ry);
 			gtk_label_set_text(layers[layer]->label, buf);
 		}
 	}
@@ -531,7 +531,6 @@ void on_filechooser_file_set(GtkFileChooserButton *widget, gpointer user_data) {
 		sequence_list_change_current();
 	}
 	else {
-		update_MenuItem();
 		adjust_cutoff_from_updated_gfit();
 		redraw(com.cvport, REMAP_ALL);
 	}
@@ -543,8 +542,8 @@ void create_the_internal_sequence() {
 
 	nb_layers = number_of_images_loaded();
 	if (nb_layers == 0 || nb_layers == 1) {
-		char *msg = siril_log_message(_("You must at least load two layers before!\n"));
-		show_dialog(msg, _("Warning"), "gtk-dialog-warning");
+		char *msg = siril_log_message("You must at least load two layers before!\n");
+		show_dialog(msg, "Warning", "gtk-dialog-warning");
 		seq = NULL;
 		return;
 	}
@@ -572,7 +571,7 @@ void create_the_internal_sequence() {
 	seq->ry = gfit.ry;
 }
 
-/* start alignming the layers: create an 'internal' sequence and run the selected method on it */
+/* start alignming the layers: create an 'internal' sequence and run the seected method on it */
 void on_button_align_clicked(GtkButton *button, gpointer user_data) {
 	int i, j;
 	struct registration_args regargs;
@@ -592,13 +591,13 @@ void on_button_align_clicked(GtkButton *button, gpointer user_data) {
 	regargs.layer = 0;	// TODO: fix with dynamic layers list
 	regargs.run_in_thread = FALSE;
 
-	msg = siril_log_message(_("Starting registration using method: %s\n"), method->name);
+	msg = siril_log_message("Starting registration using method: %s\n", method->name);
 	msg[strlen(msg)-1] = '\0';
 	set_cursor_waiting(TRUE);
 	set_progress_bar_data(msg, PROGRESS_RESET);
 	if (method->method_ptr(&regargs))
-		set_progress_bar_data(_("Error in layers alignment."), PROGRESS_DONE);
-	else set_progress_bar_data(_("Registration complete."), PROGRESS_DONE);
+		set_progress_bar_data("Error in layers alignment.", PROGRESS_DONE);
+	else set_progress_bar_data("Registration complete", PROGRESS_DONE);
 	set_cursor_waiting(FALSE);
 
 	/* display the values */
@@ -687,7 +686,7 @@ void update_compositing_interface() {
 	}
 
 	if (com.selection.w <= 0 && com.selection.h <= 0) {
-		gtk_label_set_text(label, _("An image area must be selected for align"));
+		gtk_label_set_text(label, "An image area must be selected for align");
 		gtk_widget_set_sensitive(lookup_widget("button_align"), FALSE);
 	/*} else if (ref_layer == -1 || (!luminance_mode && ref_layer == 0)) {
 		gtk_label_set_text(label, "A reference layer must be selected for align");
@@ -977,8 +976,7 @@ gboolean on_color_button_motion_event(GtkWidget *widget, GdkEventMotion *event, 
 		v -= event->y / 600.0;
 		while (h < 0.0) h += 1.0;
 		while (h > 1.0) h -= 1.0;
-		if (v < 0.0) v = 0.0;
-		if (v > 1.0) v = 1.0;
+		if (v < 0.0) v = 0.0; if (v > 1.0) v = 1.0;
 		hsv_to_rgb(h,s,v, &layers[current_layer_color_choosing]->color.red,
 				&layers[current_layer_color_choosing]->color.green,
 				&layers[current_layer_color_choosing]->color.blue);
@@ -1065,7 +1063,7 @@ void on_compositing_reset_clicked(GtkButton *button, gpointer user_data){
 	luminance_mode = 0;
 	GtkToggleButton *lum_button = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder, "composition_use_lum"));
 	gtk_toggle_button_set_active(lum_button, 0);
-	gtk_label_set_text(layers[0]->label, _("not loaded"));
+	gtk_label_set_text(layers[0]->label, "not loaded");
 
 
 	update_compositing_interface();
@@ -1111,10 +1109,10 @@ void autoadjust(int force_redraw) {
 
 	if (max_pixel.red <= 1.0 && max_pixel.green <= 1.0 && max_pixel.blue <= 1.0) {
 		if (force_redraw) {
-			siril_log_message(_("No overflow with the current colours, redrawing only\n"));
+			siril_log_message("no overflow with the current colours, redrawing only\n");
 			update_result(1);
 		} else {
-			siril_log_message(_("Nothing to adjust, no overflow\n"));
+			siril_log_message("nothing to adjust, no overflow\n");
 			set_cursor_waiting(FALSE);
 		}
 		return;
@@ -1147,7 +1145,7 @@ void autoadjust(int force_redraw) {
 					to_redistribute = to_redistribute_blue;
 			}
 
-			siril_log_message(_("Readjusting layer %d to %g times bright\n"),
+			siril_log_message("readjusting layer %d to %g times bright\n",
 					layer, 1.0-to_redistribute);
 			/* to_redistribute here is the maximum reduction we
 			 * need to give to the layer */
