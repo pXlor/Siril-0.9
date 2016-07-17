@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: Siril 0.9.4\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-07-13 18:35+0800\n"
-"PO-Revision-Date: 2016-07-13 23:26+0800\n"
+"PO-Revision-Date: 2016-07-15 23:36+0800\n"
 "Last-Translator: \n"
 "Language-Team: astronomy.com.cn <yecloud@me.com>\n"
 "Language: zh_CN\n"
@@ -2878,7 +2878,7 @@ msgstr "叠加"
 msgid ""
 "Siril output window, displays messages about what has been done and in "
 "response to command inputs."
-msgstr "Sitil输出窗口，显示各种程序执行过程的信息，并且对输入的命令进行响应。"
+msgstr "Siril输出窗口，显示各种程序执行过程的信息，并且对输入的命令进行响应。"
 
 #: ../src/gui/siril3.glade.h:693
 msgid "Output logs"
@@ -3209,11 +3209,11 @@ msgstr "Found %d stars in image, channel #%d\n"
 
 #: ../src/algos/star_finder.c:288
 msgid "This star has already been picked !\n"
-msgstr "This star has already been picked !\n"
+msgstr "这颗星已经被选取了！\n"
 
 #: ../src/algos/star_finder.c:289
 msgid "Peaker"
-msgstr "极化"
+msgstr "峰化"
 
 #: ../src/algos/transform.c:200
 msgid "wavelet_transform_data: bad plane number\n"
@@ -3225,7 +3225,7 @@ msgstr "ERROR"
 
 #: ../src/compositing/compositing.c:459
 msgid "The first loaded image should have the greatest sizes for now\n"
-msgstr "The first loaded image should have the greatest sizes for now\n"
+msgstr "第一个载入的图像需要有最大的尺寸\n"
 
 #: ../src/compositing/compositing.c:460 ../src/compositing/compositing.c:475
 #, c-format
@@ -3317,8 +3317,7 @@ msgstr "Another task is already in progress, ignoring new request.\n"
 
 #: ../src/core/command.c:340
 msgid "Multiplying by a coefficient less than or equal to 0 is not possible.\n"
-msgstr ""
-"Multiplying by a coefficient less than or equal to 0 is not possible.\n"
+msgstr "乘法的乘数小于或等于0是不允许的。\n"
 
 #: ../src/core/command.c:361
 #, c-format
@@ -3355,31 +3354,31 @@ msgstr "Wavelet: type must be %d or %d\n"
 
 #: ../src/core/command.c:550
 msgid "Cannot list files, set working directory first.\n"
-msgstr "Cannot list files, set working directory first.\n"
+msgstr "无法获得文件列表，请先设置工作目录！\n"
 
 #: ../src/core/command.c:556
 msgid "Siril cannot open the directory.\n"
-msgstr "Siril cannot open the directory.\n"
+msgstr "Siril无法打开目录。\n"
 
 #: ../src/core/command.c:581
 #, c-format
 msgid "Link: %s\n"
-msgstr "Link: %s\n"
+msgstr "链接：%s\n"
 
 #: ../src/core/command.c:585
 #, c-format
 msgid "Directory: %s\n"
-msgstr "Directory: %s\n"
+msgstr "目录：%s\n"
 
 #: ../src/core/command.c:595 ../src/core/command.c:602
 #, c-format
 msgid "Sequence: %s\n"
-msgstr "Sequence: %s\n"
+msgstr "队列：%s\n"
 
 #: ../src/core/command.c:598 ../src/core/command.c:600
 #, c-format
 msgid "Image: %s\n"
-msgstr "Image: %s\n"
+msgstr "图像：%s\n"
 
 #: ../src/core/command.c:604 ../src/core/command.c:1451
 msgid "********* END OF THE LIST *********\n"
@@ -3418,10 +3417,12 @@ msgid ""
 "Results will be displayed at the end of the processing, on the console "
 "output, in the following form:\n"
 msgstr ""
+"Results will be displayed at the end of the processing, on the console "
+"output, in the following form:\n"
 
 #: ../src/core/command.c:756
 msgid "This command can be used only when a sequence is loaded\n"
-msgstr ""
+msgstr "This command can be used only when a sequence is loaded\n"
 
 #: ../src/core/command.c:784
 #, c-format
@@ -3431,7 +3432,7 @@ msgstr "背景值: %d\n"
 #: ../src/core/command.c:830
 #, c-format
 msgid "The file %s has been created for the %s layer.\n"
-msgstr ""
+msgstr "The file %s has been created for the %s layer.\n"
 
 #: ../src/core/command.c:902
 msgid "Number of layers MUST be 1 or 3\n"
@@ -3646,7 +3647,7 @@ msgstr "Finalizing sequence processing failed.\n"
 
 #: ../src/core/processing.c:266
 msgid "Process aborted by user\n"
-msgstr "Process aborted by user\n"
+msgstr "程序处理被用户中断\n"
 
 #: ../src/core/siril.c:150
 #, c-format
@@ -4395,7 +4396,7 @@ msgstr ""
 msgid ""
 "SER output will take precedence over the one-channel per image creation "
 "option.\n"
-msgstr ""
+msgstr "SER输出将获得超过新建单通道图像的优先权。\n"
 
 #: ../src/io/conversion.c:533 ../src/io/conversion.c:582
 #: ../src/io/sequence.c:1102 ../src/io/sequence.c:1248
@@ -4454,11 +4455,11 @@ msgstr ""
 msgid ""
 "Saving to 3 FITS files cannot be done because the source image does not have "
 "three channels\n"
-msgstr ""
+msgstr "保存为3个FITS文件无法执行，因为源图像没有包含三个通道\n"
 
 #: ../src/io/conversion.c:727
 msgid "Cannot perform debayering on image with more than one channel\n"
-msgstr ""
+msgstr "在超过一个通道的图像上无法执行debayer\n"
 
 #: ../src/io/conversion.c:731
 #, c-format
@@ -4467,13 +4468,13 @@ msgstr "Filter Pattern: %s\n"
 
 #: ../src/io/conversion.c:734
 msgid "Cannot perform debayering\n"
-msgstr ""
+msgstr "无法执行debayer\n"
 
 #: ../src/io/conversion.c:802
 msgid ""
 "Requested converting a sequence file to single FITS image, should not "
 "happen\n"
-msgstr ""
+msgstr "将一个队列文件转化为单个FITS文件的请求是违法的\n"
 
 #. when the ifdefs are not compiled, default happens!
 #: ../src/io/conversion.c:807
@@ -4488,7 +4489,7 @@ msgstr "视频错误：不兼容的格式\n"
 #: ../src/io/image_format_fits.c:71
 #, c-format
 msgid "%s.[any_allowed_extension] not found.\n"
-msgstr ""
+msgstr "%s.[any_allowed_extension] 未找到。\n"
 
 #: ../src/io/image_format_fits.c:78
 #, c-format
@@ -4762,7 +4763,7 @@ msgstr "AHD插值…\n"
 msgid ""
 "Siril cannot open this file in CFA mode (no data available). Try to switch "
 "into RGB.\n"
-msgstr ""
+msgstr "Siril无法以CFA模式打开此文件（无可用数据）。请尝试使用RGB。\n"
 
 #: ../src/io/image_formats_libraries.c:899
 #, c-format
@@ -4965,7 +4966,7 @@ msgstr "Created SER file %s\n"
 
 #: ../src/io/ser.c:644 ../src/io/ser.c:825
 msgid "This type of Bayer pattern is not handled yet.\n"
-msgstr ""
+msgstr "这个类型的拜耳滤镜排列模式尚未被支持。\n"
 
 #: ../src/io/ser.c:710
 msgid "For a demosaiced image, layer has to be R, G or B (0 to 2).\n"
