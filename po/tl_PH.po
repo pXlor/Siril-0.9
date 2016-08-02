@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Siril\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-07-13 10:56+0200\n"
+"POT-Creation-Date: 2016-07-21 16:29+0200\n"
 "PO-Revision-Date: 2016-07-08 16:10+0800\n"
 "Last-Translator: Bamm Gabriana <bamm@distroastro.org>\n"
 "Language-Team: \n"
@@ -93,14 +93,16 @@ msgstr "i-Save ang larawan bilang 48-bit PPM"
 msgid "RGB Align"
 msgstr "RGB Align"
 
-#: ../src/gui/siril3.glade.h:19 ../src/compositing/compositing.c:360
+#: ../src/gui/siril3.glade.h:19 ../src/compositing/align_rgb.c:49
+#: ../src/compositing/compositing.c:360
 msgid "Image pattern alignment (planetary/deep-sky)"
 msgstr "Alignment sa pattern ng larawan (planeta/deep-sky)"
 
 #. the list below depends on the content of the glade file. It
 #. * should be done in the same way as in registration.c, but it
 #. * woud be easier if the two glades are merged.
-#: ../src/gui/siril3.glade.h:20 ../src/compositing/compositing.c:359
+#: ../src/gui/siril3.glade.h:20 ../src/compositing/align_rgb.c:47
+#: ../src/compositing/compositing.c:359
 msgid "One star registration (deep-sky)"
 msgstr "Registration gamit ang isang bituin (deep-sky)"
 
@@ -3049,6 +3051,15 @@ msgstr ""
 msgid "wavelet_transform_data: bad plane number\n"
 msgstr ""
 
+#: ../src/compositing/align_rgb.c:116 ../src/compositing/compositing.c:601
+msgid "Error in layers alignment."
+msgstr ""
+
+#: ../src/compositing/align_rgb.c:118 ../src/compositing/compositing.c:602
+#: ../src/registration/registration.c:1157
+msgid "Registration complete."
+msgstr ""
+
 #: ../src/compositing/compositing.c:447
 msgid "ERROR"
 msgstr ""
@@ -3101,14 +3112,6 @@ msgstr ""
 #: ../src/compositing/compositing.c:596
 #, c-format
 msgid "Starting registration using method: %s\n"
-msgstr ""
-
-#: ../src/compositing/compositing.c:601
-msgid "Error in layers alignment."
-msgstr ""
-
-#: ../src/compositing/compositing.c:602 ../src/registration/registration.c:1157
-msgid "Registration complete."
 msgstr ""
 
 #: ../src/compositing/compositing.c:691
@@ -3387,13 +3390,13 @@ msgstr ""
 #: ../src/core/command.c:1426
 #, c-format
 msgid ""
-"Number of logical processor MUST be greater than 0 and lower or equal to "
+"Number of logical processors MUST be greater than 0 and lower or equal to "
 "%d.\n"
 msgstr ""
 
 #: ../src/core/command.c:1436
 #, c-format
-msgid "Using now %d logical processor\n"
+msgid "Using now %d logical processors\n"
 msgstr ""
 
 #: ../src/core/command.c:1446
@@ -3523,7 +3526,7 @@ msgstr ""
 
 #: ../src/core/siril.c:1017 ../src/core/siril.c:1049
 msgid ""
-"Darkmap cosmetic correctionis only supported with single channel images\n"
+"Darkmap cosmetic correction is only supported with single channel images\n"
 msgstr ""
 
 #: ../src/core/siril.c:1024

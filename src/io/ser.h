@@ -30,7 +30,15 @@ typedef enum {
 
 /* Endianness of the frame data for 16-bit images */
 typedef enum {
-	SER_BIG_ENDIAN = 0 /* = FALSE */, SER_LITTLE_ENDIAN = 1 /* = TRUE */
+//	SER_BIG_ENDIAN = 0 /* = FALSE */, SER_LITTLE_ENDIAN = 1 /* = TRUE */
+	/* For an unknown reason, several of the first programs to support SER
+	 * disrespect the specification regarding the endianness flag. The specification
+	 * states that a boolean value is used for the LittleEndian header, and they
+	 * use it as a BigEndian header, with 0 for little-endian and 1 for big-endian.
+	 * Consequently, to not break compatibility with these first implementations,
+	 * later programs, like Siril and GoQat, have also decided to implement this
+	 * header in opposite meaning to the specification. */
+	SER_LITTLE_ENDIAN = 0, SER_BIG_ENDIAN = 1
 } ser_endian;
 
 typedef enum {

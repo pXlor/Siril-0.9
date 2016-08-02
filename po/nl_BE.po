@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-07-13 13:18+0200\n"
-"PO-Revision-Date: 2016-07-13 16:16+0200\n"
+"POT-Creation-Date: 2016-07-21 16:29+0200\n"
+"PO-Revision-Date: 2016-07-21 21:38+0200\n"
 "Last-Translator: Antoine Hoeffelman <antoine.hoeffelman[-at-]gmail.com>\n"
 "Language-Team: Dutch <antoine.hoeffelman[-at-]gmail.com>\n"
 "Language: nl_BE\n"
@@ -35,7 +35,6 @@ msgid "Crop"
 msgstr "Crop"
 
 #: ../src/gui/siril3.glade.h:5
-#, fuzzy
 msgid "Crop Sequence..."
 msgstr "Crop Sequentie..."
 
@@ -52,7 +51,6 @@ msgstr ""
 "aanvaard."
 
 #: ../src/gui/siril3.glade.h:8
-#, fuzzy
 msgid ""
 "Alternatively, for true colour rendering,\n"
 "select a filter from the list or\n"
@@ -92,18 +90,19 @@ msgid "Save RGB image to 48-bit PPM"
 msgstr "Bewaar RGB afbeelding in 48-bit PPM"
 
 #: ../src/gui/siril3.glade.h:18
-#, fuzzy
 msgid "RGB Align"
-msgstr "RGB Allign"
+msgstr "RGB Uitlijning"
 
-#: ../src/gui/siril3.glade.h:19 ../src/compositing/compositing.c:360
+#: ../src/gui/siril3.glade.h:19 ../src/compositing/align_rgb.c:49
+#: ../src/compositing/compositing.c:360
 msgid "Image pattern alignment (planetary/deep-sky)"
 msgstr "Patroonherkenning uitlijning (planetair/deep-sky)"
 
 #. the list below depends on the content of the glade file. It
 #. * should be done in the same way as in registration.c, but it
 #. * woud be easier if the two glades are merged.
-#: ../src/gui/siril3.glade.h:20 ../src/compositing/compositing.c:359
+#: ../src/gui/siril3.glade.h:20 ../src/compositing/align_rgb.c:47
+#: ../src/compositing/compositing.c:359
 msgid "One star registration (deep-sky)"
 msgstr "Registratie met één ster (deep-sky)"
 
@@ -257,7 +256,6 @@ msgid "cut"
 msgstr "knip"
 
 #: ../src/gui/siril3.glade.h:56
-#, fuzzy
 msgid ""
 "Instead of keeping pixels with values above the &quot;hi&quot; value white, "
 "put them in black to see in which part of the image the threshold is "
@@ -275,9 +273,8 @@ msgstr ""
 "(0) om ze te zien."
 
 #: ../src/gui/siril3.glade.h:58
-#, fuzzy
 msgid "Click on this button to chain the layers all together"
-msgstr "Klik op deze knop om de lagen te kettingen"
+msgstr "Klik op deze knop om de lagen te linken"
 
 #: ../src/gui/siril3.glade.h:59
 msgid "High"
@@ -390,7 +387,6 @@ msgid "Unbalance:"
 msgstr "Onevenwicht:"
 
 #: ../src/gui/siril3.glade.h:84
-#, fuzzy
 msgid ""
 "This is the factor multiplied by the deviation parameter in order to include "
 "more dark pixels in the background evaluation."
@@ -411,7 +407,6 @@ msgid "This is the number of sample box in a row."
 msgstr "Dit is het aantal samples op een rij."
 
 #: ../src/gui/siril3.glade.h:88
-#, fuzzy
 msgid ""
 "This is the factor multiplied by the deviation parameter in order to include "
 "more dark pixels in the background evaluation"
@@ -420,7 +415,6 @@ msgstr ""
 "pixels in de evaluatie van de gradient op te nemen."
 
 #: ../src/gui/siril3.glade.h:89
-#, fuzzy
 msgid "Degree Order: "
 msgstr "Orde: "
 
@@ -635,6 +629,8 @@ msgid ""
 "If a sequence is loaded and this is activated, perform the processing on all "
 "images of the sequence instead of only the loaded image."
 msgstr ""
+"Als een sequentie geladen is en dit geactiveerd is, word de bewerking op "
+"alle beelden uitgevoerd, in plaats van enkel op het geladen beekd."
 
 #: ../src/gui/siril3.glade.h:140
 msgid "Output prefix:"
@@ -643,6 +639,8 @@ msgstr "Output prefix:"
 #: ../src/gui/siril3.glade.h:141
 msgid "Prefix of the image names resulting from the unband process."
 msgstr ""
+"Prefix van de beelden afkomstig van het process voor verwijdering van inslag "
+"(banding)."
 
 #: ../src/gui/siril3.glade.h:142
 msgid "1/Sigma Factor"
@@ -1641,7 +1639,7 @@ msgstr ""
 
 #: ../src/gui/siril3.glade.h:365
 msgid "<b>Look and feel</b>"
-msgstr ""
+msgstr "<b>Weergave</b>"
 
 #: ../src/gui/siril3.glade.h:366
 msgid "Misc."
@@ -2083,6 +2081,10 @@ msgid ""
 "Only for RAW and FITS input images and SER films.\n"
 "Colour image target also applies to the debayer result for conversion."
 msgstr ""
+"Debager één-kanalige beelden (CFA formaat) gebruikmakend van de matrix "
+"layout van de instellingen. Wordt ook toegepast bij het openen van beelden, "
+"niet enkel bij conversie.\n"
+"enkel voor RAW en FITS beelden en SER sequenties."
 
 #: ../src/gui/siril3.glade.h:472
 msgid ""
@@ -2184,7 +2186,6 @@ msgid "No sequence selected"
 msgstr "Geen sequentie geselecteerd"
 
 #: ../src/gui/siril3.glade.h:493
-#, fuzzy
 msgid ""
 "Image index in the sequence. You can also use arrow keys to browse images, "
 "and the SPACE key to toggle exclude for the current image."
@@ -3345,7 +3346,7 @@ msgid "Insufficient background samples.\n"
 msgstr "Te weinig achtergrondsamples.\n"
 
 #: ../src/algos/PSF.c:606
-#, fuzzy, c-format
+#, c-format
 msgid ""
 "PSF fit Result:\n"
 "x0=%0.2f px, y0=%0.2f px\n"
@@ -3386,9 +3387,18 @@ msgstr "Aanwijzing"
 msgid "wavelet_transform_data: bad plane number\n"
 msgstr "wavelet_transform_date: fout aantal lagen\n"
 
+#: ../src/compositing/align_rgb.c:116 ../src/compositing/compositing.c:601
+msgid "Error in layers alignment."
+msgstr "Fout in het uitlijnen van de lagen."
+
+#: ../src/compositing/align_rgb.c:118 ../src/compositing/compositing.c:602
+#: ../src/registration/registration.c:1157
+msgid "Registration complete."
+msgstr "Registratie klaar."
+
 #: ../src/compositing/compositing.c:447
 msgid "ERROR"
-msgstr ""
+msgstr "FOUT"
 
 #: ../src/compositing/compositing.c:459
 msgid "The first loaded image should have the greatest sizes for now\n"
@@ -3422,7 +3432,7 @@ msgstr "OK %ux%u"
 
 #: ../src/compositing/compositing.c:516
 msgid "Unsaved compositing result"
-msgstr ""
+msgstr "Compositing resultaat niet opgeslaan"
 
 #: ../src/compositing/compositing.c:547
 msgid "You must at least load two layers before!\n"
@@ -3442,21 +3452,13 @@ msgstr "Opgelet"
 msgid "Starting registration using method: %s\n"
 msgstr "Begin de registratie met de methode: %s\n"
 
-#: ../src/compositing/compositing.c:601
-msgid "Error in layers alignment."
-msgstr "Fout in het uitlijnen van de lagen."
-
-#: ../src/compositing/compositing.c:602 ../src/registration/registration.c:1157
-msgid "Registration complete."
-msgstr "Registratie klaar."
-
 #: ../src/compositing/compositing.c:691
 msgid "An image area must be selected for align"
-msgstr ""
+msgstr "Een beeld moet worden geselecteerd voor de uitlijning"
 
 #: ../src/compositing/compositing.c:697
 msgid "At least 2 channels must be loaded for align"
-msgstr ""
+msgstr "Minstens twee kanalen moeten worden geladen voor de uitlijning"
 
 #: ../src/compositing/compositing.c:1119
 msgid "No overflow with the current colours, redrawing only\n"
@@ -3743,7 +3745,7 @@ msgstr "met succes"
 #: ../src/core/command.c:1426
 #, c-format
 msgid ""
-"Number of logical processor MUST be greater than 0 and lower or equal to "
+"Number of logical processors MUST be greater than 0 and lower or equal to "
 "%d.\n"
 msgstr ""
 "Aantal logische processoren MOET groter dan 0 en kleiner of gelijk aan %d "
@@ -3751,7 +3753,7 @@ msgstr ""
 
 #: ../src/core/command.c:1436
 #, c-format
-msgid "Using now %d logical processor\n"
+msgid "Using now %d logical processors\n"
 msgstr "Gebruikt nu %d logische processoren\n"
 
 #: ../src/core/command.c:1446
@@ -3888,7 +3890,7 @@ msgstr "Pre-processing van de beelden %s"
 
 #: ../src/core/siril.c:1017 ../src/core/siril.c:1049
 msgid ""
-"Darkmap cosmetic correctionis only supported with single channel images\n"
+"Darkmap cosmetic correction is only supported with single channel images\n"
 msgstr ""
 "Darkmap cosmetische correcties enkel ondersteund met éénkanalige "
 "afbeeldingen\n"
@@ -4171,9 +4173,9 @@ msgid "%s (channel 2)"
 msgstr "%s (kanaal 2)"
 
 #: ../src/gui/callbacks.c:2952
-#, fuzzy, c-format
+#, c-format
 msgid "%d: not affected yet"
-msgstr "%d: nog niet "
+msgstr "%d: nog niet beïnvloed"
 
 #: ../src/gui/callbacks.c:3004
 #, c-format
@@ -4211,7 +4213,7 @@ msgstr "Selecteer alle beelden van de sequentie\n"
 
 #: ../src/gui/callbacks.c:3152
 msgid "Unselected all images from sequence\n"
-msgstr ""
+msgstr "Deselecteer alle beelden van de sequentie\n"
 
 #: ../src/gui/callbacks.c:3184
 msgid "Opening dark image..."
@@ -5331,6 +5333,11 @@ msgid ""
 "used to register planetary movies. It can also be used for some deep-sky "
 "images registration. Shifts at pixel precision are saved in seq file."
 msgstr ""
+"Patroonherkenning Uitlijning: Dit is een eenvoudige registratiemethode via "
+"translatie en maakt gebruik van cross-correlatie in het spatiaal domein. Dit "
+"is een snelle methode om planetaire videos te registrer. Het kan ook "
+"gebruikt worden om deep-sky beelden te registrer. Versschuivingen op pixel "
+"niveau worden opgeslaan in het seq bestand."
 
 #: ../src/registration/registration.c:69
 msgid ""
@@ -5340,10 +5347,15 @@ msgid ""
 "good for moon surface images registration. Only translation is taken into "
 "account yet."
 msgstr ""
+"Verbetering van de correllatiecoëfficiënt: Deze methode is gebaseerd op het "
+"algoritme van maximisatie van de corellatiecoëfficiënt. De methode is "
+"complex en trager dan de methode van patroonherkenning maar een selectie is "
+"niet vereist. Deze methode is aanbevolen voor planetaire beelden zoals de "
+"maan. Enkel translaties worden toegepast."
 
 #: ../src/registration/registration.c:100
 msgid "One Star Registration (deep-sky)"
-msgstr ""
+msgstr "Eén Ster Registratie (deep-sky)"
 
 #: ../src/registration/registration.c:103
 msgid "Global Star Alignment (deep-sky)"
@@ -5351,442 +5363,463 @@ msgstr "Globale Ster Uitlijning (deep-sky)"
 
 #: ../src/registration/registration.c:106
 msgid "Image Pattern Alignment (planetary - full disk)"
-msgstr ""
+msgstr "Patroonherkenning Uitlijning (planetair - volle disk)"
 
 #: ../src/registration/registration.c:109
 msgid "Enhanced Correlation Coefficient (planetary - surfaces)"
-msgstr ""
+msgstr "Verbetering van de correllatiecoëfficiënt (planetair - oppervlakken)"
 
 #: ../src/registration/registration.c:133
 #, c-format
 msgid "Added a registration method: %s\n"
-msgstr ""
+msgstr "Nieuwe registratiemethode: %s\n"
 
 #: ../src/registration/registration.c:212
 msgid "Recomputing already existing registration for this layer\n"
-msgstr ""
+msgstr "Herberekenen van de al bestaande registraties voor deze laag\n"
 
 #: ../src/registration/registration.c:229
 msgid "Register DFT: loading and processing reference frame"
-msgstr ""
+msgstr "DFT Uitlijning: referentiebeeld laden en bewerken"
 
 #: ../src/registration/registration.c:237
 msgid "Register: could not load first image to register, aborting.\n"
 msgstr ""
+"Registratie: kon eerste beeld voor registratie niet laden, stopgezet.\n"
 
 #: ../src/registration/registration.c:289
 #: ../src/registration/registration.c:797
 #, c-format
 msgid "Register: processing image %s\n"
-msgstr ""
+msgstr "Registratie: beweking van beeld %s\n"
 
 #: ../src/registration/registration.c:387
 #: ../src/registration/registration.c:474
 #: ../src/registration/registration.c:703
 #: ../src/registration/registration.c:848
 msgid "Registration finished.\n"
-msgstr ""
+msgstr "Registratie klaar.\n"
 
 #: ../src/registration/registration.c:388
 #: ../src/registration/registration.c:851
 #, c-format
 msgid "Best frame: #%d.\n"
-msgstr ""
+msgstr "Beste beeld: #%d.\n"
 
 #: ../src/registration/registration.c:426
 msgid "Registration PSF: failed to compute PSF for reference frame at least\n"
 msgstr ""
+"Registratie PSF: PSF berekening gefaald, tenminste voor referentiebeeld\n"
 
 #: ../src/registration/registration.c:475
 #, c-format
 msgid "Best frame: #%d with fwhm=%.3g.\n"
-msgstr ""
+msgstr "Beste beeld: #%d met fwhm=%.3g.\n"
 
 #: ../src/registration/registration.c:492
 msgid "Matching stars: done\n"
-msgstr ""
+msgstr "Uitlijning van de beelden: klaar\n"
 
 #: ../src/registration/registration.c:493
 #, c-format
 msgid "%d pair matches.\n"
-msgstr ""
+msgstr "%d overeenstemmende paren.\n"
 
 #: ../src/registration/registration.c:494
 #, c-format
 msgid "scale:%*.3f\n"
-msgstr ""
+msgstr "schaal:%*.3f\n"
 
 #: ../src/registration/registration.c:495
 #, c-format
 msgid "rotation:%+*.2f deg\n"
-msgstr ""
+msgstr "rotatie:%+*.2f deg\n"
 
 #: ../src/registration/registration.c:496
 #, c-format
 msgid "dx:%+*.2f px\n"
-msgstr ""
+msgstr "dx:%+*.2f px\n"
 
 #: ../src/registration/registration.c:497
 #, c-format
 msgid "dy:%+*.2f px\n"
-msgstr ""
+msgstr "dy:%+*.2f px\n"
 
 #: ../src/registration/registration.c:498
 #: ../src/registration/registration.c:588
 #, c-format
 msgid "FWHMx:%*.2f px\n"
-msgstr ""
+msgstr "FWHMx:%*.2f px\n"
 
 #: ../src/registration/registration.c:499
 #: ../src/registration/registration.c:589
 #, c-format
 msgid "FWHMy:%*.2f px\n"
-msgstr ""
+msgstr "FWHMy:%*.2f px\n"
 
 #: ../src/registration/registration.c:502
 msgid "Not handled yet\n"
-msgstr ""
+msgstr "Nog niet ondersteund\n"
 
 #: ../src/registration/registration.c:552
 #: ../src/registration/registration.c:759
 msgid "Could not load reference image\n"
-msgstr ""
+msgstr "Referentiebeeld kon niet worden geladen\n"
 
 #: ../src/registration/registration.c:558
 msgid "Reference Image:\n"
-msgstr ""
+msgstr "Referentiebeeld:\n"
 
 #: ../src/registration/registration.c:568
 msgid "There are not enough stars in reference image to perform alignment\n"
 msgstr ""
+"Er zijn niet genoeg sterren in het referentiebeeld om de uitlijning uit te "
+"voeren\n"
 
 #: ../src/registration/registration.c:632
 #, c-format
 msgid "Not enough stars. Image %d skipped\n"
-msgstr ""
+msgstr "Niet genoeg sterren. Beeld %d overgeslagen\n"
 
 #: ../src/registration/registration.c:656
 #, c-format
 msgid "Cannot perform star matching. Image %d skipped\n"
 msgstr ""
+"Kon ster uitlijnning niet uitvoeren. Beeld %d overgeslagen\n"
+"\n"
 
 #: ../src/registration/registration.c:704
 #, c-format
 msgid "%d images processed.\n"
-msgstr ""
+msgstr "%d beelden bewerkt.\n"
 
 #: ../src/registration/registration.c:706
 #, c-format
 msgid "Total: %d failed, %d registered.\n"
-msgstr ""
+msgstr "Totaal: %d gefaald, %d geregistreerd.\n"
 
 #: ../src/registration/registration.c:711
 msgid "Registration aborted.\n"
-msgstr ""
+msgstr "Registratie stopgezet.\n"
 
 #: ../src/registration/registration.c:810
 #, c-format
 msgid "Cannot perform ECC alignment for frame %d\n"
-msgstr ""
+msgstr "ECC uitlijnong kan niet worden uitgevoerd voor beeld %d\n"
 
 #: ../src/registration/registration.c:850
 #, c-format
 msgid "%d frames were excluded.\n"
-msgstr ""
+msgstr "%d beelden uitgesloten.\n"
 
 #: ../src/registration/registration.c:938
 msgid "Select an area in image first, and select images in the sequence."
-msgstr ""
+msgstr "Kies eerst een regio in het beeld en beelden uit de sequentie."
 
 #: ../src/registration/registration.c:940
 msgid "Select images in the sequence."
-msgstr ""
+msgstr "Kies beelden uit de sequentie."
 
 #: ../src/registration/registration.c:942
 msgid "Select an area in image first."
-msgstr ""
+msgstr "Kies eerst een regio in het beeld."
 
 #: ../src/registration/registration.c:1047
 msgid ""
 "All prerequisites are not filled for registration. Select a rectangle "
 "first.\n"
 msgstr ""
+"Alle voorwaarden zijn niet vervuld voor registratie. Kies eerst een regio.\n"
 
 #: ../src/registration/registration.c:1077
 #, c-format
 msgid "Registration: processing using method: %s\n"
-msgstr ""
+msgstr "Registratie: processing met methode: %s\n"
 
 #: ../src/stacking/stacking.c:137
 msgid "Computing normalization...\n"
-msgstr ""
+msgstr "Berekening van normalisatie...\n"
 
 #: ../src/stacking/stacking.c:154
 msgid "Normalization failed."
-msgstr ""
+msgstr "Normalisatie gefaald."
 
 #: ../src/stacking/stacking.c:205 ../src/stacking/stacking.c:825
 #: ../src/stacking/stacking.c:982
 msgid "No frame selected for stacking (select at least 2). Aborting.\n"
 msgstr ""
+"Geen beelden geselecteerd voor stacking (kies minstens 2). Stopgezet.\n"
 
 #: ../src/stacking/stacking.c:234 ../src/stacking/stacking.c:854
 #: ../src/stacking/stacking.c:1011
 msgid "Stacking: could not read frame, aborting\n"
-msgstr ""
+msgstr "Stacking: kon beeld niet lezen, stopgezet\n"
 
 #: ../src/stacking/stacking.c:265 ../src/stacking/stacking.c:878
 #: ../src/stacking/stacking.c:1034
 msgid "Stacking: image in sequence doesn't has the same dimensions\n"
-msgstr ""
+msgstr "Staking: beeld(en) in de sequenties hebben niet dezelfde afmetingen\n"
 
 #: ../src/stacking/stacking.c:311 ../src/stacking/stacking.c:760
 #: ../src/stacking/stacking.c:929 ../src/stacking/stacking.c:1085
 #: ../src/stacking/stacking.c:1775
 msgid "Finalizing stacking..."
-msgstr ""
+msgstr "Stacking finalisatie..."
 
 #: ../src/stacking/stacking.c:338 ../src/stacking/stacking.c:950
 #: ../src/stacking/stacking.c:1106
 msgid "Stacking failed. Check the log."
-msgstr ""
+msgstr "Stacking gefaald. Lees de log."
 
 #: ../src/stacking/stacking.c:339 ../src/stacking/stacking.c:792
 #: ../src/stacking/stacking.c:951 ../src/stacking/stacking.c:1107
 #: ../src/stacking/stacking.c:1816
 msgid "Stacking failed.\n"
-msgstr ""
+msgstr "Stacking gefaald.\n"
 
 #: ../src/stacking/stacking.c:341 ../src/stacking/stacking.c:953
 #: ../src/stacking/stacking.c:1109
 msgid "Stacking complete."
-msgstr ""
+msgstr "Stacking klaar."
 
 #: ../src/stacking/stacking.c:371
 msgid "Median stacking is only supported for FITS images and SER sequences.\n"
 msgstr ""
+"Median stacking is enkel ondersteund voor FITS bestanden en SER sequenties.\n"
 
 #: ../src/stacking/stacking.c:376 ../src/stacking/stacking.c:1201
 msgid "Select at least two frames for stacking. Aborting.\n"
-msgstr ""
+msgstr "Kies minstens twee beelden voor staking. Stopgezet.\n"
 
 #: ../src/stacking/stacking.c:398
 #, c-format
 msgid "Median stack: opening image %s"
-msgstr ""
+msgstr "Median stack: opent beeld %s"
 
 #: ../src/stacking/stacking.c:419
 msgid "Median stack error: images with > 3 dimensions are not supported\n"
 msgstr ""
+"Median stack foutmelding: beelden met meer dan 3 dimensies worden niet "
+"ondersteund\n"
 
 #: ../src/stacking/stacking.c:430
 msgid "Median stack error: input images have different sizes\n"
-msgstr ""
+msgstr "Median stack foudmelding: beelden hebben verschillende afmetingen\n"
 
 #: ../src/stacking/stacking.c:480 ../src/stacking/stacking.c:1305
 msgid "Super-pixel is not handled yet for on the fly SER stacking\n"
-msgstr ""
+msgstr "Super-pixel nog niet ondersteund voor \"on the fly\" SER stachking\n"
 
 #. no image has been loaded
 #: ../src/stacking/stacking.c:487
 msgid "Median stack error: uninitialized sequence\n"
-msgstr ""
+msgstr "Median stack foutmelding: sequentie niet geïnitialiseerd.\n"
 
 #: ../src/stacking/stacking.c:544 ../src/stacking/stacking.c:1369
 msgid "Your version of cfitsio does not support multi-threading\n"
-msgstr ""
+msgstr "Multithreading niet ondersteund door uw versie van cfitsio\n"
 
 #: ../src/stacking/stacking.c:552 ../src/stacking/stacking.c:1377
 msgid "Processing the sequence as RGB\n"
-msgstr ""
+msgstr "Sequentie als RGB behandelt\n"
 
 #: ../src/stacking/stacking.c:589 ../src/stacking/stacking.c:1414
 #, c-format
 msgid "We have %d parallel blocks of size %d (+%d) for stacking.\n"
-msgstr ""
+msgstr "We hebben %d parelelle blokken van grootte %d (+%d) voor stacking.\n"
 
 #: ../src/stacking/stacking.c:600 ../src/stacking/stacking.c:1425
 msgid ""
 "A bug has been found. Unable to split the image area into the correct "
 "processing blocks.\n"
 msgstr ""
+"Een bug werd gevonden. Onmogelijk om het beeld op te splitsen in de correcte "
+"precessing blocks.\n"
 
 #: ../src/stacking/stacking.c:666 ../src/stacking/stacking.c:1492
 msgid "Starting stacking...\n"
-msgstr ""
+msgstr "Stacking begonnen...\n"
 
 #: ../src/stacking/stacking.c:667
 msgid "Median stacking in progress..."
-msgstr ""
+msgstr "Mediaan stacking bezig..."
 
 #: ../src/stacking/stacking.c:705 ../src/stacking/stacking.c:1567
 msgid "Error reading one of the image areas\n"
-msgstr ""
+msgstr "Fout bij het lezen van een van de regio's\n"
 
 #: ../src/stacking/stacking.c:791
 msgid "Median stacking failed. Check the log."
-msgstr ""
+msgstr "Median stacking gefaald. Lees de log."
 
 #: ../src/stacking/stacking.c:794
 msgid "Median stacking complete."
-msgstr ""
+msgstr "Median stacking klaar."
 
 #: ../src/stacking/stacking.c:795
 #, c-format
 msgid "Median stacking complete. %d have been stacked.\n"
-msgstr ""
+msgstr "Median stacking klaar. %d beelden werden bewerkt.\n"
 
 #: ../src/stacking/stacking.c:1196
 msgid ""
 "Rejection stacking is only supported for FITS images and SER sequences.\n"
 "Use \"Sum Stacking\" instead.\n"
 msgstr ""
+"Stacking met verwerping is enkel ondersteund voor FITS beelden en SER "
+"sequenties.\n"
+"Gebruik \"Som Stacking\" in de plaats.\n"
 
 #: ../src/stacking/stacking.c:1223
 #, c-format
 msgid "Rejection stack: opening image %s"
-msgstr ""
+msgstr "Verwerping stack: open beeld %s"
 
 #: ../src/stacking/stacking.c:1244
 msgid "Rejection stack error: images with > 3 dimensions are not supported\n"
 msgstr ""
+"Verwerping stack foutmelding: beelden met meer dan 3 dimenseis worden niet "
+"ondersteund\n"
 
 #: ../src/stacking/stacking.c:1255
 msgid "Rejection stack error: input images have different sizes\n"
 msgstr ""
+"Verwerping stack foutmelding: beelden hebben verschillende afmetingen\n"
 
 #. no image has been loaded
 #: ../src/stacking/stacking.c:1312
 msgid "Rejection stack error: uninitialized sequence\n"
-msgstr ""
+msgstr "Verwerping stack foutmelding: sequentie niet geïnitialiseerd\n"
 
 #: ../src/stacking/stacking.c:1493
 msgid "Rejection stacking in progress..."
-msgstr ""
+msgstr "Verwerping stacking bezig..."
 
 #: ../src/stacking/stacking.c:1779
 #, c-format
 msgid "Pixel rejection in channel #%d: %.3lf%% - %.3lf%%\n"
-msgstr ""
+msgstr "Pixel verwerping in kanaal #%d: %.3lf%% - %.3lf%%\n"
 
 #: ../src/stacking/stacking.c:1815
 msgid "Rejection stacking failed. Check the log."
-msgstr ""
+msgstr "Verwerping staking gefaald. Lees de log."
 
 #: ../src/stacking/stacking.c:1818
 msgid "Rejection stacking complete."
-msgstr ""
+msgstr "Verwerping stacking klaar."
 
 #: ../src/stacking/stacking.c:1869
 #, c-format
 msgid "Using %d MB memory maximum for stacking\n"
-msgstr ""
+msgstr "Gebruikt maximaal %d MB geheugen voor de stacking\n"
 
 #: ../src/stacking/stacking.c:1881
 msgid "Stacking: processing...\n"
-msgstr ""
+msgstr "Stacking: bezig...\n"
 
 #: ../src/stacking/stacking.c:1896
 #, c-format
 msgid "Integration of %d images:\n"
-msgstr ""
+msgstr "Integratie van %d beelden:\n"
 
 #: ../src/stacking/stacking.c:1900
 msgid "Pixel combination ......... average\n"
-msgstr ""
+msgstr "Pixel combinatie ......... gemiddelde\n"
 
 #: ../src/stacking/stacking.c:1903
 msgid "Pixel combination ......... normalized sum\n"
-msgstr ""
+msgstr "Pixel combinatie ......... genormaliseerde som\n"
 
 #: ../src/stacking/stacking.c:1906
 msgid "Pixel combination ......... median\n"
-msgstr ""
+msgstr "Pixel combinatie ......... mediaan\n"
 
 #: ../src/stacking/stacking.c:1909
 msgid "Pixel combination ......... minimum\n"
-msgstr ""
+msgstr "Pixel combinatie ......... minimum\n"
 
 #: ../src/stacking/stacking.c:1912
 msgid "Pixel combination ......... maximum\n"
-msgstr ""
+msgstr "Pixel combinatie ......... maximum\n"
 
 #: ../src/stacking/stacking.c:1915
 msgid "Pixel combination ......... none\n"
-msgstr ""
+msgstr "Pixel combinatie ......... geen\n"
 
 #: ../src/stacking/stacking.c:1925 ../src/stacking/stacking.c:1954
 msgid "none"
-msgstr ""
+msgstr "geen"
 
 #: ../src/stacking/stacking.c:1928
 msgid "additive"
-msgstr ""
+msgstr "additief"
 
 #: ../src/stacking/stacking.c:1931
 msgid "multiplicative"
-msgstr ""
+msgstr "multiplicatief"
 
 #: ../src/stacking/stacking.c:1934
 msgid "additive + scaling"
-msgstr ""
+msgstr "additief + schaling"
 
 #: ../src/stacking/stacking.c:1937
 msgid "multiplicative + scaling"
-msgstr ""
+msgstr "multiplicatief + schaling"
 
 #: ../src/stacking/stacking.c:1942
 #, c-format
 msgid "Normalization ............. %s\n"
-msgstr ""
+msgstr "Normalisatie ............. %s\n"
 
 #: ../src/stacking/stacking.c:1946
 msgid "Pixel rejection ........... none\n"
-msgstr ""
+msgstr "Pixel verwerping ........... geen\n"
 
 #: ../src/stacking/stacking.c:1947
 msgid "Rejection parameters ...... none\n"
-msgstr ""
+msgstr "Verwerpingsparameters ........... geen\n"
 
 #: ../src/stacking/stacking.c:1957
 msgid "percentile clipping"
-msgstr ""
+msgstr "percentile clipping"
 
 #: ../src/stacking/stacking.c:1960
 msgid "sigma clipping"
-msgstr ""
+msgstr "sigma clipping"
 
 #: ../src/stacking/stacking.c:1963
 msgid "median sigma clipping"
-msgstr ""
+msgstr "median sigma clipping"
 
 #: ../src/stacking/stacking.c:1966
 msgid "Winsorized sigma clipping"
-msgstr ""
+msgstr "Winsorized sigma clipping"
 
 #: ../src/stacking/stacking.c:1969
 msgid "linear fit clipping"
-msgstr ""
+msgstr "linear fit clipping"
 
 #: ../src/stacking/stacking.c:1972
 #, c-format
 msgid "Pixel rejection ........... %s\n"
-msgstr ""
+msgstr "Pixel verwerping ........... %s\n"
 
 #: ../src/stacking/stacking.c:1973
 #, c-format
 msgid "Rejection parameters ...... low=%.3f high=%.3f\n"
-msgstr ""
+msgstr "Verwerpingsparameter ...... laag=%.3f hoog=%.3f\n"
 
 #: ../src/stacking/stacking.c:2032 ../src/stacking/stacking.c:2037
 msgid "Unsaved stacking result"
-msgstr ""
+msgstr "Onopgeslagen stacking resultaat"
 
 #: ../src/stacking/stacking.c:2219
 msgid ""
 "Error in highest FWHM accepted for sequence processing: some images don't "
 "have this kind of information available\n"
 msgstr ""
+"Fout in de hoogste FWHM aanvaard voor het bewerken van de sequentie: voor "
+"enkele beelden is dit type informatie niet beschikbaar\n"
 
 #: ../src/stacking/stacking.c:2254
 #, c-format
@@ -5794,43 +5827,51 @@ msgid ""
 "Error in highest quality accepted for sequence processing: some images don't "
 "have this kind of information available for channel #%d.\n"
 msgstr ""
+"Fout in de hoogste aanvaarde kwaliteit voor het bewerken van de sequentie: "
+"voor enkele beelden is dit type informatie niet beschikbaar voor kanaal #"
+"%d.\n"
 
 #: ../src/stacking/stacking.c:2312
 #, c-format
 msgid "Stacking all images in the sequence (%d)\n"
-msgstr ""
+msgstr "Alle beelden van de sequentie (%d) stacken\n"
 
 #: ../src/stacking/stacking.c:2319
 #, c-format
 msgid "Stacking only selected images in the sequence (%d)\n"
-msgstr ""
+msgstr "enkel de geselecteerde beelden van de sequentie (%d) stacken\n"
 
 #: ../src/stacking/stacking.c:2330
 #, c-format
 msgid ""
 "Stacking images of the sequence with a FWHM lower or equal than %g (%d)\n"
 msgstr ""
+"De beelden van de sequentie met een FWHM lager of gelijk aan %g stacken "
+"(%d)\n"
 
 #: ../src/stacking/stacking.c:2336
 #, c-format
 msgid "Based on FWHM < %.2f (%d images)"
-msgstr ""
+msgstr "Gebaseerd op FWHM < %.2f (%d beelden)"
 
 #: ../src/stacking/stacking.c:2347
 #, c-format
 msgid ""
 "Stacking images of the sequence with a quality higher or equal than %g (%d)\n"
 msgstr ""
+"De beelden van de sequentie met een kwaliteit hoger of gelijk aan %g stacken "
+"(%d)\n"
+"\n"
 
 #: ../src/stacking/stacking.c:2353
 #, c-format
 msgid "Based on quality > %.2f (%d images)"
-msgstr ""
+msgstr "Gebaseerd op kwaiteit > %.2f (%d beelden)"
 
 #: ../src/stacking/stacking.c:2355
 #, c-format
 msgid "Based on quality"
-msgstr ""
+msgstr "Gebaseerd op kwaliteit"
 
 #~ msgid ""
 #~ "Debayer single-channel images (CFA format) using the Bayer matrix layout "

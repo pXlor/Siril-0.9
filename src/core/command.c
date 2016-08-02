@@ -635,7 +635,7 @@ int process_resample(int nb) {
 	int toY = round_to_int(factor * gfit.ry);
 	
 	set_cursor_waiting(TRUE);
-	verbose_resize_gaussian(&gfit, toX, toY, 1);
+	verbose_resize_gaussian(&gfit, toX, toY, OPENCV_LINEAR);
 	update_used_memory();
 	adjust_vport_size_to_image();
 	redraw(com.cvport, REMAP_ALL);
@@ -1072,9 +1072,9 @@ int process_cosme(int nb) {
 			}
 			dev.type = HOT_PIXEL; // we force it
 			dev.p.y = gfit.rx - dev.p.y - 1; /* FITS are stored bottom to top */
-			cvRotateImage(&gfit, 90.0, -1, 0);
+			cvRotateImage(&gfit, 90.0, -1, OPENCV_LINEAR);
 			cosmeticCorrOneLine(&gfit, dev, is_cfa);
-			cvRotateImage(&gfit, -90.0, -1, 0);
+			cvRotateImage(&gfit, -90.0, -1, OPENCV_LINEAR);
 #else
 			siril_log_message(_("Opencv need to be compiled to remove bad column.\n"));
 			retval = 1;
@@ -1423,7 +1423,7 @@ int process_set_cpu(int nb){
 	proc_in = atoi(word[1]);
 	proc_max = omp_get_num_procs();
 	if (proc_in > proc_max || proc_in < 1) {
-		siril_log_message(_("Number of logical processor MUST be greater "
+		siril_log_message(_("Number of logical processors MUST be greater "
 				"than 0 and lower or equal to %d.\n"), proc_max);
 		return 1;
 	}
@@ -1433,7 +1433,7 @@ int process_set_cpu(int nb){
 	{
 		proc_out = omp_get_num_threads();
 	}
-	siril_log_message(_("Using now %d logical processor\n"), proc_out);
+	siril_log_message(_("Using now %d logical processors\n"), proc_out);
 	com.max_thread = proc_out;
 	update_spinCPU(0);
 

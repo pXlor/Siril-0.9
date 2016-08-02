@@ -546,30 +546,6 @@ char *convtoupper(char *str) {
 	return newstr;
 }
 
-/* This function returns a new string containing the dir name of a path.
- * Conversely, dirname modifies the argument.
- * The return value here must be freed. */
-char *extract_path(const char *filename) {
-	size_t pathlen;
-	const char *p;
-	char *dirname = NULL;
-
-	p = strrchr(filename, '/');
-
-	if (p == NULL) {
-		dirname = malloc(1);
-		dirname[0] = '\0';
-		return dirname;
-	}
-
-	pathlen = p - filename;	// contains the trailing '/'
-	dirname = malloc(pathlen + 1);
-	strncpy(dirname, filename, pathlen);
-	dirname[pathlen] = '\0';
-
-	return dirname;
-}
-
 char *remove_ext_from_filename(const char *filename) {
 	size_t filelen;
 	const char *p;

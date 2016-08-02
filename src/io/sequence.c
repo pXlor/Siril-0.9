@@ -62,10 +62,10 @@
 int read_single_sequence(char *realname, int imagetype) {
 	int retval=3;		// needs to return 3 if ok !!!
 	char *name = strdup(realname);
-	char *dirname = extract_path(realname);
+	gchar *dirname = g_path_get_dirname(realname);
 	if (!changedir(dirname))
 		writeinitfile();
-	free(dirname);
+	g_free(dirname);
 
 	if (check_only_one_film_seq(realname)) retval = 1;
 	else {
@@ -87,17 +87,21 @@ int read_single_sequence(char *realname, int imagetype) {
 			default:
 				retval = 1;
 		}
-		if (!set_seq(basename(name))) {
+		gchar *fname = g_path_get_basename(name);
+		if (!set_seq(fname)) {
 			/* if it loads, make it selected and only element in the list of sequences */
 			control_window_switch_to_tab(IMAGE_SEQ);
 			GtkComboBoxText *combo_box_text = GTK_COMBO_BOX_TEXT(lookup_widget("sequence_list_combobox"));
 			gtk_combo_box_text_remove_all(combo_box_text);
-			gtk_combo_box_text_append(combo_box_text, 0, basename(realname));
+			gchar *rname = g_path_get_basename(realname);
+			gtk_combo_box_text_append(combo_box_text, 0, rname);
 			g_signal_handlers_block_by_func(GTK_COMBO_BOX(combo_box_text), on_seqproc_entry_changed, NULL);
 			gtk_combo_box_set_active(GTK_COMBO_BOX(combo_box_text), 0);
 			g_signal_handlers_unblock_by_func(GTK_COMBO_BOX(combo_box_text), on_seqproc_entry_changed, NULL);
+			g_free(rname);
 		}
 		else retval = 1;
+		g_free(fname);
 	}
 	free(name);
 	return retval;
@@ -1424,7 +1428,7 @@ gpointer export_sequence(gpointer ptr) {
 						sizeof(uint8_t) * args->avi_width * args->avi_height
 								* destfit.naxes[2]);
 				cvResizeGaussian_data8(data, destfit.rx, destfit.ry, newdata,
-						args->avi_width, args->avi_height, destfit.naxes[2], 0);
+						args->avi_width, args->avi_height, destfit.naxes[2], OPENCV_LINEAR);
 				avi_file_write_frame(0, newdata);
 				free(newdata);
 #else

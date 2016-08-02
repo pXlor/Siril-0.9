@@ -342,9 +342,9 @@ int main(int argc, char *argv[]) {
 		if (cwd_orig)
 			changedir(cwd_orig);
 		open_single_image(argv[optind]);
-		char *newpath = extract_path(argv[optind]);
+		gchar *newpath = g_path_get_dirname(argv[optind]);
 		changedir(newpath);
-		free(newpath);
+		g_free(newpath);
 	}
 	if (cwd_orig)
 		free(cwd_orig);
@@ -360,7 +360,7 @@ void initialize_scrollbars() {
 	char *vport_names[] = { "r", "g", "b", "rgb" };
 	char window_name[32];
 
-	for (i=0; i<sizeof(vport_names)/sizeof(char *); i++) {
+	for (i = 0; i < sizeof(vport_names) / sizeof(char *); i++) {
 		sprintf(window_name, "scrolledwindow%s", vport_names[i]);
 		GtkScrolledWindow *win = GTK_SCROLLED_WINDOW(gtk_builder_get_object(builder, window_name));
 		com.hadj[i] = gtk_scrolled_window_get_hadjustment(win);

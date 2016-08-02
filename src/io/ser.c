@@ -281,7 +281,8 @@ static int ser_read_header(struct ser_struct *ser_file) {
 
 	if (ser_file->color_id == SER_RGB || ser_file->color_id == SER_BGR)
 		ser_file->number_of_planes = 3;
-	else ser_file->number_of_planes = 1;
+	else
+		ser_file->number_of_planes = 1;
 
 	ser_read_timestamp(ser_file);
 
@@ -392,8 +393,8 @@ void ser_manage_endianess_and_depth(struct ser_struct *ser_file, WORD *data, int
 		// inline conversion to 16 bit
 		for (i = frame_size - 1; i >= 0; i--)
 			data[i] = (WORD) (((BYTE*)data)[i]);
-	} else if (ser_file->little_endian) {	// TODO check if it is needed for big endian
-		// inline conversion to big endian
+	} else if (ser_file->little_endian == SER_BIG_ENDIAN) {
+		// inline conversion
 		for (i = frame_size - 1; i >= 0; i--) {
 			pixel = data[i];
 			pixel = (pixel >> 8) | (pixel << 8);
@@ -412,6 +413,7 @@ void ser_display_info(struct ser_struct *ser_file) {
 	fprintf(stdout, "=========== SER file info ==============\n");
 	fprintf(stdout, "file id: %s\n", ser_file->file_id);
 	fprintf(stdout, "lu id: %d\n", ser_file->lu_id);
+	fprintf(stdout, "little endian: %d\n", ser_file->little_endian);
 	fprintf(stdout, "sensor type: %s\n", color);
 	fprintf(stdout, "image size: %d x %d (%d bits)\n", ser_file->image_width,
 			ser_file->image_height, ser_file->bit_pixel_depth);
@@ -451,6 +453,7 @@ int ser_create_file(const char *filename, struct ser_struct *ser_file,
 		memcpy(ser_file->telescope, copy_from->telescope, 40);
 		ser_file->byte_pixel_depth = copy_from->byte_pixel_depth;
 		ser_file->number_of_planes = copy_from->number_of_planes;
+
 		int i;
 		if (copy_from->ts) {
 			ser_file->ts = calloc(8, copy_from->frame_count);
@@ -612,6 +615,7 @@ int ser_read_frame(struct ser_struct *ser_file, int frame_no, fits *fit) {
 	case SER_BAYER_GRBG:
 		fit->naxes[0] = fit->rx = ser_file->image_width;
 		fit->naxes[1] = fit->ry = ser_file->image_height;
+		fit->naxes[2] = 3;
 		if (com.debayer.ser_use_bayer_header)
 			set_combo_box_bayer_pattern(type_ser);
 		debayer(fit, com.debayer.bayer_inter);
@@ -865,7 +869,12 @@ int ser_write_frame_from_fit(struct ser_struct *ser_file, fits *fit, int frame_n
 				pixel++) {
 			if (ser_file->byte_pixel_depth == SER_PIXEL_DEPTH_8)
 				data8[dest] = (BYTE)(fit->pdata[plane][pixel]);
-			else data16[dest] = (fit->pdata[plane][pixel] >> 8 | fit->pdata[plane][pixel] << 8);
+			else {
+				if (ser_file->little_endian == SER_BIG_ENDIAN)
+					data16[dest] = (fit->pdata[plane][pixel] >> 8 | fit->pdata[plane][pixel] << 8);
+				else
+					data16[dest] = fit->pdata[plane][pixel];
+			}
 			dest += ser_file->number_of_planes;
 		}
 	}

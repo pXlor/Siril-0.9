@@ -605,7 +605,13 @@ int register_star_alignment(struct registration_args *args) {
 		else
 			snprintf(dest, 255, "%s%s.ser", args->prefix, args->seq->seqname);
 
-		ser_create_file(dest, new_ser, TRUE, args->seq->ser_file);
+		/* Here the last argument is NULL because we do not want copy SER file
+		 * from the original. Indeed in the demosaicing case this would lead to
+		 * a wrong file (B&W and not in RAW data). Moreover, header informations
+		 * (like fps, local and UTC time, ...) have no sense now since some frames
+		 * could be removed from the sequence.
+		 */
+		ser_create_file(dest, new_ser, TRUE, NULL);
 	}
 
 	skipped = 0;
@@ -669,7 +675,7 @@ int register_star_alignment(struct registration_args *args) {
 					current_regdata[frame].fwhm = FWHMx;
 
 					fits_flip_top_to_bottom(&fit);	// this is because in cvTransformImage, rotation center point is at (0, 0)
-					cvTransformImage(&fit, trans, 0);
+					cvTransformImage(&fit, trans, OPENCV_LANCZOS4);
 					fits_flip_top_to_bottom(&fit);
 
 					i = 0;
@@ -705,11 +711,11 @@ int register_star_alignment(struct registration_args *args) {
 				args->seq->new_total + failed);
 		siril_log_color_message(_("Total: %d failed, %d registered.\n"), "green",
 				failed, args->seq->new_total);
-		args->load_new_sequance = TRUE;
+		args->load_new_sequence = TRUE;
 	}
 	else {
 		siril_log_message(_("Registration aborted.\n"));
-		args->load_new_sequance = FALSE;
+		args->load_new_sequence = FALSE;
 	}
 
 	return args->seq->new_total == 0;
@@ -1105,15 +1111,19 @@ static gboolean end_register_idle(gpointer p) {
 		/* Load new sequence. Only star alignment method uses new sequence. */
 #ifdef HAVE_OPENCV
 		if (args->func == &register_star_alignment) {
-			if (args->load_new_sequance) {
+			if (args->load_new_sequence) {
 				int frame, new_frame;
 				regdata *new_data;
 				imgdata *new_image;
-				char *rseqname = malloc(
-						strlen(args->prefix) + strlen(com.seq.seqname) + 5);
 
-				sprintf(rseqname, "%s%s.seq", args->prefix, com.seq.seqname);
+				/* we are not interested in the whole path */
+				gchar *seqname = g_path_get_basename (com.seq.seqname);
+				char *rseqname = malloc(
+						strlen(args->prefix) + strlen(seqname) + 5);
+
+				sprintf(rseqname, "%s%s.seq", args->prefix, seqname);
 				unlink(rseqname);
+				g_free(seqname);
 				check_seq(0);
 				if (args->seq->seqname)
 					free(args->seq->seqname);

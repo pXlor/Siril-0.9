@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Siril 0.9.4\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-07-13 18:35+0800\n"
-"PO-Revision-Date: 2016-07-15 23:36+0800\n"
+"POT-Creation-Date: 2016-07-21 16:29+0200\n"
+"PO-Revision-Date: 2016-07-21 16:37+0200\n"
 "Last-Translator: \n"
 "Language-Team: astronomy.com.cn <yecloud@me.com>\n"
 "Language: zh_CN\n"
@@ -91,14 +91,16 @@ msgstr "将RGB图像保存为48位PPM格式"
 msgid "RGB Align"
 msgstr "RGB对齐"
 
-#: ../src/gui/siril3.glade.h:19 ../src/compositing/compositing.c:360
+#: ../src/gui/siril3.glade.h:19 ../src/compositing/align_rgb.c:49
+#: ../src/compositing/compositing.c:360
 msgid "Image pattern alignment (planetary/deep-sky)"
 msgstr "图像模式对齐（行星/深空）"
 
 #. the list below depends on the content of the glade file. It
 #. * should be done in the same way as in registration.c, but it
 #. * woud be easier if the two glades are merged.
-#: ../src/gui/siril3.glade.h:20 ../src/compositing/compositing.c:359
+#: ../src/gui/siril3.glade.h:20 ../src/compositing/align_rgb.c:47
+#: ../src/compositing/compositing.c:359
 msgid "One star registration (deep-sky)"
 msgstr "单星对齐（深空）"
 
@@ -3219,6 +3221,15 @@ msgstr "峰化"
 msgid "wavelet_transform_data: bad plane number\n"
 msgstr "wavelet_transform_data: bad plane number\n"
 
+#: ../src/compositing/align_rgb.c:116 ../src/compositing/compositing.c:601
+msgid "Error in layers alignment."
+msgstr "通道对齐错误。"
+
+#: ../src/compositing/align_rgb.c:118 ../src/compositing/compositing.c:602
+#: ../src/registration/registration.c:1157
+msgid "Registration complete."
+msgstr "对齐完成。"
+
 #: ../src/compositing/compositing.c:447
 msgid "ERROR"
 msgstr "ERROR"
@@ -3272,14 +3283,6 @@ msgstr "警告"
 #, c-format
 msgid "Starting registration using method: %s\n"
 msgstr "Starting registration using method: %s\n"
-
-#: ../src/compositing/compositing.c:601
-msgid "Error in layers alignment."
-msgstr "通道对齐错误。"
-
-#: ../src/compositing/compositing.c:602 ../src/registration/registration.c:1157
-msgid "Registration complete."
-msgstr "对齐完成。"
 
 #: ../src/compositing/compositing.c:691
 msgid "An image area must be selected for align"
@@ -3561,13 +3564,13 @@ msgstr ""
 #: ../src/core/command.c:1426
 #, c-format
 msgid ""
-"Number of logical processor MUST be greater than 0 and lower or equal to "
+"Number of logical processors MUST be greater than 0 and lower or equal to "
 "%d.\n"
 msgstr ""
 
 #: ../src/core/command.c:1436
 #, c-format
-msgid "Using now %d logical processor\n"
+msgid "Using now %d logical processors\n"
 msgstr ""
 
 #: ../src/core/command.c:1446
@@ -3699,7 +3702,7 @@ msgstr "预处理图像 %s"
 
 #: ../src/core/siril.c:1017 ../src/core/siril.c:1049
 msgid ""
-"Darkmap cosmetic correctionis only supported with single channel images\n"
+"Darkmap cosmetic correction is only supported with single channel images\n"
 msgstr "暗场降噪只支持单通道图像\n"
 
 #: ../src/core/siril.c:1024

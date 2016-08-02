@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: siril 0.9.4\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-07-13 10:56+0200\n"
-"PO-Revision-Date: 2016-07-11 23:34+0200\n"
+"POT-Creation-Date: 2016-07-21 16:29+0200\n"
+"PO-Revision-Date: 2016-07-21 16:36+0200\n"
 "Last-Translator: Cyril <cyril@free-astro.fr>\n"
 "Language-Team: French <cyril@free-astro.fr>\n"
 "Language: fr\n"
@@ -94,14 +94,16 @@ msgstr "Enregistrer l'image RVB en PPM 48-bit"
 msgid "RGB Align"
 msgstr "Alignement RVB"
 
-#: ../src/gui/siril3.glade.h:19 ../src/compositing/compositing.c:360
+#: ../src/gui/siril3.glade.h:19 ../src/compositing/align_rgb.c:49
+#: ../src/compositing/compositing.c:360
 msgid "Image pattern alignment (planetary/deep-sky)"
 msgstr "Alignement par motif de l'image (planétaire/ciel profond)"
 
 #. the list below depends on the content of the glade file. It
 #. * should be done in the same way as in registration.c, but it
 #. * woud be easier if the two glades are merged.
-#: ../src/gui/siril3.glade.h:20 ../src/compositing/compositing.c:359
+#: ../src/gui/siril3.glade.h:20 ../src/compositing/align_rgb.c:47
+#: ../src/compositing/compositing.c:359
 msgid "One star registration (deep-sky)"
 msgstr "Alignement sur une étoile (ciel profond)"
 
@@ -3422,6 +3424,15 @@ msgstr "Pointage"
 msgid "wavelet_transform_data: bad plane number\n"
 msgstr "wavelet_transform_data : mauvais nombre de plans\n"
 
+#: ../src/compositing/align_rgb.c:116 ../src/compositing/compositing.c:601
+msgid "Error in layers alignment."
+msgstr "Erreur dans l'alignement des canaux."
+
+#: ../src/compositing/align_rgb.c:118 ../src/compositing/compositing.c:602
+#: ../src/registration/registration.c:1157
+msgid "Registration complete."
+msgstr "Alignement terminé."
+
 #: ../src/compositing/compositing.c:447
 msgid "ERROR"
 msgstr "ERREUR"
@@ -3477,14 +3488,6 @@ msgstr "Attention"
 #, c-format
 msgid "Starting registration using method: %s\n"
 msgstr "Début de l'alignement avec la méthode : %s\n"
-
-#: ../src/compositing/compositing.c:601
-msgid "Error in layers alignment."
-msgstr "Erreur dans l'alignement des canaux."
-
-#: ../src/compositing/compositing.c:602 ../src/registration/registration.c:1157
-msgid "Registration complete."
-msgstr "Alignement terminé."
 
 #: ../src/compositing/compositing.c:691
 msgid "An image area must be selected for align"
@@ -3790,14 +3793,14 @@ msgstr "avec succès"
 #: ../src/core/command.c:1426
 #, c-format
 msgid ""
-"Number of logical processor MUST be greater than 0 and lower or equal to "
+"Number of logical processors MUST be greater than 0 and lower or equal to "
 "%d.\n"
 msgstr ""
 "Le nombre de processeurs doit être supérieur à 0 et inférieur ou égal à %d.\n"
 
 #: ../src/core/command.c:1436
 #, c-format
-msgid "Using now %d logical processor\n"
+msgid "Using now %d logical processors\n"
 msgstr "Utilise maintenant %d processeurs\n"
 
 #: ../src/core/command.c:1446
@@ -3931,7 +3934,7 @@ msgstr "Pré-traitement de l'image %s"
 
 #: ../src/core/siril.c:1017 ../src/core/siril.c:1049
 msgid ""
-"Darkmap cosmetic correctionis only supported with single channel images\n"
+"Darkmap cosmetic correction is only supported with single channel images\n"
 msgstr ""
 "La correction cosmétique utilisant le master-dark ne supporte que des images "
 "à un canal\n"

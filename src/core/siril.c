@@ -1014,17 +1014,20 @@ gpointer seqpreprocess(gpointer p) {
 				free(dev);
 			}
 			else
-				siril_log_message(_("Darkmap cosmetic correction"
+				siril_log_message(_("Darkmap cosmetic correction "
 						"is only supported with single channel images\n"));
 		}
 
-		snprintf(dest_filename, 255, "%s%s", com.uniq->ppprefix,
-		basename(com.uniq->filename));
+		gchar *filename = g_path_get_basename(com.uniq->filename);
+		char *filename_noext = remove_ext_from_filename(filename);
+		snprintf(dest_filename, 255, "%s%s", com.uniq->ppprefix, filename_noext);
 		dest_filename[255] = '\0';
-		snprintf(msg, 255, _("Saving image %s"), com.uniq->filename);
+		snprintf(msg, 255, _("Saving image %s"), filename_noext);
 		msg[255] = '\0';
 		set_progress_bar_data(msg, PROGRESS_NONE);
 		savefits(dest_filename, com.uniq->fit);
+		g_free(filename);
+		free(filename_noext);
 	} else {	// sequence
 		struct ser_struct *new_ser_file;
 		char source_filename[256];
@@ -1046,7 +1049,7 @@ gpointer seqpreprocess(gpointer p) {
 				siril_log_message(_("%ld pixels corrected (%ld + %ld)\n"),
 						icold + ihot, icold, ihot);
 			} else
-				siril_log_message(_("Darkmap cosmetic correction"
+				siril_log_message(_("Darkmap cosmetic correction "
 						"is only supported with single channel images\n"));
 		}
 
@@ -1487,7 +1490,7 @@ int BandingEngine(fits *fit, double sigma, double amount, gboolean protect_highl
 
 	if (applyRotation) {
 #ifdef HAVE_OPENCV
-		cvRotateImage(fit, 90.0, -1, 0);
+		cvRotateImage(fit, 90.0, -1, OPENCV_LINEAR);
 #else
 		siril_log_message(_("Rotation is only possible when Siril has been compiled with OpenCV support.\n"));
 		free(fiximage);
@@ -1551,7 +1554,7 @@ int BandingEngine(fits *fit, double sigma, double amount, gboolean protect_highl
 	clearfits(fiximage);
 #ifdef HAVE_OPENCV
 	if (applyRotation)
-		cvRotateImage(fit, -90.0, -1, 0);
+		cvRotateImage(fit, -90.0, -1, OPENCV_LINEAR);
 #endif
 	return 0;
 }
