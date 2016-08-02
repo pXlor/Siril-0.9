@@ -234,30 +234,28 @@ int changedir(const char *dir) {
  * its loading */
 int update_sequences_list(const char *sequence_name_to_select) {
 	GtkComboBoxText *seqcombo;
-	DIR *dir;
-	struct dirent *file;
+	struct dirent **list;
+	int i, n;
 	char filename[256];
 	int number_of_loaded_sequences = 0;
 	int index_of_seq_to_load = -1;
-
-	if ((dir = opendir(com.wd)) == NULL) {
-		fprintf(stderr, "working directory cannot be opened.\n");
-		com.wd[0] = '\0';
-		return 1;
-	}
 
 	// clear the previous list
 	seqcombo = GTK_COMBO_BOX_TEXT(
 			gtk_builder_get_object(builder, "sequence_list_combobox"));
 	gtk_combo_box_text_remove_all(seqcombo);
 
-	while ((file = readdir(dir)) != NULL) {
+	n = scandir(com.wd, &list, 0, alphasort);
+	if (n < 0)
+		perror("scandir");
+
+	for (i = 0; i < n; ++i) {
 		char *suf;
 
-		if ((suf = strstr(file->d_name, ".seq")) && strlen(suf) == 4) {
-			sequence *seq = readseqfile(file->d_name);
+		if ((suf = strstr(list[i]->d_name, ".seq")) && strlen(suf) == 4) {
+			sequence *seq = readseqfile(list[i]->d_name);
 			if (seq != NULL) {
-				strncpy(filename, file->d_name, 255);
+				strncpy(filename, list[i]->d_name, 255);
 				free_sequence(seq, TRUE);
 				gtk_combo_box_text_append_text(seqcombo, filename);
 				if (sequence_name_to_select
@@ -269,7 +267,10 @@ int update_sequences_list(const char *sequence_name_to_select) {
 			}
 		}
 	}
-	closedir(dir);
+	for (i = 0; i < n; i++)
+		free(list[i]);
+	free(list);
+
 	if (!number_of_loaded_sequences) {
 		fprintf(stderr, "No valid sequence found in CWD.\n");
 		return -1;
@@ -278,9 +279,7 @@ int update_sequences_list(const char *sequence_name_to_select) {
 	}
 
 	if (number_of_loaded_sequences > 1 && index_of_seq_to_load < 0) {
-		//g_signal_handlers_block_by_func(GTK_WIDGET(seqcombo), on_seqproc_entry_changed, NULL);
 		gtk_combo_box_popup(GTK_COMBO_BOX(seqcombo));
-		//g_signal_handlers_unblock_by_func(GTK_WIDGET(seqcombo), on_seqproc_entry_changed, NULL);
 	} else if (index_of_seq_to_load >= 0)
 		gtk_combo_box_set_active(GTK_COMBO_BOX(seqcombo), index_of_seq_to_load);
 	else

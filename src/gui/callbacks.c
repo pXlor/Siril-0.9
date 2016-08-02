@@ -3953,6 +3953,7 @@ gboolean rgb_area_popup_menu_handler(GtkWidget *widget) {
 void do_popup_graymenu(GtkWidget *my_widget, GdkEventButton *event) {
 	static GtkMenu *menu = NULL;
 	int button, event_time;
+	gboolean selected;
 
 	if (!menu) {
 		menu = GTK_MENU(gtk_builder_get_object(builder, "menugray"));
@@ -3966,34 +3967,14 @@ void do_popup_graymenu(GtkWidget *my_widget, GdkEventButton *event) {
 		button = 0;
 		event_time = gtk_get_current_event_time();
 	}
-	if (com.selection.w && com.selection.h) {
-		gtk_widget_set_sensitive(lookup_widget("menu_gray_psf"), TRUE);
-		gtk_widget_set_sensitive(lookup_widget("menu_gray_pick_star"), TRUE);
-		gtk_widget_set_sensitive(lookup_widget("menu_gray_crop"), TRUE);
-		if (sequence_is_loaded())
-			gtk_widget_set_sensitive(lookup_widget("menu_gray_crop_seq"), TRUE);
-		else
-			gtk_widget_set_sensitive(lookup_widget("menu_gray_crop_seq"), FALSE);
-		// TODO: add the sequence processing entry
-	} else {
-		gtk_widget_set_sensitive(lookup_widget("menu_gray_psf"), FALSE);
-		gtk_widget_set_sensitive(lookup_widget("menu_gray_pick_star"), FALSE);
-		gtk_widget_set_sensitive(lookup_widget("menu_gray_crop"), FALSE);
-		gtk_widget_set_sensitive(lookup_widget("menu_gray_crop_seq"), FALSE);
-	}
 
-	if (is_undo_available()) {
-		gtk_widget_set_sensitive(lookup_widget("undo_item1"), TRUE);
-	}
-	else {
-		gtk_widget_set_sensitive(lookup_widget("undo_item1"), FALSE);
-	}
-	if (is_redo_available()) {
-		gtk_widget_set_sensitive(lookup_widget("redo_item1"), TRUE);
-	}
-	else {
-		gtk_widget_set_sensitive(lookup_widget("redo_item1"), FALSE);
-	}
+	selected = com.selection.w && com.selection.h;
+	gtk_widget_set_sensitive(lookup_widget("undo_item1"), is_undo_available());
+	gtk_widget_set_sensitive(lookup_widget("redo_item1"), is_redo_available());
+	gtk_widget_set_sensitive(lookup_widget("menu_gray_psf"), selected);
+	gtk_widget_set_sensitive(lookup_widget("menu_gray_pick_star"), selected);
+	gtk_widget_set_sensitive(lookup_widget("menu_gray_crop"), selected && !sequence_is_loaded());
+	gtk_widget_set_sensitive(lookup_widget("menu_gray_crop_seq"), selected && sequence_is_loaded());
 
 	gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, button, event_time);
 }
@@ -4452,13 +4433,8 @@ void on_combo_scnr_changed(GtkComboBoxText *box, gpointer user_data) {
 	GtkScale *scale = GTK_SCALE(lookup_widget("scale_scnr"));
 	GtkLabel *label = GTK_LABEL(lookup_widget("label56"));
 
-	if (type > 1) {
-		gtk_widget_set_sensitive(GTK_WIDGET(scale), TRUE);
-		gtk_widget_set_sensitive(GTK_WIDGET(label), TRUE);
-	} else {
-		gtk_widget_set_sensitive(GTK_WIDGET(scale), FALSE);
-		gtk_widget_set_sensitive(GTK_WIDGET(label), FALSE);
-	}
+	gtk_widget_set_sensitive(GTK_WIDGET(scale), type > 1);
+	gtk_widget_set_sensitive(GTK_WIDGET(label), type > 1);
 }
 
 #ifdef HAVE_OPENCV
