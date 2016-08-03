@@ -3954,6 +3954,8 @@ void do_popup_graymenu(GtkWidget *my_widget, GdkEventButton *event) {
 	static GtkMenu *menu = NULL;
 	int button, event_time;
 	gboolean selected;
+	gboolean is_a_single_image_loaded = single_image_is_loaded()	&& (!sequence_is_loaded()
+				|| (sequence_is_loaded() && com.seq.current == RESULT_IMAGE));
 
 	if (!menu) {
 		menu = GTK_MENU(gtk_builder_get_object(builder, "menugray"));
@@ -3973,7 +3975,7 @@ void do_popup_graymenu(GtkWidget *my_widget, GdkEventButton *event) {
 	gtk_widget_set_sensitive(lookup_widget("redo_item1"), is_redo_available());
 	gtk_widget_set_sensitive(lookup_widget("menu_gray_psf"), selected);
 	gtk_widget_set_sensitive(lookup_widget("menu_gray_pick_star"), selected);
-	gtk_widget_set_sensitive(lookup_widget("menu_gray_crop"), selected && !sequence_is_loaded());
+	gtk_widget_set_sensitive(lookup_widget("menu_gray_crop"), selected && is_a_single_image_loaded);
 	gtk_widget_set_sensitive(lookup_widget("menu_gray_crop_seq"), selected && sequence_is_loaded());
 
 	gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, button, event_time);
