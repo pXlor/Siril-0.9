@@ -41,6 +41,8 @@
 static const uint64_t epochTicks = 621355968000000000UL;
 static const uint64_t ticksPerSecond = 10000000;
 
+static int ser_write_header(struct ser_struct *ser_file);
+
 /* Given an SER timestamp, return a char string representation
  * MUST be freed
  */
@@ -243,6 +245,27 @@ static int ser_read_timestamp(struct ser_struct *ser_file) {
 	return 0;
 }
 
+static int ser_fix_broken_file(struct ser_struct *ser_file) {
+	int frame_count_calculated;
+	off_t filesize = ser_file->filesize;
+
+	siril_log_message(_("Trying to fix broken SER file...\n"));
+	int frame_size = ser_file->image_width * ser_file->image_height;
+
+	if (ser_file->color_id == SER_RGB || ser_file->color_id == SER_BGR) {
+		frame_size *= 3;  // Color images have twice as many samples
+	}
+
+	if (ser_file->bit_pixel_depth > 8) {
+		frame_size *= 2;  // Greater than 8-bit data has 2 bytes per pixel rather than one
+	}
+
+	filesize -= SER_HEADER_LEN;  // Remove header size from file size
+	frame_count_calculated = filesize / frame_size;
+
+	return frame_count_calculated;
+}
+
 static int ser_read_header(struct ser_struct *ser_file) {
 	char header[SER_HEADER_LEN];
 
@@ -262,8 +285,10 @@ static int ser_read_header(struct ser_struct *ser_file) {
 		perror("read");
 		return -1;
 	}
+
 	// modify this to support big endian
 	memcpy(&ser_file->lu_id, header + 14, 28);	// read all integers
+
 	memcpy(&ser_file->date, header + 162, 8);
 	memcpy(&ser_file->date_utc, header + 170, 8);
 
@@ -283,6 +308,19 @@ static int ser_read_header(struct ser_struct *ser_file) {
 		ser_file->number_of_planes = 3;
 	else
 		ser_file->number_of_planes = 1;
+
+/* In some cases, oacapture, firecapture, ... crash before writing frame_count
+ * data. Here we try to get the calculated frame count which has not been written
+ * in the header. Then we fix the SER file
+ */
+	if (ser_file->frame_count == 0) {
+		ser_file->frame_count = ser_fix_broken_file(ser_file);
+
+		if (ser_file->frame_count > 0) {
+			if (ser_write_header(ser_file) == 0)
+				siril_log_message(_("SER file has been fixed...\n"));
+		}
+	}
 
 	ser_read_timestamp(ser_file);
 
@@ -500,7 +538,7 @@ int ser_open_file(char *filename, struct ser_struct *ser_file) {
 		fprintf(stderr, "SER: file already opened, or badly closed\n");
 		return -1;
 	}
-	ser_file->fd = open(filename, O_RDONLY);
+	ser_file->fd = open(filename, O_RDWR); // now we can fix broken file, so not O_RDONLY anymore
 	if (ser_file->fd == -1) {
 		perror("SER file open");
 		return -1;
@@ -526,11 +564,6 @@ int ser_close_file(struct ser_struct *ser_file) {
 	if (ser_file->fd > 0) {
 		retval = close(ser_file->fd);
 		ser_file->fd = -1;
-		// removing the created file if frames have not been added
-		if (ser_file->frame_count < 2 && ser_file->filename) {
-			unlink(ser_file->filename);
-			retval = 1;
-		}
 	}
 	if (ser_file->file_id)
 		free(ser_file->file_id);
