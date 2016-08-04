@@ -3954,7 +3954,7 @@ void do_popup_graymenu(GtkWidget *my_widget, GdkEventButton *event) {
 	static GtkMenu *menu = NULL;
 	int button, event_time;
 	gboolean selected;
-	gboolean is_a_single_image_loaded = single_image_is_loaded()	&& (!sequence_is_loaded()
+	gboolean is_a_single_image_loaded = single_image_is_loaded() && (!sequence_is_loaded()
 				|| (sequence_is_loaded() && com.seq.current == RESULT_IMAGE));
 
 	if (!menu) {

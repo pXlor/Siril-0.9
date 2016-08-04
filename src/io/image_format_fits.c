@@ -24,7 +24,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <string.h>
-#include <gsl/gsl_statistics_double.h>
+#include <gsl/gsl_statistics.h>
 
 #include "core/siril.h"
 #include "core/proto.h"
@@ -183,10 +183,17 @@ int readfits(const char *filename, fits *fit, char *realname) {
 		status = 0;
 		fits_read_pix(fit->fptr, TLONG, orig, nbdata * fit->naxes[2], &zero,
 				pixels_long, &zero, &status);
+		long m_long = gsl_stats_long_max(pixels_long, 1, nbdata * fit->naxes[2]);
 		for (i = 0; i < nbdata * fit->naxes[2]; i++) {
 			double shift = (double) (0x80000000UL - offset) / (double) UINT_MAX;
-			double pixel = (double) (pixels_long[i] / (double) UINT_MAX);
-			fit->data[i] = round_to_WORD((pixel + shift) * USHRT_MAX_DOUBLE);
+			if (m_long> USHRT_MAX) {
+				double pixel = (double) (pixels_long[i] / (double) UINT_MAX);
+				fit->data[i] = round_to_WORD((pixel + shift) * USHRT_MAX_DOUBLE);
+			}
+			else {
+				double pixel = (double) (pixels_long[i]);
+				fit->data[i] = round_to_WORD((pixel + shift));
+			}
 		}
 		free(pixels_long);
 		fit->bitpix = USHORT_IMG;
@@ -201,10 +208,10 @@ int readfits(const char *filename, fits *fit, char *realname) {
 		 * Indeed, it looks like that some FLOAT_IMG are in fact integers.
 		 * In order to read most pictures we test the maximum value to
 		 * know if the range is [0, 1] or not */
-		double maximum = gsl_stats_max(pixels_double, 1,
+		double m_double = gsl_stats_max(pixels_double, 1,
 				nbdata * fit->naxes[2]);
 		for (i = 0; i < nbdata * fit->naxes[2]; i++) {
-			if (maximum > 1.) {
+			if (m_double > 1.0) {
 				fit->data[i] = round_to_WORD(pixels_double[i]);
 			} else
 				fit->data[i] = round_to_WORD(
