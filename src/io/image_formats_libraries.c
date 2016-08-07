@@ -129,8 +129,11 @@ int readtif(const char *name, fits *fit) {
 		retval = nsamples;
 	}
 	if (nbits==16) mirrorx(fit, FALSE);
+	char *basename = g_path_get_basename(name);
 	siril_log_message(_("Reading TIFF: %d-bit file %s, %ld layer(s), %ux%u pixels\n"),
-						nbits, name, fit->naxes[2], fit->rx, fit->ry);
+						nbits, basename, fit->naxes[2], fit->rx, fit->ry);
+	g_free(basename);
+
 	return retval;
 }
 
@@ -419,8 +422,11 @@ int readjpg(const char* name, fits *fit){
 		fit->binning_x=fit->binning_y=1;
 	}
 	mirrorx(fit, FALSE);
+	char *basename = g_path_get_basename(name);
 	siril_log_message(_("Reading JPG: file %s, %ld layer(s), %ux%u pixels\n"),
-						name, fit->naxes[2], fit->rx, fit->ry);
+						basename, fit->naxes[2], fit->rx, fit->ry);
+	g_free(basename);
+
 	return cinfo.output_components;
 }
 
@@ -640,8 +646,10 @@ int readpng(const char *name, fits* fit) {
 
 	}
 	mirrorx(fit, FALSE);
+	char *basename = g_path_get_basename(name);
 	siril_log_message(_("Reading PNG: %d-bit file %s, %ld layer(s), %ux%u pixels\n"),
-						bit_depth, name, fit->naxes[2], fit->rx, fit->ry);
+						bit_depth, basename, fit->naxes[2], fit->rx, fit->ry);
+	g_free(basename);
 
 	return nbplanes;
 }
@@ -896,8 +904,11 @@ int open_raw_files(const char *name, fits *fit, int type) {
 			break;
 	}
 	mirrorx(fit, FALSE);
+	char *basename = g_path_get_basename(name);
 	siril_log_message(_("Reading RAW: file %s, %ld layer(s), %ux%u pixels\n"),
-						name, fit->naxes[2], fit->rx, fit->ry);		
+						basename, fit->naxes[2], fit->rx, fit->ry);
+	g_free(basename);
+
 	return retvalue;
 }
 #endif

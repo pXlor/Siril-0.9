@@ -102,8 +102,10 @@ int readbmp(const char *name, fits *fit) {
 		show_dialog(msg, _("Error"), "gtk-dialog-error");
 	}
 	free(buf);
+	char *basename = g_path_get_basename(name);
 	siril_log_message(_("Reading BMP: file %s, %ld layer(s), %ux%u pixels\n"),
-			name, fit->naxes[2], fit->rx, fit->ry);
+			basename, fit->naxes[2], fit->rx, fit->ry);
+	g_free(basename);
 	return nbplane;
 }
 
@@ -511,8 +513,10 @@ int import_pnm_to_fits(const char *filename, fits *fit) {
 		return -1;
 	}
 	fclose(fd);
+	char *basename = g_path_get_basename(filename);
 	siril_log_message(_("Reading NetPBM: file %s, %ld layer(s), %ux%u pixels\n"),
-			filename, fit->naxes[2], fit->rx, fit->ry);
+			basename, fit->naxes[2], fit->rx, fit->ry);
+	g_free(basename);
 	return fit->naxes[2];
 }
 
@@ -657,18 +661,13 @@ static int _pic_read_header(struct pic_struct *pic_file) {
 	memcpy(&pic_file->width, header + 68, 2);
 	memcpy(&pic_file->height, header + 70, 2);
 	assert(pic_file->width > 0 && pic_file->height > 0);
-	memcpy(&pic_file->bin[0], header + 80, 2);
-	memcpy(&pic_file->bin[1], header + 82, 2);
-	memcpy(&pic_file->bin[2], header + 84, 2);
-	memcpy(&pic_file->bin[3], header + 86, 2);
-	memcpy(&pic_file->bin[4], header + 88, 2);
-	memcpy(&pic_file->bin[5], header + 90, 2);
+	memcpy(pic_file->bin, header + 80, 12);
 	memcpy(&pic_file->nbplane, header + 92, 2);
 	assert(pic_file->nbplane != 0);
 	memcpy(&pic_file->hi, header + 118, 2);
 	memcpy(&pic_file->lo, header + 120, 2);
 	pic_file->date = strndup(header + 94, 10);
-	pic_file->time = strndup(header + 106, 12);
+	pic_file->time = strndup(header + 104, 12);
 	return 0;
 }
 
@@ -744,16 +743,22 @@ int readpic(const char *name, fits *fit) {
 		show_dialog(msg, _("Error"), "gtk-dialog-error");
 	}
 
+	char *basename = g_path_get_basename(name);
 	siril_log_message(_("Reading PIC: file %s, %ld layer(s), %ux%u pixels\n"),
-			name, fit->naxes[2], fit->rx, fit->ry);
+			basename, fit->naxes[2], fit->rx, fit->ry);
+	g_free(basename);
 	siril_log_message("(%d,%d)-(%d,%d) - Binning %dx%d\n", pic_file->bin[0],
 			pic_file->bin[1], pic_file->bin[2], pic_file->bin[3],
 			fit->binning_x, fit->binning_y);
 
-	if (pic_file->date[0] != 0)
+	if (pic_file->date[0] != 0x00) {
+		g_strchug(pic_file->date);	// removing left white spaces if exist
 		siril_log_message(_("Date (of observation): %s\n"), pic_file->date);
-	if (pic_file->time[0] != 0)
+	}
+	if (pic_file->time[0] != 0x00) {
+		g_strchug(pic_file->time);	// removing left white spaces if exist
 		siril_log_message(_("Time (of observation): %s\n"), pic_file->time);
+	}
 
 	_pic_close_file(pic_file);
 	free(buf);

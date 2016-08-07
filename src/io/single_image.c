@@ -146,11 +146,10 @@ int open_single_image(const char* filename) {
 	
 	/* A single sequence has been loaded */
 	if (retval == 3) {
-		siril_log_message(_("Sequence loaded: %s\n"), com.seq.seqname);
 		return 0;
 	}
 	if (retval == 2) {
-		show_dialog(_("This file could not be openend because its extension is not supported.\n"), _("Error"), "gtk-dialog-error");
+		show_dialog(_("This file could not be opened because its extension is not supported.\n"), _("Error"), "gtk-dialog-error");
 		return 1;
 	}
 	if (retval == 1) {
@@ -159,7 +158,9 @@ int open_single_image(const char* filename) {
 	}
 
 	if (sequence_is_loaded()) {
-		siril_log_message(_("Closing sequence %s\n"), com.seq.seqname);
+		char *basename = g_path_get_basename(com.seq.seqname);
+		siril_log_message(_("Closing sequence %s\n"), basename);
+		g_free(basename);
 		clear_sequence_list();
 		free_sequence(&(com.seq), FALSE);
 		initialize_sequence(&com.seq, FALSE);

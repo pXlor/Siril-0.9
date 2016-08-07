@@ -28,7 +28,6 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <gtk/gtk.h>
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <sys/param.h>		// define or not BSD macro
 #endif

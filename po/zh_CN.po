@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Siril 0.9.4\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-08-04 14:52+0200\n"
-"PO-Revision-Date: 2016-07-21 16:37+0200\n"
+"POT-Creation-Date: 2016-08-05 22:44+0200\n"
+"PO-Revision-Date: 2016-08-05 22:45+0200\n"
 "Last-Translator: \n"
 "Language-Team: astronomy.com.cn <yecloud@me.com>\n"
 "Language: zh_CN\n"
@@ -3520,7 +3520,6 @@ msgid "Selection update finished, %d images are selected in the sequence\n"
 msgstr ""
 
 #: ../src/core/command.c:1337
-#, fuzzy
 msgid "Siril cannot split layers. Make sure your image is in RGB mode.\n"
 msgstr "Siril无法提取通道，请确保你的图像为RGB模式。\n"
 
@@ -3571,7 +3570,7 @@ msgstr ""
 #: ../src/core/command.c:1436
 #, c-format
 msgid "Using now %d logical processors\n"
-msgstr ""
+msgstr "当前使用 %d 逻辑处理器\n"
 
 #: ../src/core/command.c:1446
 msgid "********* LIST OF AVAILABLE COMMANDS *********\n"
@@ -3781,16 +3780,16 @@ msgstr ""
 msgid "Noise standard deviation: calculating...\n"
 msgstr ""
 
-#: ../src/core/utils.c:217
+#: ../src/core/utils.c:216
 #, c-format
 msgid "Setting CWD (Current Working Directory) to '%s'\n"
 msgstr ""
 
-#: ../src/core/utils.c:227
+#: ../src/core/utils.c:226
 msgid "Could not change directory.\n"
 msgstr "无法更改目录。\n"
 
-#: ../src/core/utils.c:410
+#: ../src/core/utils.c:409
 msgid "Filename is too long, not expanding it\n"
 msgstr "文件名太长了\n"
 
@@ -4163,7 +4162,7 @@ msgstr "背景无法自己提取自己，请点击显示图像\n"
 #: ../src/io/image_formats_libraries.c:378
 #: ../src/io/image_formats_libraries.c:443
 #: ../src/io/image_formats_libraries.c:529 ../src/io/single_image.c:111
-#: ../src/io/single_image.c:153 ../src/io/single_image.c:157
+#: ../src/io/single_image.c:152 ../src/io/single_image.c:156
 #: ../src/stacking/stacking.c:372 ../src/stacking/stacking.c:1197
 msgid "Error"
 msgstr "错误"
@@ -4404,7 +4403,7 @@ msgstr "SER输出将获得超过新建单通道图像的优先权。\n"
 #: ../src/io/conversion.c:533 ../src/io/conversion.c:582
 #: ../src/io/sequence.c:1106 ../src/io/sequence.c:1252
 msgid "Creating the SER file failed, aborting.\n"
-msgstr ""
+msgstr "创建SER文件失败，异常终止。\n"
 
 #: ../src/io/conversion.c:550 ../src/io/conversion.c:551
 #, c-format
@@ -4557,7 +4556,7 @@ msgstr ""
 #: ../src/io/image_format_fits.c:645
 #, c-format
 msgid "ERROR: trying to save a FITS image with an unsupported format (%d).\n"
-msgstr ""
+msgstr "错误：企图以不支持的格式(%d)来保存一个FITS文件。\n"
 
 #: ../src/io/image_format_fits.c:656
 #, c-format
@@ -4580,7 +4579,7 @@ msgstr ""
 
 #: ../src/io/image_formats_internal.c:164
 msgid "Can't create BMP file.\n"
-msgstr ""
+msgstr "无法创建BMP文件。\n"
 
 #: ../src/io/image_formats_internal.c:201
 #, c-format
@@ -4950,44 +4949,44 @@ msgstr "Sequence export succeeded.\n"
 
 #: ../src/io/sequence.c:1522
 msgid "GIF support was not compiled, aborting.\n"
-msgstr ""
+msgstr "GIF支持未被编译进来，异常终止。\n"
 
 #: ../src/io/sequence.c:1535
 msgid "Width or height cannot be null. Not resizing.\n"
-msgstr ""
+msgstr "宽度和高度不能为空。缩放不成功。\n"
 
 #: ../src/io/ser.c:252
 msgid "Trying to fix broken SER file...\n"
-msgstr ""
+msgstr "尝试修复损坏的SER文件...\n"
 
-#: ../src/io/ser.c:319
+#: ../src/io/ser.c:321
 msgid "SER file has been fixed...\n"
-msgstr ""
+msgstr "SER文件已被修复…\n"
 
-#: ../src/io/ser.c:410
+#: ../src/io/ser.c:412
 msgid ""
 "Writing to SER files from larger than 16-bit FITS images is not yet "
 "implemented\n"
-msgstr ""
+msgstr "以超过16位的FITS图像为源生成SER文件的功能尚未实现\n"
 
-#: ../src/io/ser.c:530
+#: ../src/io/ser.c:532
 #, c-format
 msgid "Created SER file %s\n"
 msgstr "Created SER file %s\n"
 
-#: ../src/io/ser.c:679 ../src/io/ser.c:860
+#: ../src/io/ser.c:681 ../src/io/ser.c:862
 msgid "This type of Bayer pattern is not handled yet.\n"
 msgstr "这个类型的拜耳滤镜排列模式尚未被支持。\n"
 
-#: ../src/io/ser.c:745
+#: ../src/io/ser.c:747
 msgid "For a demosaiced image, layer has to be R, G or B (0 to 2).\n"
 msgstr ""
 
-#: ../src/io/ser.c:772 ../src/io/ser.c:832
+#: ../src/io/ser.c:774 ../src/io/ser.c:834
 msgid "Out of memory - aborting\n"
 msgstr "内存不足，异常中止\n"
 
-#: ../src/io/ser.c:881
+#: ../src/io/ser.c:883
 msgid "Trying to add an image of different size in a SER\n"
 msgstr "试图在SER文件中加入不是一致尺寸的图像\n"
 
@@ -5001,22 +5000,16 @@ msgstr "Error opening image %s: file not found or not supported.\n"
 msgid "Opening %s failed.\n"
 msgstr "打开 %s 失败。\n"
 
-#: ../src/io/single_image.c:149
-#, c-format
-msgid "Sequence loaded: %s\n"
-msgstr "Sequence loaded: %s\n"
+#: ../src/io/single_image.c:152
+msgid "This file could not be opened because its extension is not supported.\n"
+msgstr "文件无法被打开，由于扩展名不被支持。\n"
 
-#: ../src/io/single_image.c:153
-msgid ""
-"This file could not be openend because its extension is not supported.\n"
-msgstr ""
-
-#: ../src/io/single_image.c:157
+#: ../src/io/single_image.c:156
 msgid ""
 "There was an error when opening this image. See the log for more information."
 msgstr ""
 
-#: ../src/io/single_image.c:162
+#: ../src/io/single_image.c:161
 #, c-format
 msgid "Closing sequence %s\n"
 msgstr "Closing sequence %s\n"
@@ -5048,7 +5041,7 @@ msgstr "Welcome to %s v%s\n"
 
 #: ../src/main.c:279
 msgid "Could not load or create settings file in ~/.siril, exiting.\n"
-msgstr ""
+msgstr "无法读取或创建设置文件于目录 ~/.siril，程序退出。\n"
 
 #. Get CPU number and set the number of threads
 #: ../src/main.c:318
@@ -5600,6 +5593,9 @@ msgstr "基于品质 > %.2f (%d 图像)"
 #, c-format
 msgid "Based on quality"
 msgstr "基于品质"
+
+#~ msgid "Sequence loaded: %s\n"
+#~ msgstr "Sequence loaded: %s\n"
 
 #~ msgid ""
 #~ "Debayer single-channel images (CFA format) using the Bayer matrix layout "

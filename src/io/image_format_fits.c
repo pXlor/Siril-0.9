@@ -56,7 +56,7 @@ int readfits(const char *filename, fits *fit, char *realname) {
 	long orig[3] = { 1L, 1L, 1L };
 	// orig ^ gives the coordinate in each dimension of the first pixel to be read
 	int zero = 0;
-	char name[256], *msg = NULL;
+	char name[256], *msg = NULL, *basename;
 	image_type imagetype;
 	int i;
 	unsigned int nbdata;
@@ -249,8 +249,10 @@ int readfits(const char *filename, fits *fit, char *realname) {
 
 	status = 0;
 	fits_close_file(fit->fptr, &status);
+	basename = g_path_get_basename(filename);
 	siril_log_message(_("Reading FITS: file %s, %ld layer(s), %ux%u pixels\n"),
-			filename, fit->naxes[2], fit->rx, fit->ry);
+			basename, fit->naxes[2], fit->rx, fit->ry);
+	g_free(basename);
 	return 0;
 }
 

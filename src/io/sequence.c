@@ -319,6 +319,7 @@ int check_only_one_film_seq(char* name) {
 int set_seq(const char *name){
 	sequence *seq;
 	int image_to_load;
+	char *basename;
 	
 	if ((seq = readseqfile(name)) == NULL) {
 		fprintf(stderr, "could not load sequence %s\n", name);
@@ -346,8 +347,10 @@ int set_seq(const char *name){
 		writeseqfile(seq);
 	}
 
-	siril_log_message(_("Sequence loaded: %s (%d->%d)\n"), seq->seqname, seq->beg,
+	basename = g_path_get_basename(seq->seqname);
+	siril_log_message(_("Sequence loaded: %s (%d->%d)\n"), basename, seq->beg,
 			seq->end);
+	g_free(basename);
 	/* Sequence is stored in com.seq for now */
 	free_sequence(&com.seq, FALSE);
 	memcpy(&com.seq, seq, sizeof(sequence));

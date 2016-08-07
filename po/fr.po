@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: siril 0.9.4\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-08-04 14:52+0200\n"
-"PO-Revision-Date: 2016-08-04 15:25+0200\n"
+"POT-Creation-Date: 2016-08-05 22:44+0200\n"
+"PO-Revision-Date: 2016-08-05 22:44+0200\n"
 "Last-Translator: Cyril <cyril@free-astro.fr>\n"
 "Language-Team: French <cyril@free-astro.fr>\n"
 "Language: fr\n"
@@ -4018,16 +4018,16 @@ msgstr "Estimation du bruit : (canal : #%d) : %0.3lf (%.3e)\n"
 msgid "Noise standard deviation: calculating...\n"
 msgstr "Déviation standard du bruit : calcul en cours...\n"
 
-#: ../src/core/utils.c:217
+#: ../src/core/utils.c:216
 #, c-format
 msgid "Setting CWD (Current Working Directory) to '%s'\n"
 msgstr "Définir le répertoire de travail à '%s'\n"
 
-#: ../src/core/utils.c:227
+#: ../src/core/utils.c:226
 msgid "Could not change directory.\n"
 msgstr "Impossible de changer le répertoire de travail.\n"
 
-#: ../src/core/utils.c:410
+#: ../src/core/utils.c:409
 msgid "Filename is too long, not expanding it\n"
 msgstr "Nom de fichier trop long, ne fera rien\n"
 
@@ -4411,7 +4411,7 @@ msgstr ""
 #: ../src/io/image_formats_libraries.c:378
 #: ../src/io/image_formats_libraries.c:443
 #: ../src/io/image_formats_libraries.c:529 ../src/io/single_image.c:111
-#: ../src/io/single_image.c:153 ../src/io/single_image.c:157
+#: ../src/io/single_image.c:152 ../src/io/single_image.c:156
 #: ../src/stacking/stacking.c:372 ../src/stacking/stacking.c:1197
 msgid "Error"
 msgstr "Erreur"
@@ -5256,11 +5256,11 @@ msgstr ""
 msgid "Trying to fix broken SER file...\n"
 msgstr "Tentative de récupération du fichier SER corrompu...\n"
 
-#: ../src/io/ser.c:319
+#: ../src/io/ser.c:321
 msgid "SER file has been fixed...\n"
 msgstr "Le fichier SER a été réparé...\n"
 
-#: ../src/io/ser.c:410
+#: ../src/io/ser.c:412
 msgid ""
 "Writing to SER files from larger than 16-bit FITS images is not yet "
 "implemented\n"
@@ -5268,24 +5268,24 @@ msgstr ""
 "Créé un fichier SER d'une précision supérieur à 16-bit n'est pas encore "
 "implémenté\n"
 
-#: ../src/io/ser.c:530
+#: ../src/io/ser.c:532
 #, c-format
 msgid "Created SER file %s\n"
 msgstr "Fichier SER créé : %s\n"
 
-#: ../src/io/ser.c:679 ../src/io/ser.c:860
+#: ../src/io/ser.c:681 ../src/io/ser.c:862
 msgid "This type of Bayer pattern is not handled yet.\n"
 msgstr "Ce type de motif de Bayer n'est pas pris en charge.\n"
 
-#: ../src/io/ser.c:745
+#: ../src/io/ser.c:747
 msgid "For a demosaiced image, layer has to be R, G or B (0 to 2).\n"
 msgstr "Pour les images dématricées, le canal doit être R, V ou B (0 à 2).\n"
 
-#: ../src/io/ser.c:772 ../src/io/ser.c:832
+#: ../src/io/ser.c:774 ../src/io/ser.c:834
 msgid "Out of memory - aborting\n"
 msgstr "Mémoire insuffisante - abandon\n"
 
-#: ../src/io/ser.c:881
+#: ../src/io/ser.c:883
 msgid "Trying to add an image of different size in a SER\n"
 msgstr "Essaye d'ajouter une image de taille différente dans le fichier SER\n"
 
@@ -5300,23 +5300,17 @@ msgstr ""
 msgid "Opening %s failed.\n"
 msgstr "Échec de l'ouverture de %s.\n"
 
-#: ../src/io/single_image.c:149
-#, c-format
-msgid "Sequence loaded: %s\n"
-msgstr "Séquence chargée : %s\n"
-
-#: ../src/io/single_image.c:153
-msgid ""
-"This file could not be openend because its extension is not supported.\n"
+#: ../src/io/single_image.c:152
+msgid "This file could not be opened because its extension is not supported.\n"
 msgstr ""
 "Impossible d'ouvrir le fichier à cause d'une extension non supportée.\n"
 
-#: ../src/io/single_image.c:157
+#: ../src/io/single_image.c:156
 msgid ""
 "There was an error when opening this image. See the log for more information."
 msgstr "Impossible d'ouvrir cette image. Vérifier les log."
 
-#: ../src/io/single_image.c:162
+#: ../src/io/single_image.c:161
 #, c-format
 msgid "Closing sequence %s\n"
 msgstr "Fermeture de la séquence %s\n"
@@ -5944,6 +5938,9 @@ msgstr "Basé sur la qualité  > %.2f (%d images)"
 #, c-format
 msgid "Based on quality"
 msgstr "Basé sur la qualité"
+
+#~ msgid "Sequence loaded: %s\n"
+#~ msgstr "Séquence chargée : %s\n"
 
 #~ msgid "page 1"
 #~ msgstr "page 1"
