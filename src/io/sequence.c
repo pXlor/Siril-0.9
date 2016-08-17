@@ -1337,7 +1337,8 @@ gpointer export_sequence(gpointer ptr) {
 			retval = -3;
 			goto free_and_reset_progress_bar;
 		}
-
+		/* we want copy the header */
+		copy_header(&fit, &destfit);
 
 		if (!nbdata) {
 			memcpy(&destfit, &fit, sizeof(fits));

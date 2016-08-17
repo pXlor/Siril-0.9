@@ -32,6 +32,7 @@ int	read_opened_fits_partial(sequence *seq, int layer, int index, WORD *buffer, 
 int 	savefits(const char *, fits *);
 void 	save_fits_header(fits *);
 int	copyfits(fits *from, fits *to, unsigned char oper, int layer);
+int copy_header(fits *from, fits *to);
 int	save1fits16(const char *filename, fits *fit, int layer);
 int	fits48to3fits16(fits *rgb, fits *r, fits *g, fits *b);
 

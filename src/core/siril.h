@@ -407,10 +407,12 @@ struct ffit {
 	char date_obs[FLEN_VALUE];		// YYYY-MM-DDThh:mm:ss observation start, UT
 	char date[FLEN_VALUE];		// YYYY-MM-DDThh:mm:ss creation of file, UT
 	char instrume[FLEN_VALUE];		// INSTRUME key
+	char telescop[FLEN_VALUE];		// TELESCOP key
+	char observer[FLEN_VALUE];		// OBSERVER key
 	/* data obtained from FITS or RAW files */
 	double focal_length, iso_speed, exposure, aperture, ccd_temp;
 
-	/* data used in the Fourrier space */
+	/* data used in the Fourier space */
 	double dft_norm[3];			// Normalization value
 	char dft_type[FLEN_VALUE];		// spectrum, phase
 	char dft_ord[FLEN_VALUE];		// regular, centered
@@ -553,13 +555,13 @@ struct cominf {
 	fitted_PSF **stars;		// list of stars detected in the current image
 	gboolean star_is_seqdata;	// the only star in stars belongs to seq, don't free it
 	int selected_star;		// current selected star in the GtkListStore
-	double magOffset;		// offset to reduce the real magitude
+	double magOffset;		// offset to reduce the real magnitude
 	
 	gradient *grad;
 	int grad_nb_boxes, grad_size_boxes;
 	gboolean grad_boxes_drawn;
 
-	GThread *thread;		// the thread for processings
+	GThread *thread;		// the thread for processing
 	GMutex mutex;			// a mutex we use for this thread
 	gboolean run_thread;		// the main thread loop condition
 	int max_thread;			// maximum of thread used

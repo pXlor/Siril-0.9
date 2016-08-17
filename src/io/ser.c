@@ -415,10 +415,17 @@ static void ser_write_header_from_fit(struct ser_struct *ser_file, fits *fit) {
 		memset(ser_file->instrument, 0, 40);
 		memcpy(ser_file->instrument, fit->instrume, 40);
 	}
+	if (fit->observer[0] != 0) {
+		memset(ser_file->observer, 0, 40);
+		memcpy(ser_file->observer, fit->observer, 40);
+	}
+	if (fit->instrume[0] != 0) {
+		memset(ser_file->telescope, 0, 40);
+		memcpy(ser_file->telescope, fit->telescop, 40);
+	}
 	int ret = FITS_date_key_to_Unix_time(fit->date_obs, &ser_file->date_utc, &ser_file->date);
 	if (ret == -1)
 		FITS_date_key_to_Unix_time(fit->date, &ser_file->date_utc, &ser_file->date);
-	// TODO: copy data from the fit header: observer, telescope
 }
 
 /* once a buffer (data) has been acquired from the file, with frame_size pixels

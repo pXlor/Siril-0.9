@@ -311,7 +311,7 @@ int stack_summing(struct stacking_args *args) {
 	set_progress_bar_data(_("Finalizing stacking..."), (double)nb_frames/((double)nb_frames + 1.));
 
 	copyfits(fit, &gfit, CP_ALLOC|CP_FORMAT, 0);
-	gfit.hi = maxim > USHRT_MAX ? USHRT_MAX : maxim;
+	gfit.hi = round_to_WORD(maxim);
 	gfit.bitpix = USHORT_IMG;
 	gfit.exposure = exposure;
 
@@ -929,7 +929,7 @@ int stack_addmax(struct stacking_args *args) {
 	set_progress_bar_data(_("Finalizing stacking..."), (double)nb_frames/((double)nb_frames+1.));
 
 	copyfits(fit, &gfit, CP_ALLOC|CP_FORMAT, 0);
-	gfit.hi = maxim > USHRT_MAX ? USHRT_MAX : maxim;	// Should not be greater than USHRT_MAX with this method
+	gfit.hi = round_to_WORD(maxim);
 	gfit.bitpix = USHORT_IMG;
 	gfit.exposure = exposure;						// TODO : think if exposure has a sense here
 
@@ -1085,7 +1085,7 @@ int stack_addmin(struct stacking_args *args) {
 	set_progress_bar_data(_("Finalizing stacking..."), (double)nb_frames/((double)nb_frames+1.));
 
 	copyfits(fit, &gfit, CP_ALLOC|CP_FORMAT, 0);
-	gfit.hi = minim > USHRT_MAX ? USHRT_MAX : minim;
+	gfit.hi = round_to_WORD(minim);
 	gfit.bitpix = USHORT_IMG;
 	gfit.exposure = exposure;						// TODO : think if exposure has a sense here
 

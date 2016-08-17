@@ -290,6 +290,14 @@ void read_fits_header(fits *fit) {
 			&status);
 
 	status = 0;
+	fits_read_key(fit->fptr, TSTRING, "TELESCOP", &(fit->telescop), NULL,
+			&status);
+
+	status = 0;
+	fits_read_key(fit->fptr, TSTRING, "OBSERVER", &(fit->observer), NULL,
+			&status);
+
+	status = 0;
 	fits_read_key(fit->fptr, TSTRING, "DATE-OBS", &(fit->date_obs), NULL,
 			&status);
 
@@ -699,7 +707,14 @@ void save_fits_header(fits *fit) {
 	if (fit->instrume[0] != '\0')
 		fits_update_key(fit->fptr, TSTRING, "INSTRUME", &(fit->instrume),
 				"instrument name", &status);
-
+	status = 0;
+	if (fit->telescop[0] != '\0')
+		fits_update_key(fit->fptr, TSTRING, "TELESCOP", &(fit->telescop),
+				"telescope used to acquire this image", &status);
+	status = 0;
+	if (fit->observer[0] != '\0')
+		fits_update_key(fit->fptr, TSTRING, "OBSERVER", &(fit->observer),
+				"observer name", &status);
 	status = 0;
 	int itmp;
 	char fit_date[40];
@@ -919,6 +934,33 @@ int copyfits(fits *from, fits *to, unsigned char oper, int layer) {
 				nbdata * to->naxes[2] * sizeof(WORD));
 	}
 	update_used_memory();
+	return 0;
+}
+
+/* copy non-mandatory keywords from 'from' to 'to' */
+int copy_header(fits *from, fits *to) {
+	to->pixel_size_x = from->pixel_size_x;
+	to->pixel_size_y = from->pixel_size_y;
+	to->binning_x = from->binning_x;
+	to->binning_y = from->binning_y;
+
+	strncpy(to->date_obs, from->date_obs, FLEN_VALUE);
+	strncpy(to->date, from->date, FLEN_VALUE);
+	strncpy(to->instrume, from->instrume, FLEN_VALUE);
+	strncpy(to->dft_type, from->dft_type, FLEN_VALUE);
+	strncpy(to->dft_ord, from->dft_ord, FLEN_VALUE);
+
+	to->focal_length = from->focal_length;
+	to->iso_speed = from->iso_speed;
+	to->exposure = from->exposure;
+	to->aperture = from->aperture;
+	to->ccd_temp = from->ccd_temp;
+	to->dft_norm[0] = from->dft_norm[0];
+	to->dft_norm[1] = from->dft_norm[1];
+	to->dft_norm[2] = from->dft_norm[2];
+	to->dft_rx = from->dft_rx;
+	to->dft_ry = from->dft_ry;
+
 	return 0;
 }
 

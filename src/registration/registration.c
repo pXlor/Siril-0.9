@@ -675,7 +675,7 @@ int register_star_alignment(struct registration_args *args) {
 					current_regdata[frame].fwhm = FWHMx;
 
 					fits_flip_top_to_bottom(&fit);	// this is because in cvTransformImage, rotation center point is at (0, 0)
-					cvTransformImage(&fit, trans, OPENCV_LANCZOS4);
+					cvTransformImage(&fit, trans, OPENCV_CUBIC);
 					fits_flip_top_to_bottom(&fit);
 
 					i = 0;
