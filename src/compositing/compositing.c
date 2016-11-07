@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -765,7 +765,9 @@ void luminance_and_colors_align_and_compose() {
 
 	double norm = (double)(layers[0]->the_fit.maxi);
 
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(y,x) schedule(static)
+#endif
 	for (y = 0; y < gfit.ry; y++) {
 		for (x = 0; x < gfit.rx; x++) {
 			int layer;

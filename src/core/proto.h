@@ -16,14 +16,8 @@
 #undef int64
 #endif
 
-#ifdef HAVE_LIBGIF
-#include <gif_lib.h>
-#endif
-
 /****************** image_format_fits.h ******************/
-int computeRawFitsStats(fits *fit, int layer);
 int	readfits(const char *filename, fits *fit, char *realname);
-void	read_fits_header(fits *fit);
 char*	list_header(fits *fit);
 void	clearfits(fits *);
 void	report_fits_error(int status);
@@ -34,7 +28,6 @@ void 	save_fits_header(fits *);
 int	copyfits(fits *from, fits *to, unsigned char oper, int layer);
 int copy_header(fits *from, fits *to);
 int	save1fits16(const char *filename, fits *fit, int layer);
-int	fits48to3fits16(fits *rgb, fits *r, fits *g, fits *b);
 
 void	rgb24bit_to_fits48bit(unsigned char *rgbbuf, fits *fit, gboolean inverted);
 void	rgb8bit_to_fits16bit(unsigned char *graybuf, fits *fit);
@@ -100,11 +93,6 @@ int readraw_in_cfa(const char *, fits *);
 int open_raw_files(const char *, fits *, int);
 #endif
 
-#ifdef HAVE_LIBGIF
-int savegif(const char *filename, fits *fit, int anim, GifFileType **gif, int delay, int loop_count);
-void closegif(GifFileType **gif);
-#endif
-
 /****************** utils.h ******************/
 int	round_to_int(double x);
 WORD	round_to_WORD(double x);
@@ -127,14 +115,11 @@ void	read_and_show_textfile(char*, char*);
 void	swap_param(double *, double *);
 void	quicksort_d (double *a, int n);
 void	quicksort_s (WORD *a, int n);
-double	get_median_value_from_sorted_word_data(WORD *data, int size);
-double	get_standard_deviation(WORD *data, int size);
-char*	convtoupper(char *filename);
 char*	remove_ext_from_filename(const char *basename);
-char*	replace_spaces_from_filename(const char *filename);
 char*	str_append(char** data, const char* newdata);
 char*	format_basename(char *root);
 float	computePente(WORD *lo, WORD *hi);
+void load_css_style_sheet (char *path);
 
 /****************** quantize.h ***************/
 int fits_img_stats_ushort(WORD *array, long nx, long ny, int nullcheck,
@@ -206,7 +191,7 @@ gpointer seqpreprocess(gpointer empty);
 void	initialize_preprocessing();
 double	background(fits* fit, int reqlayer, rectangle *selection);
 int backgroundnoise(fits* fit, double sigma[]);
-imstats* statistics(fits *, int, rectangle *, int);
+imstats* statistics(fits *, int, rectangle *, int, int);
 void	show_FITS_header(fits *);
 #ifdef HAVE_OPENCV
 int	verbose_resize_gaussian(fits *, int, int, int);
@@ -244,7 +229,7 @@ void	sequence_free_preprocessing_data(sequence *seq);
 gboolean sequence_is_loaded();
 int	sequence_processing(sequence *seq, sequence_proc process, int layer, gboolean run_in_thread, gboolean run_in_parallel, void *arg);
 int	seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area, void *arg);
-int	do_fwhm_sequence_processing(sequence *seq, int layer, int print_psf, gboolean follow_star, gboolean run_in_thread);
+int	do_fwhm_sequence_processing(sequence *seq, int layer, gboolean print_psf, gboolean follow_star, gboolean run_in_thread, gboolean for_registration);
 void	check_or_allocate_regparam(sequence *seq, int layer);
 sequence *create_internal_sequence(int size);
 void	internal_sequence_set(sequence *seq, int index, fits *fit);
@@ -252,7 +237,8 @@ int	internal_sequence_find_index(sequence *seq, fits *fit);
 gpointer crop_sequence(gpointer p);
 gboolean sequence_is_rgb(sequence *seq);
 imstats* seq_get_imstats(sequence *seq, int index, fits *the_image, int option);
-void	check_area_is_in_image(rectangle *area, sequence *seq);
+void	enforce_area_in_image(rectangle *area, sequence *seq);
+void	update_export_crop_label();
 
 /****************** seqfile.h ******************/
 sequence * readseqfile(const char *name);

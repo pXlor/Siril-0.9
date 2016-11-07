@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,16 +39,17 @@ enum {
 };
 
 char *statName[] = {
-		"count (px)",
-		"mean",
-		"median",
-		"sigma",
-		"avgDev",
-		"MAD",
-		"sqrt(BWMV)",
-		"min",
-		"max",
-		"normalization"
+		N_("count (%)"),
+		N_("count (px)"),
+		N_("mean"),
+		N_("median"),
+		N_("sigma"),
+		N_("avgDev"),
+		N_("MAD"),
+		N_("sqrt(BWMV)"),
+		N_("min"),
+		N_("max"),
+		N_("normalization")
 };
 
 void get_statlist_store() {
@@ -66,7 +67,7 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	get_statlist_store();
 	if (!selection)
 		selection = GTK_TREE_SELECTION(gtk_builder_get_object(builder, "treeview-selection9"));
-	if (stat == NULL) {
+	if (stat[RLAYER] == NULL) {
 		gtk_list_store_clear(list_store);
 		return;		// just clear the list
 	}
@@ -81,21 +82,38 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	else
 		sprintf(format, "%%.1lf");
 
-	sprintf(rvalue, "%lu", stat[RLAYER]->count);
+	sprintf(rvalue, "%.4lf", ((double) stat[RLAYER]->ngoodpix / (double) stat[RLAYER]->total) * 100.0);
 	if (nblayer > 1) {
-		sprintf(gvalue, "%lu", stat[GLAYER]->count);
-		sprintf(bvalue, "%lu", stat[BLAYER]->count);
+		sprintf(gvalue, "%.4lf", ((double) stat[GLAYER]->ngoodpix / (double) stat[GLAYER]->total) * 100.0);
+		sprintf(bvalue, "%.4lf", ((double) stat[BLAYER]->ngoodpix / (double) stat[BLAYER]->total) * 100.0);
 	} else {
 		sprintf(gvalue, "--");
 		sprintf(bvalue, "--");
 	}
 
 	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[0],
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, _(statName[0]),
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
 			COLUMN_COLOR, first_colour[com.have_dark_theme],
+			-1);
+
+	sprintf(rvalue, "%lu", stat[RLAYER]->total);
+	if (nblayer > 1) {
+		sprintf(gvalue, "%lu", stat[GLAYER]->total);
+		sprintf(bvalue, "%lu", stat[BLAYER]->total);
+	} else {
+		sprintf(gvalue, "--");
+		sprintf(bvalue, "--");
+	}
+
+	gtk_list_store_append(list_store, &iter);
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, _(statName[1]),
+			COLUMN_RVALUE, rvalue,
+			COLUMN_GVALUE, gvalue,
+			COLUMN_BVALUE, bvalue,
+			COLUMN_COLOR, second_colour[com.have_dark_theme],
 			-1);
 
 	/** Mean */
@@ -109,11 +127,11 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	}
 
 	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[1],
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, _(statName[2]),
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, second_colour[com.have_dark_theme],
+			COLUMN_COLOR, first_colour[com.have_dark_theme],
 			-1);
 
 	/* median */
@@ -127,11 +145,11 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	}
 
 	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[2],
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, _(statName[3]),
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, first_colour[com.have_dark_theme],
+			COLUMN_COLOR, second_colour[com.have_dark_theme],
 			-1);
 
 	/* sigma */
@@ -145,11 +163,11 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	}
 
 	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[3],
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, _(statName[4]),
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, second_colour[com.have_dark_theme],
+			COLUMN_COLOR, first_colour[com.have_dark_theme],
 			-1);
 
 	/* avgDev */
@@ -163,11 +181,11 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	}
 
 	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[4],
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, _(statName[5]),
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, first_colour[com.have_dark_theme],
+			COLUMN_COLOR, second_colour[com.have_dark_theme],
 			-1);
 
 	/* MAD */
@@ -181,11 +199,11 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	}
 
 	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[5],
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, _(statName[6]),
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, second_colour[com.have_dark_theme],
+			COLUMN_COLOR, first_colour[com.have_dark_theme],
 			-1);
 
 	/* sqrt(BWMV) */
@@ -199,11 +217,11 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	}
 
 	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[6],
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, _(statName[7]),
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, first_colour[com.have_dark_theme],
+			COLUMN_COLOR, second_colour[com.have_dark_theme],
 			-1);
 
 	/* min */
@@ -217,11 +235,11 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	}
 
 	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[7],
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, _(statName[8]),
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, second_colour[com.have_dark_theme],
+			COLUMN_COLOR, first_colour[com.have_dark_theme],
 			-1);
 
 	/* max */
@@ -235,11 +253,11 @@ void add_stats_to_list(imstats *stat[], int nblayer, gboolean normalized) {
 	}
 
 	gtk_list_store_append(list_store, &iter);
-	gtk_list_store_set(list_store, &iter, COLUMN_NAME, statName[8],
+	gtk_list_store_set(list_store, &iter, COLUMN_NAME, _(statName[9]),
 			COLUMN_RVALUE, rvalue,
 			COLUMN_GVALUE, gvalue,
 			COLUMN_BVALUE, bvalue,
-			COLUMN_COLOR, first_colour[com.have_dark_theme],
+			COLUMN_COLOR, second_colour[com.have_dark_theme],
 			-1);
 
 }
@@ -281,8 +299,13 @@ void computeStat() {
 
 	gtk_label_set_text(statSelecLabel, selection);
 
-	for (channel = 0; channel < gfit.naxes[2]; channel++)
-		stat[channel] = statistics(&gfit, channel, &com.selection, STATS_MAIN);
+	for (channel = 0; channel < gfit.naxes[2]; channel++) {
+		stat[channel] = statistics(&gfit, channel, &com.selection, STATS_MAIN,
+				STATS_ZERO_NULLCHECK);
+		if (!stat[channel]) {
+			siril_log_message(_("Error: no data computed.\n"));
+		}
+	}
 	add_stats_to_list(stat, gfit.naxes[2], normalized);
 	for (channel = 0; channel < gfit.naxes[2]; channel++)
 		free(stat[channel]);

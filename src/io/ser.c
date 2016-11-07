@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -428,6 +428,26 @@ static void ser_write_header_from_fit(struct ser_struct *ser_file, fits *fit) {
 		FITS_date_key_to_Unix_time(fit->date, &ser_file->date_utc, &ser_file->date);
 }
 
+static int retrieveSERBayerPattern(ser_color pattern) {
+
+	switch (pattern) {
+	case SER_BAYER_RGGB:
+		return BAYER_FILTER_RGGB;
+		break;
+	case SER_BAYER_BGGR:
+		return BAYER_FILTER_BGGR;
+		break;
+	case SER_BAYER_GBRG:
+		return BAYER_FILTER_GBRG;
+		break;
+	case SER_BAYER_GRBG:
+		return BAYER_FILTER_GRBG;
+		break;
+	default:
+		return BAYER_FILTER_NONE;
+	}
+}
+
 /* once a buffer (data) has been acquired from the file, with frame_size pixels
  * read in it, depending on ser_file's endianess and pixel depth, data is
  * reorganized to match Siril's data format . */
@@ -656,9 +676,26 @@ int ser_read_frame(struct ser_struct *ser_file, int frame_no, fits *fit) {
 		fit->naxes[0] = fit->rx = ser_file->image_width;
 		fit->naxes[1] = fit->ry = ser_file->image_height;
 		fit->naxes[2] = 3;
-		if (com.debayer.ser_use_bayer_header)
-			set_combo_box_bayer_pattern(type_ser);
+		/* Get Bayer informations from header if available */
+		sensor_pattern sensortmp;
+		sensortmp = com.debayer.bayer_pattern;
+		if (com.debayer.use_bayer_header) {
+			sensor_pattern bayer;
+			bayer = retrieveSERBayerPattern(type_ser);
+			if (bayer != com.debayer.bayer_pattern) {
+				if (bayer == BAYER_FILTER_NONE) {
+					siril_log_color_message(_("No Bayer pattern found in the header file.\n"), "red");
+				}
+				else {
+					siril_log_color_message(_("Bayer pattern found in header (%s) is different"
+							" from Bayer pattern in settings (%s). Overriding settings.\n"),
+							"red", filter_pattern[bayer], filter_pattern[com.debayer.bayer_pattern]);
+					com.debayer.bayer_pattern = bayer;
+				}
+			}
+		}
 		debayer(fit, com.debayer.bayer_inter);
+		com.debayer.bayer_pattern = sensortmp;
 		break;
 	case SER_BGR:
 		swap = 2;
@@ -700,6 +737,7 @@ int ser_read_opened_partial(struct ser_struct *ser_file, int layer,
 	ser_color type_ser;
 	WORD *rawbuf, *demosaiced_buf, *rgb_buf;
 	rectangle debayer_area, image_area;
+	sensor_pattern sensortmp;
 
 	if (!ser_file || ser_file->fd <= 0 || frame_no < 0
 			|| frame_no >= ser_file->frame_count)
@@ -748,8 +786,24 @@ int ser_read_opened_partial(struct ser_struct *ser_file, int layer,
 		 * Original is monochrome, we demosaic it in an area slightly larger than the
 		 * requested area, giving 3 channels in form of RGBRGBRGB buffers, and finally
 		 * we extract one of the three channels and crop it to the requested area. */
-		if (com.debayer.ser_use_bayer_header)
-			set_combo_box_bayer_pattern(type_ser);
+
+		/* Get Bayer informations from header if available */
+		sensortmp = com.debayer.bayer_pattern;
+		if (com.debayer.use_bayer_header) {
+			sensor_pattern bayer;
+			bayer = retrieveSERBayerPattern(type_ser);
+			if (bayer != com.debayer.bayer_pattern) {
+				if (bayer == BAYER_FILTER_NONE) {
+					siril_log_color_message(_("No Bayer pattern found in the header file.\n"), "red");
+				}
+				else {
+					siril_log_color_message(_("Bayer pattern found in header (%s) is different"
+							" from Bayer pattern in settings (%s). Overriding settings.\n"),
+							"red", filter_pattern[bayer], filter_pattern[com.debayer.bayer_pattern]);
+					com.debayer.bayer_pattern = bayer;
+				}
+			}
+		}
 		if (layer < 0 || layer >= 3) {
 			siril_log_message(_("For a demosaiced image, layer has to be R, G or B (0 to 2).\n"));
 			return -1;
@@ -813,6 +867,7 @@ int ser_read_opened_partial(struct ser_struct *ser_file, int layer,
 		}
 
 		free(demosaiced_buf);
+		com.debayer.bayer_pattern = sensortmp;
 		break;
 	case SER_BGR:
 	case SER_RGB:
@@ -963,26 +1018,4 @@ free_and_quit:
 	if (data8) free(data8);
 	if (data16) free(data16);
 	return retval;
-}
-
-void set_combo_box_bayer_pattern(ser_color pattern) {
-	GtkComboBox *combo = GTK_COMBO_BOX(lookup_widget("comboBayer_pattern"));
-	int entry;
-
-	switch (pattern) {
-	default:
-	case SER_BAYER_RGGB:
-		entry = 0;
-		break;
-	case SER_BAYER_BGGR:
-		entry = 1;
-		break;
-	case SER_BAYER_GBRG:
-		entry = 2;
-		break;
-	case SER_BAYER_GRBG:
-		entry = 3;
-		break;
-	}
-	gtk_combo_box_set_active(combo, entry);
 }

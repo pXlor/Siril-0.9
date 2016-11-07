@@ -72,8 +72,10 @@ gpointer generic_sequence_worker(gpointer p) {
 
 	memset(&fit, 0, sizeof(fits));
 
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) firstprivate(fit) private(input_idx) schedule(static) \
 	if(args->parallel && ((args->seq->type == SEQ_REGULAR && fits_is_reentrant()) || args->seq->type == SEQ_SER))
+#endif
 	for (frame = 0; frame < nb_frames; frame++) {
 		if (!abort) {
 			char filename[256], msg[256];
@@ -115,7 +117,9 @@ gpointer generic_sequence_worker(gpointer p) {
 
 			clearfits(&fit);
 
+#ifdef _OPENMP
 #pragma omp atomic
+#endif
 			progress++;
 			snprintf(msg, 256, _("%s. Processing image %d (%s)"), args->description, input_idx, filename);
 			set_progress_bar_data(msg, (float)progress / nb_framesf);

@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2015 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -83,9 +83,11 @@ static int readinitfile() {
 	config_setting_t *debayer_setting = config_lookup(&config, keywords[BAY]);
 	if (debayer_setting) {
 		config_setting_lookup_bool(debayer_setting, "ser_use_bayer_header",
-				&com.debayer.ser_use_bayer_header);
+				&com.debayer.use_bayer_header);
 		config_setting_lookup_int(debayer_setting, "pattern",
 				&com.debayer.bayer_pattern);
+		config_setting_lookup_bool(debayer_setting, "compatibility",
+						&com.debayer.compatibility);
 		int inter;
 		config_setting_lookup_int(debayer_setting, "inter", &inter);
 		com.debayer.bayer_inter = inter;
@@ -197,12 +199,16 @@ static void _save_debayer(config_t *config, config_setting_t *root) {
 	debayer_group = config_setting_add(root, keywords[BAY], CONFIG_TYPE_GROUP);
 
 	debayer_setting = config_setting_add(debayer_group, "ser_use_bayer_header",
-	CONFIG_TYPE_BOOL);
-	config_setting_set_bool(debayer_setting, com.debayer.ser_use_bayer_header);
+			CONFIG_TYPE_BOOL);
+	config_setting_set_bool(debayer_setting, com.debayer.use_bayer_header);
 
 	debayer_setting = config_setting_add(debayer_group, "pattern",
 			CONFIG_TYPE_INT);
 	config_setting_set_int(debayer_setting, com.debayer.bayer_pattern);
+
+	debayer_setting = config_setting_add(debayer_group, "compatibility",
+			CONFIG_TYPE_BOOL);
+	config_setting_set_bool(debayer_setting, com.debayer.compatibility);
 
 	debayer_setting = config_setting_add(debayer_group, "inter",
 			CONFIG_TYPE_INT);

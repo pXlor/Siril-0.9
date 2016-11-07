@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,6 +43,7 @@
 #include "gui/callbacks.h"
 #include "gui/PSF_list.h"
 #include "gui/histogram.h"
+#include "gui/quality_plot.h"
 #include "algos/colors.h"
 #include "algos/PSF.h"
 #include "algos/star_finder.h"
@@ -118,7 +119,7 @@ command commande[] = {
 	{"mirrorx", 0, "mirrorx", process_mirrorx},
 	{"mirrory", 0, "mirrory", process_mirrory},
 	
-	{"new", 2, "new width height nb_layers", process_new},
+	{"new", 3, "new width height nb_layers", process_new},
 	{"nozero", 1, "nozero level (replaces null values by level)", process_nozero}, /* replaces null values by level */
 	
 	{"offset", 1, "offset value", process_offset},
@@ -724,10 +725,19 @@ int process_psf(int nb){
 	return 0;
 }
 
+gboolean end_seqpsf(gpointer arg) {
+	set_layers_for_registration();	// update display of available reg data
+	if (com.seq.needs_saving)
+		writeseqfile(&com.seq);
+	drawPlot();
+	notify_new_photometry();
+	return end_generic(arg);
+}
+
 void *_psf_thread(void *arg) {
 	int layer = (intptr_t) arg;
-	do_fwhm_sequence_processing(&com.seq, layer, TRUE, TRUE, TRUE);
-	gdk_threads_add_idle(end_generic, NULL);
+	do_fwhm_sequence_processing(&com.seq, layer, TRUE, TRUE, TRUE, FALSE);
+	gdk_threads_add_idle(end_seqpsf, NULL);
 	return NULL;
 }
 
@@ -1351,7 +1361,12 @@ int process_stat(int nb){
 	int layer;
 
 	for (layer = 0; layer < nplane; layer++) {
-		imstats* stat = statistics(&gfit, layer, &com.selection, STATS_MAIN);
+		imstats* stat = statistics(&gfit, layer, &com.selection, STATS_MAIN,
+		STATS_ZERO_NULLCHECK);
+		if (!stat) {
+			siril_log_message(_("Error: no data computed.\n"));
+			return 1;
+		}
 		siril_log_message(
 				_("%s layer: Mean: %0.1lf, Median: %0.1lf, Sigma: %0.1lf, "
 						"AvgDev: %0.1lf, Min: %0.1lf, Max: %0.1lf\n"),
@@ -1429,7 +1444,9 @@ int process_set_cpu(int nb){
 	}
 	omp_set_num_threads(proc_in);
 
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
 	{
 		proc_out = omp_get_num_threads();
 	}

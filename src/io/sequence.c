@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,12 +41,16 @@
 #include "core/initfile.h"
 #include "core/undo.h"
 #include "gui/callbacks.h"
+#include "gui/quality_plot.h"
 #include "io/ser.h"
 #if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 #include "io/films.h"
 #endif
 #ifdef HAVE_OPENCV
 #include "opencv/opencv.h"
+#endif
+#ifdef HAVE_FFMPEG
+#include "../io/mp4_output.h"
 #endif
 #include "io/avi_pipp/avi_writer.h"
 #include "io/single_image.h"
@@ -56,6 +60,28 @@
 #include "algos/quality.h"
 #include "registration/registration.h"	// for update_reg_interface
 #include "stacking/stacking.h"	// for update_stack_interface
+
+static void fillSeqAviExport() {
+	char width[6], height[6], fps[7];
+	GtkEntry *heightEntry = GTK_ENTRY(lookup_widget("entryAviHeight"));
+	GtkEntry *widthEntry = GTK_ENTRY(lookup_widget("entryAviWidth"));
+
+	g_snprintf(width, sizeof(width), "%d", com.seq.rx);
+	g_snprintf(height, sizeof(width), "%d", com.seq.ry);
+	gtk_entry_set_text(widthEntry, width);
+	gtk_entry_set_text(heightEntry, height);
+	if (com.seq.type == SEQ_SER) {
+		GtkEntry *entryAviFps = GTK_ENTRY(lookup_widget("entryAviFps"));
+
+		if (com.seq.ser_file && com.seq.ser_file->fps <= 0.0) {
+			g_snprintf(fps, sizeof(fps), "25.000");
+		} else {
+			g_snprintf(fps, sizeof(fps), "%2.3lf", com.seq.ser_file->fps);
+		}
+		gtk_entry_set_text(entryAviFps, fps);
+
+	}
+}
 
 /* when opening a file outside the main sequence loading system and that file
  * is a sequence (SER/AVI), this function is called to load this sequence. */
@@ -390,6 +416,7 @@ int set_seq(const char *name){
 	close_tab();	//close Green and Blue Tab if a 1-layer sequence is loaded
 	adjust_vport_size_to_image();	// resize viewports to the displayed image size
 	redraw(com.cvport, REMAP_ALL);
+	drawPlot();
 
 	update_used_memory();
 	return 0;
@@ -799,7 +826,7 @@ void initialize_sequence(sequence *seq, gboolean is_zeroed) {
  * (= do it for com.seq) */
 void free_sequence(sequence *seq, gboolean free_seq_too) {
 	static GtkComboBoxText *cbbt_layers = NULL;
-	int i;
+	int i, j;
 		
 	if (cbbt_layers == NULL)
 		cbbt_layers = GTK_COMBO_BOX_TEXT(gtk_builder_get_object(
@@ -810,9 +837,9 @@ void free_sequence(sequence *seq, gboolean free_seq_too) {
 	if (seq->nb_layers > 0 && seq->regparam) {
 		for (i=0; i<seq->nb_layers; i++) {
 			if (seq->regparam[i]) {
-				int j;
 				for (j=0; j < seq->number; j++) {
-					if (seq->regparam[i][j].fwhm_data)
+					if (seq->regparam[i][j].fwhm_data
+							&& (seq->regparam[i][j].fwhm_data != seq->photometry[0][j]))	// avoid double free
 						free(seq->regparam[i][j].fwhm_data);
 				}
 				free(seq->regparam[i]);
@@ -866,6 +893,16 @@ void free_sequence(sequence *seq, gboolean free_seq_too) {
 	 */
 	if (seq->type != SEQ_INTERNAL)
 		undo_flush();
+	free_plot_data();
+
+	for (i = 0; i < MAX_SEQPSF && seq->photometry[i]; i++) {
+		for (j = 0; j < seq->number; j++) {
+			if (seq->photometry[i][j])
+				free(seq->photometry[i][j]);
+		}
+		free(seq->photometry[i]);
+	}
+
 	if (free_seq_too)	free(seq);
 }
 
@@ -917,20 +954,21 @@ int sequence_processing(sequence *seq, sequence_proc process, int layer, gboolea
 	}
 	memcpy(&area, &com.selection, sizeof(rectangle));
 	memset(&fit, 0, sizeof(fits));
-	check_or_allocate_regparam(seq, layer);
 
 	nb_frames = (float)seq->number;
 
 	/* this loops could be run in parallel, but now the area depends on the previous star
 	 * detection, which makes it a bit hard to keep track of the star movement... */
+#ifdef _OPENMP
 #pragma omp parallel for firstprivate(fit) schedule(static) if(run_in_parallel && ((seq->type == SEQ_REGULAR && fits_is_reentrant()) || seq->type == SEQ_SER))
+#endif
 	for (i=0; i<seq->number; ++i) {
 		if (!abort) {
 			if (run_in_thread && !get_thread_run()) {
 				abort = 1;
 				continue;
 			}
-			check_area_is_in_image(&area, seq);
+			enforce_area_in_image(&area, seq);
 
 			/* opening the image */
 			if (seq_read_frame_part(seq, layer, i, &fit, &area)) {
@@ -944,7 +982,9 @@ int sequence_processing(sequence *seq, sequence_proc process, int layer, gboolea
 				abort = 1;
 				continue;
 			}
+#ifdef _OPENMP
 #pragma omp atomic
+#endif
 			cur_nb += 1.f;
 			set_progress_bar_data(NULL, cur_nb/nb_frames);
 		}
@@ -952,12 +992,19 @@ int sequence_processing(sequence *seq, sequence_proc process, int layer, gboolea
 	return abort;
 }
 
-/* Computes FWHM for a sequence image and store data in the sequence imgdata.
+struct fwhm_seq_proc_struct {
+	gboolean follow_star;		// input
+	fitted_PSF **psf;		// input allocated, output result
+};
+
+
+/* Computes FWHM for a sequence image and store data in the sequence regdata.
  * seq_layer is the corresponding layer in the raw image from the sequence.
- * source_area is the area from which fit was extracted from the full frame. It can be used
- * for reference, but can also be modified to help subsequent minimisations.
+ * source_area is the area from which fit was extracted from the full frame.
+ * when arg->follow_star is true, source_area is centered on the found star.
  */
 int seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, rectangle *source_area, void *arg) {
+	struct fwhm_seq_proc_struct *args = (struct fwhm_seq_proc_struct *)arg;
 	rectangle area;
 	area.x = area.y = 0;
 	area.w = fit->rx; area.h = fit->ry;
@@ -966,39 +1013,68 @@ int seqprocess_fwhm(sequence *seq, int seq_layer, int frame_no, fits *fit, recta
 	if (result) {
 		result->xpos = result->x0 + source_area->x;
 		result->ypos = source_area->y + source_area->h - result->y0;
-		seq->regparam[seq_layer][frame_no].fwhm_data = result;
-		seq->regparam[seq_layer][frame_no].fwhm = result->fwhmx;
+		args->psf[frame_no] = result;
 
 		/* let's move source_area to center it on the star */
-		if (arg) {
+		if (args->follow_star) {
 			source_area->x = round_to_int(result->xpos) - source_area->w/2;
 			source_area->y = round_to_int(result->ypos) - source_area->h/2;
 		}
 		return 0;
 	} else {
-		seq->regparam[seq_layer][frame_no].fwhm_data = NULL;
-		seq->regparam[seq_layer][frame_no].fwhm = 0.0f;
+		args->psf[frame_no] = NULL;
 		return 1;
 	}
 }
 
 /* Computes PSF for all images in a sequence.
  * Prints PSF data if print_psf is true, only position if false. */
-int do_fwhm_sequence_processing(sequence *seq, int layer, gboolean print_psf, gboolean follow_star, gboolean run_in_thread) {
+int do_fwhm_sequence_processing(sequence *seq, int layer, gboolean print_psf, gboolean follow_star, gboolean run_in_thread, gboolean for_registration) {
 	int i, retval;
+	struct fwhm_seq_proc_struct args;
+
 	siril_log_message(_("Starting sequence processing of PSF\n"));
 	set_progress_bar_data(_("Computing PSF on selected star"), PROGRESS_NONE);
-	retval = sequence_processing(seq, &seqprocess_fwhm, layer, run_in_thread, !follow_star, GINT_TO_POINTER(follow_star));	// allocates regparam
+
+	args.follow_star = follow_star;
+	args.psf = malloc(seq->number * sizeof(fitted_PSF *));
+	retval = sequence_processing(seq, &seqprocess_fwhm, layer, run_in_thread, !follow_star, &args);
+
 	if (retval) {
 		set_progress_bar_data(_("Failed to compute PSF for the sequence. Ready."), PROGRESS_NONE);
 		set_cursor_waiting(FALSE);
 		return 1;
 	}
 	siril_log_message(_("Finished sequence processing of PSF\n"));
-	// update the list
+
+	// for registration use: store data in seq->regparam
+	if (for_registration || !seq->regparam[layer]) {
+		check_or_allocate_regparam(seq, layer);
+		for (i = 0; i < seq->number; i++) {
+			seq->regparam[layer][i].fwhm_data = args.psf[i];
+			if (args.psf[i])
+				seq->regparam[layer][i].fwhm = args.psf[i]->fwhmx;
+		}
+		// the data put in regparam if !for_registration will not be saved
+		// should we writeseqfile(seq); ?
+
+		if (for_registration)
+			free(args.psf);
+		seq->needs_saving = TRUE;
+	}
+
+	// for photometry use: store data in seq->photometry
+	if (!for_registration) {
+		for (i = 0; i < MAX_SEQPSF && seq->photometry[i]; i++);
+		if (i == MAX_SEQPSF) i = 0;
+		seq->photometry[i] = args.psf;
+	}
+
+	// update the list in the GUI
 	if (seq->type != SEQ_INTERNAL)
 		fill_sequence_list(seq, layer);
 
+	// deprecated soon
 	if (print_psf) {
 		siril_log_message(_("See the console for a dump of star data over the sequence (stdout)\n"));
 		fprintf(stdout, _("# image_no amplitude magnitude fwhm x y\n"));
@@ -1049,8 +1125,8 @@ sequence *create_internal_sequence(int size) {
 		seq->imgparam[i].filenum = i;
 		seq->imgparam[i].incl = 1;
 		seq->imgparam[i].stats = NULL;
-	}
-	check_or_allocate_regparam(seq, 0);
+}
+check_or_allocate_regparam(seq, 0);
 	return seq;
 }
 
@@ -1175,16 +1251,20 @@ gboolean sequence_is_rgb(sequence *seq) {
 imstats* seq_get_imstats(sequence *seq, int index, fits *the_image, int option) {
 	assert(seq->imgparam);
 	if (!seq->imgparam[index].stats && the_image) {
-		seq->imgparam[index].stats = statistics(the_image, 0, NULL, option);
+		seq->imgparam[index].stats = statistics(the_image, 0, NULL, option, STATS_ZERO_NULLCHECK);
+		if (!seq->imgparam[index].stats) {
+			siril_log_message(_("Error: no data computed.\n"));
+			return NULL;
+		}
 		seq->needs_saving = TRUE;
 	}
 	return seq->imgparam[index].stats;
 }
 
-/* ensures that an area does not derive off-image.
+/* Ensures that an area does not derive off-image.
  * Verifies coordinates of the center and moves it inside the image if the area crosses the bounds.
  */
-void check_area_is_in_image(rectangle *area, sequence *seq) {
+void enforce_area_in_image(rectangle *area, sequence *seq) {
 	if (area->x < 0) area->x = 0;
 	if (area->y < 0) area->y = 0;
 	if (area->x + area->w > seq->rx)
@@ -1198,10 +1278,13 @@ struct exportseq_args {
 	char *basename;
 	int convflags;
 	gboolean normalize;
-	int gif_delay, gif_loops;
+//	int gif_delay, gif_loops;
 	double avi_fps;
+	int quality;	// [1, 5], for mp4 and webm
 	gboolean resize;
-	int32_t avi_width, avi_height;
+	int32_t dest_width, dest_height;
+	gboolean crop;
+	rectangle crop_area;
 };
 
 /* Used for avi exporter */
@@ -1231,58 +1314,114 @@ static uint8_t *fits_to_uint8(fits *fit) {
 gpointer export_sequence(gpointer ptr) {
 	int i, x, y, nx, ny, shiftx, shifty, layer, retval = 0, reglayer, nb_layers, skipped;
 	float cur_nb = 0.f, nb_frames;
-	unsigned int nbdata = 0;
+	unsigned int out_width, out_height, in_width, in_height, nbdata = 0;
 	uint8_t *data;
 	fits fit, destfit;
 	char filename[256], dest[256];
 	struct ser_struct *ser_file = NULL;
+#ifdef HAVE_FFMPEG
+	struct mp4_struct *mp4_file = NULL;
+#endif
 	struct exportseq_args *args = (struct exportseq_args *)ptr;
+	norm_coeff coeff;
 	memset(&fit, 0, sizeof(fits));
 	memset(&destfit, 0, sizeof(fits));
-#ifdef HAVE_LIBGIF
-	GifFileType *gif = NULL;
-	char giffilename[256];
-#endif
-	norm_coeff coeff;
 
 	reglayer = get_registration_layer();
 	siril_log_message(_("Using registration information from layer %d to export sequence\n"), reglayer);
-
-	if (args->convflags == TYPESER) {
-		ser_file = malloc(sizeof(struct ser_struct));
-		snprintf(dest, 256, "%s.ser", args->basename);
-		if (ser_create_file(dest, ser_file, TRUE, NULL))
-			siril_log_message(_("Creating the SER file failed, aborting.\n"));
+	if (args->crop) {
+		in_width  = args->crop_area.w;
+		in_height = args->crop_area.h;
+	} else {
+		in_width  = args->seq->rx;
+		in_height = args->seq->ry;
 	}
-	else if (args->convflags == TYPEAVI){
-		snprintf(dest, 256, "%s.avi", args->basename);
-		int32_t width;
-		int32_t height;
-		int32_t mode;
 
-		switch(args->seq->nb_layers) {
-		case 1:
-			mode = AVI_WRITER_INPUT_FORMAT_MONOCHROME;
+	if (args->resize) {
+		out_width = args->dest_width;
+		out_height = args->dest_height;
+		if (out_width == in_width && out_height == in_height)
+			args->resize = FALSE;
+	} else {
+		out_width = in_width;
+		out_height = in_height;
+	}
+
+	switch (args->convflags) {
+		case TYPESER:
+			/* image size is not known here, no problem for crop or resize */
+			ser_file = malloc(sizeof(struct ser_struct));
+			snprintf(dest, 256, "%s.ser", args->basename);
+			if (ser_create_file(dest, ser_file, TRUE, NULL))
+				siril_log_message(_("Creating the SER file failed, aborting.\n"));
 			break;
-		default:
-			mode = AVI_WRITER_INPUT_FORMAT_COLOUR;
-		}
-		if (args->resize) {
-			width = args->avi_width;
-			height = args->avi_height;
-		}
-		else {
-			width  = (int32_t) args->seq->rx;
-			height = (int32_t) args->seq->ry;
-		}
 
-		avi_file_create(dest, width, height, mode, AVI_WRITER_CODEC_DIB, args->avi_fps);
-}
-	else if (args->convflags == TYPEGIF) {
-#ifdef HAVE_LIBGIF
-		snprintf(giffilename, 256, "%s.gif", args->basename);
+		case TYPEAVI:
+			/* image size is set here, resize is managed by opencv when
+			 * writing frames, we don't need crop size here */
+			snprintf(dest, 256, "%s.avi", args->basename);
+			int32_t avi_format;
+
+			if (args->seq->nb_layers == 1)
+				avi_format = AVI_WRITER_INPUT_FORMAT_MONOCHROME;
+			else avi_format = AVI_WRITER_INPUT_FORMAT_COLOUR;
+
+			avi_file_create(dest, out_width, out_height, avi_format,
+					AVI_WRITER_CODEC_DIB, args->avi_fps);
+			break;
+
+		case TYPEMP4:
+		case TYPEWEBM:
+#ifndef HAVE_FFMPEG
+			siril_log_message(_("MP4 output is not supported because siril was not compiled with ffmpeg support.\n"));
+			retval = -1;
+			goto free_and_reset_progress_bar;
+#else
+			/* image size is set here, resize is managed by ffmpeg so it also
+			 * needs to know the input image size after crop */
+			snprintf(dest, 256, "%s.%s", args->basename,
+					args->convflags == TYPEMP4 ? "mp4" : "webm");
+			if (args->avi_fps <= 0) args->avi_fps = 25;
+
+			if (in_width % 32 || out_height % 2 || out_width % 2) {
+				siril_log_message(_("Film output needs to have a width that is a multiple of 32 and an even height, resizing selection.\n"));
+				if (in_width % 32) in_width = (in_width / 32) * 32 + 32;
+				if (in_height % 2) in_height++;
+				if (args->crop) {
+					args->crop_area.w = in_width;
+					args->crop_area.h = in_height;
+				} else {
+					args->crop = TRUE;
+					args->crop_area.x = 0;
+					args->crop_area.y = 0;
+					args->crop_area.w = in_width;
+					args->crop_area.h = in_height;
+				}
+				compute_fitting_selection(&args->crop_area, 32, 2, 0);
+				memcpy(&com.selection, &args->crop_area, sizeof(rectangle));
+				fprintf(stdout, "final input area: %d,%d,\t%dx%d\n",
+						args->crop_area.x, args->crop_area.y,
+						args->crop_area.w, args->crop_area.h);
+				in_width = args->crop_area.w;
+				in_height = args->crop_area.h;
+				if (!args->resize) {
+					out_width = in_width;
+					out_height = in_height;
+				} else {
+					if (out_width % 2) out_width++;
+					if (out_height % 2) out_height++;
+				}
+			}
+
+			mp4_file = mp4_create(dest, out_width, out_height, args->avi_fps, args->seq->nb_layers, args->quality, in_width, in_height);
+			if (!mp4_file) {
+				retval = -1;
+				goto free_and_reset_progress_bar;
+			}
 #endif
+			break;
 	}
+
 	if (args->normalize) {
 		struct stacking_args stackargs;
 
@@ -1337,22 +1476,21 @@ gpointer export_sequence(gpointer ptr) {
 			retval = -3;
 			goto free_and_reset_progress_bar;
 		}
-		/* we want copy the header */
-		copy_header(&fit, &destfit);
 
 		if (!nbdata) {
+			/* destfit is allocated to the real size because of the possible
+			 * shifts and of the inplace cropping. FITS data is copied from
+			 * fit, image buffers are duplicated. */
 			memcpy(&destfit, &fit, sizeof(fits));
 			destfit.header = NULL;
 			destfit.fptr = NULL;
-			nbdata = fit.ry * fit.rx;
-			nb_layers = fit.naxes[2];
+			nbdata = fit.rx * fit.ry;
 			destfit.data = calloc(nbdata * fit.naxes[2], sizeof(WORD));
 			if (!destfit.data) {
-				printf("Could not allocate memory for the export, aborting\n");
+				fprintf(stderr, "Could not allocate memory for the export, aborting\n");
 				retval = -1;
 				goto free_and_reset_progress_bar;
 			}
-
 			destfit.pdata[0] = destfit.data;
 			if (fit.naxes[2] == 1) {
 				destfit.pdata[1] = destfit.data;
@@ -1361,14 +1499,26 @@ gpointer export_sequence(gpointer ptr) {
 				destfit.pdata[1] = destfit.data + nbdata;
 				destfit.pdata[2] = destfit.data + nbdata * 2;
 			}
+			nb_layers = fit.naxes[2];
 		}
 		else if (fit.ry * fit.rx != nbdata || nb_layers != fit.naxes[2]) {
-			printf("Export: image in args->sequence doesn't has the same dimensions\n");
+			fprintf(stderr, "An image of the sequence doesn't have the same dimensions\n");
 			retval = -3;
 			goto free_and_reset_progress_bar;
 		}
 		else {
+			/* we want copy the header */
+			copy_header(&fit, &destfit);
 			memset(destfit.data, 0, nbdata * fit.naxes[2] * sizeof(WORD));
+			if (args->crop) {
+				/* reset destfit damaged by the crop function */
+				if (fit.naxes[2] == 3) {
+					destfit.pdata[1] = destfit.data + nbdata;
+					destfit.pdata[2] = destfit.data + nbdata * 2;
+				}
+				destfit.rx = destfit.naxes[0] = fit.rx;
+				destfit.ry = destfit.naxes[1] = fit.ry;
+			}
 		}
 
 		/* load registration data for current image */
@@ -1380,7 +1530,7 @@ gpointer export_sequence(gpointer ptr) {
 			shifty = 0;
 		}
 
-		/* fill the image with shift data */
+		/* fill the image with shift data and normalization */
 		for (layer=0; layer<fit.naxes[2]; ++layer) {
 			for (y=0; y < fit.ry; ++y){
 				for (x=0; x < fit.rx; ++x){
@@ -1400,50 +1550,48 @@ gpointer export_sequence(gpointer ptr) {
 			}
 		}
 
+		if (args->crop) {
+			crop(&destfit, &args->crop_area);
+		}
 
 		switch (args->convflags) {
-		case TYPEFITS:
-			snprintf(dest, 255, "%s%05d%s", args->basename, i, com.ext);
-			if (savefits(dest, &destfit)) {
-				retval = -1;
-				goto free_and_reset_progress_bar;
-			}
-			break;
-		case TYPESER:
-			if (ser_write_frame_from_fit(ser_file, &destfit, i - skipped))
-				siril_log_message(
-						_("Error while converting to SER (no space left?)\n"));
-			break;
-		case TYPEGIF:
-#ifdef HAVE_LIBGIF
-			if (savegif(giffilename, &destfit, 1, &gif, args->gif_delay,
-					args->gif_loops)) {
-				retval = -1;
-				goto free_and_reset_progress_bar;
-			}
-#endif
-			break;
-		case TYPEAVI:
-			data = fits_to_uint8(&destfit);
+			case TYPEFITS:
+				snprintf(dest, 255, "%s%05d%s", args->basename, i, com.ext);
+				if (savefits(dest, &destfit)) {
+					retval = -1;
+					goto free_and_reset_progress_bar;
+				}
+				break;
+			case TYPESER:
+				if (ser_write_frame_from_fit(ser_file, &destfit, i - skipped))
+					siril_log_message(
+							_("Error while converting to SER (no space left?)\n"));
+				break;
+			case TYPEAVI:
+				data = fits_to_uint8(&destfit);
 
-			if (args->resize) {
+				if (args->resize) {
 #ifdef HAVE_OPENCV
-				uint8_t *newdata = malloc(
-						sizeof(uint8_t) * args->avi_width * args->avi_height
-								* destfit.naxes[2]);
-				cvResizeGaussian_data8(data, destfit.rx, destfit.ry, newdata,
-						args->avi_width, args->avi_height, destfit.naxes[2], OPENCV_LINEAR);
-				avi_file_write_frame(0, newdata);
-				free(newdata);
+					uint8_t *newdata = malloc(out_width * out_height * destfit.naxes[2]);
+					cvResizeGaussian_data8(data, destfit.rx, destfit.ry, newdata,
+							out_width, out_height, destfit.naxes[2], OPENCV_CUBIC);
+					avi_file_write_frame(0, newdata);
+					free(newdata);
 #else
-				siril_log_message(_("Siril needs opencv to resize images\n"));
-				avi_file_write_frame(0, data);
+					siril_log_message(_("Siril needs opencv to resize images\n"));
+					avi_file_write_frame(0, data);
 #endif
-			}
-			else
-				avi_file_write_frame(0, data);
-			free(data);
-			break;
+				}
+				else
+					avi_file_write_frame(0, data);
+				free(data);
+				break;
+#ifdef HAVE_FFMPEG
+			case TYPEMP4:
+			case TYPEWEBM:
+				mp4_add_frame(mp4_file, &destfit);
+				break;
+#endif
 		}
 		cur_nb += 1.f;
 		set_progress_bar_data(NULL, cur_nb / nb_frames);
@@ -1466,10 +1614,10 @@ free_and_reset_progress_bar:
 	else if (args->convflags == TYPEAVI) {
 		avi_file_close(0);
 	}
-#ifdef HAVE_LIBGIF
-	else if (args->convflags == TYPEGIF) {
-		if (gif)
-			closegif(&gif);
+#ifdef HAVE_FFMPEG
+	else if (mp4_file && (args->convflags == TYPEMP4 || args->convflags == TYPEWEBM)) {
+		mp4_close(mp4_file);
+		free(mp4_file);
 	}
 #endif
 
@@ -1493,10 +1641,8 @@ void on_buttonExportSeq_clicked(GtkButton *button, gpointer user_data) {
 	const char *bname = gtk_entry_get_text(GTK_ENTRY(lookup_widget("entryExportSeq")));
 	struct exportseq_args *args;
 	GtkToggleButton *exportNormalize, *checkResize;
-#ifdef HAVE_LIBGIF
-	GtkEntry *delayEntry, *loopsEntry;
-#endif
 	GtkEntry *fpsEntry, *widthEntry, *heightEntry;
+	GtkAdjustment *adjQual;
 
 	if (bname[0] == '\0') return;
 	if (selected == -1) return;
@@ -1506,6 +1652,9 @@ void on_buttonExportSeq_clicked(GtkButton *button, gpointer user_data) {
 	args->seq = &com.seq;
 	exportNormalize = GTK_TOGGLE_BUTTON(lookup_widget("exportNormalize"));
 	args->normalize = gtk_toggle_button_get_active(exportNormalize);
+	args->crop = com.selection.w && com.selection.h;
+	if (args->crop)
+		memcpy(&args->crop_area, &com.selection, sizeof(rectangle));
 
 	switch (selected) {
 	case 0:
@@ -1516,46 +1665,54 @@ void on_buttonExportSeq_clicked(GtkButton *button, gpointer user_data) {
 		args->convflags = TYPESER;
 		break;
 	case 2:
-#ifdef HAVE_LIBGIF
-		delayEntry = GTK_ENTRY(lookup_widget("entryGifDelay"));
-		args->gif_delay = atoi(gtk_entry_get_text(delayEntry));
-		loopsEntry = GTK_ENTRY(lookup_widget("entryGifLoops"));
-		args->gif_loops = atoi(gtk_entry_get_text(loopsEntry));
-		args->convflags = TYPEGIF;
-#else
-		siril_log_message(_("GIF support was not compiled, aborting.\n"));
-		return;
-#endif
-		break;
+#ifdef HAVE_FFMPEG
 	case 3:
+	case 4:
+#endif
 		fpsEntry = GTK_ENTRY(lookup_widget("entryAviFps"));
 		args->avi_fps = atoi(gtk_entry_get_text(fpsEntry));
 		widthEntry = GTK_ENTRY(lookup_widget("entryAviWidth"));
-		args->avi_width = atof(gtk_entry_get_text(widthEntry));
+		args->dest_width = atof(gtk_entry_get_text(widthEntry));
 		heightEntry = GTK_ENTRY(lookup_widget("entryAviHeight"));
-		args->avi_height = atof(gtk_entry_get_text(heightEntry));
+		args->dest_height = atof(gtk_entry_get_text(heightEntry));
 		checkResize = GTK_TOGGLE_BUTTON(lookup_widget("checkAviResize"));
-		if (args->avi_height == 0 || args->avi_width == 0) {
+		adjQual = GTK_ADJUSTMENT(gtk_builder_get_object(builder,"adjustment3"));
+		args->quality = (int)gtk_adjustment_get_value(adjQual);
+
+		if (args->dest_height == 0 || args->dest_width == 0) {
 			siril_log_message(_("Width or height cannot be null. Not resizing.\n"));
 			args->resize = FALSE;
+			gtk_toggle_button_set_active(checkResize, FALSE);
+		} else if (args->dest_height == args->seq->ry && args->dest_width == args->seq->rx) {
+			args->resize = FALSE;
+			gtk_toggle_button_set_active(checkResize, FALSE);
 		} else {
 			args->resize = gtk_toggle_button_get_active(checkResize);
 		}
 		args->convflags = TYPEAVI;
+#ifdef HAVE_FFMPEG
+		if (selected == 3)
+			args->convflags = TYPEMP4;
+		else if (selected == 4)
+			args->convflags = TYPEWEBM;
+#endif
 		break;
+	default:
+		free(args);
+		return;
 	}
 	set_cursor_waiting(TRUE);
 	start_in_new_thread(export_sequence, args);
 }
 
 void on_comboExport_changed(GtkComboBox *box, gpointer user_data) {
-	GtkWidget *gif_options = lookup_widget("boxGifOptions");
 	GtkWidget *avi_options = lookup_widget("boxAviOptions");
 	GtkWidget *checkAviResize = lookup_widget("checkAviResize");
-	gtk_widget_set_visible(gif_options, 2 == gtk_combo_box_get_active(box));
-	gtk_widget_set_visible(avi_options, 3 == gtk_combo_box_get_active(box));
+	GtkWidget *quality = lookup_widget("exportQualScale");
+	gtk_widget_set_visible(avi_options, gtk_combo_box_get_active(box) >= 2);
+	gtk_widget_set_visible(quality, gtk_combo_box_get_active(box) >= 3);
 #ifdef HAVE_OPENCV
-	gtk_widget_set_sensitive(checkAviResize, TRUE); // not available yet because resizing image crashes
+	gtk_widget_set_sensitive(checkAviResize, TRUE);
 #else
 	gtk_widget_set_sensitive(checkAviResize, FALSE);
 #endif
@@ -1566,5 +1723,14 @@ void on_checkAviResize_toggled(GtkToggleButton *togglebutton, gpointer user_data
 	GtkWidget *widthEntry = lookup_widget("entryAviWidth");
 	gtk_widget_set_sensitive(heightEntry, gtk_toggle_button_get_active(togglebutton));
 	gtk_widget_set_sensitive(widthEntry, gtk_toggle_button_get_active(togglebutton));
+}
+
+void update_export_crop_label() {
+	static GtkLabel *label = NULL;
+	if (!label) 
+		label = GTK_LABEL(lookup_widget("exportLabel"));
+	if (com.selection.w && com.selection.h)
+		gtk_label_set_text(label, _("Cropping to selection"));
+	else gtk_label_set_text(label, _("Select area to crop"));
 }
 

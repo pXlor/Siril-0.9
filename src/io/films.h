@@ -37,7 +37,6 @@ int check_for_film_extensions(const char *extension);
 int film_open_file(const char *sourcefile, struct film_struct *film);
 void film_close_file(struct film_struct *film);
 int film_read_frame(struct film_struct *film, int frame_no, fits *fit);
-void film_init_struct(struct film_struct *film);
 void film_display_info(struct film_struct *film);
 
 #endif

@@ -25,6 +25,7 @@ struct deviant_struct {
 	typeOfDeviant type;
 };
 
+long count_deviant_pixels(fits *fit, double sig[2], long *icold, long *ihot);
 deviant_pixel *find_deviant_pixels(fits *fit, double sig[2], long *icold, long *ihot);
 int autoDetect(fits *fit, int layer, double sig[2], long *icold, long *ihot,
 		double amount, gboolean is_cfa);

@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@
 
 #define MAX_OF_EXTENSIONS 50	// actual size of supported_extensions
 
-static char *destroot = NULL;
+static gchar *destroot = NULL;
 static unsigned int convflags = CONV1X3;	// default
 static unsigned int supported_filetypes = 0;	// initialized by initialize_converters()
 
@@ -55,7 +55,7 @@ supported_raw_list supported_raw[] = {
 	{"crw",	"Canon", BAYER_FILTER_RGGB},
 	{"bay",	"Casio", BAYER_FILTER_NONE},		// Not tested
 	{"erf",	"Epson", BAYER_FILTER_RGGB},
-	{"raf",	"Fuji", BAYER_FILTER_RGGB},		// Bugged with some files
+	{"raf",	"Fuji", BAYER_FILTER_GBRG},		// Not really supported, specially XTRANS
 	{"3fr",	"Hasselblad", BAYER_FILTER_GRBG},	// GRBG, RGGB		
 	{"kdc",	"Kodak", BAYER_FILTER_GRBG},
 	{"dcr",	"Kodak", BAYER_FILTER_GRBG},
@@ -68,7 +68,7 @@ supported_raw_list supported_raw[] = {
 	{"rw2",	"Panasonic", BAYER_FILTER_BGGR},
 	{"pef",	"Pentax", BAYER_FILTER_BGGR},
 	{"ptx",	"Pentax", BAYER_FILTER_NONE},		// Not tested
-	{"x3f",	"Sigma", BAYER_FILTER_NONE},		// No Bayer-Pattern
+	{"x3f",	"Sigma", BAYER_FILTER_NONE},		// Not supported yet
 	{"srw",	"Samsung", BAYER_FILTER_BGGR},
 	{"arw",	"Sony", BAYER_FILTER_RGGB}
 };
@@ -141,24 +141,24 @@ char *create_sequence_filename(int counter, char *output, int outsize) {
 	const char *ext = get_filename_ext(destroot);
 	if (ext) {
 		/* we need to insert a number before the extension */
-		char *the_ext = strdup(ext);
-		char *the_root = strdup(destroot);
+		gchar *the_ext = g_strdup(ext);
+		gchar *the_root = g_strdup(destroot);
 		if (the_ext == the_root) {
-			snprintf(output, outsize, "%s", destroot);
-			free(the_ext);
-			free(the_root);
+			g_snprintf(output, outsize, "%s", destroot);
+			g_free(the_ext);
+			g_free(the_root);
 			return output;
 		}
 		the_root[ext-destroot-1] = '\0';
-		char last_char = the_root[strlen(the_root)-1];
+		gchar last_char = the_root[strlen(the_root)-1];
 		if (last_char == '-' || last_char == '_')
-			snprintf(output, outsize, "%s%05d.%s", the_root, counter, the_ext);
-		else 	snprintf(output, outsize, "%s_%05d.%s", the_root, counter, the_ext);
-		free(the_ext);
-		free(the_root);
+			g_snprintf(output, outsize, "%s%05d.%s", the_root, counter, the_ext);
+		else 	g_snprintf(output, outsize, "%s_%05d.%s", the_root, counter, the_ext);
+		g_free(the_ext);
+		g_free(the_root);
 	} else {
 		/* create the file name with destroot_number */
-		snprintf(output, outsize, "%s%05d", destroot, counter);
+		g_snprintf(output, outsize, "%s%05d", destroot, counter);
 	}
 	return output;
 }
@@ -167,14 +167,14 @@ char *create_sequence_filename(int counter, char *output, int outsize) {
 // doesn't end with one or a '-'. SER extensions are accepted and unmodified.
 void on_convtoroot_changed (GtkEditable *editable, gpointer user_data){
 	static GtkWidget *multiple_ser = NULL;
-	const char *name = gtk_entry_get_text(GTK_ENTRY(editable));
+	const gchar *name = gtk_entry_get_text(GTK_ENTRY(editable));
 	if (!multiple_ser)
 		multiple_ser = lookup_widget("multipleSER");
-	if (destroot) free(destroot);
-	destroot = strdup(name);
+	if (destroot) g_free(destroot);
+	destroot = g_strdup(name);
 
 	const char *ext = get_filename_ext(destroot);
-	if (ext && !strcasecmp(ext, "ser")) {
+	if (ext && !g_ascii_strcasecmp(ext, "ser")) {
 		convflags |= CONVDSTSER;
 		gtk_widget_set_visible(multiple_ser, TRUE);
 		return;
@@ -240,13 +240,14 @@ void initialize_libraw_settings() {
 	com.raw_set.use_camera_wb = 0;	// if possible, use the white balance from the camera. 
 	com.raw_set.use_auto_wb = 0;		// use automatic white balance obtained after averaging over the entire image
 	com.raw_set.user_qual = 1;		// type of interpolation. AHD by default
-	com.raw_set.gamm[0] = 1.0;		// gamm curve: linear by default
+	com.raw_set.gamm[0] = 1.0;		// gamma curve: linear by default
 	com.raw_set.gamm[1] = 1.0;
 }
 
 void initialize_ser_debayer_settings() {
 	com.debayer.open_debayer = FALSE;
-	com.debayer.ser_use_bayer_header = TRUE;
+	com.debayer.use_bayer_header = TRUE;
+	com.debayer.compatibility = FALSE;
 	com.debayer.bayer_pattern = BAYER_FILTER_RGGB;
 	com.debayer.bayer_inter = BAYER_VNG;
 }
@@ -256,19 +257,18 @@ void initialize_ser_debayer_settings() {
  * list of file types used in convflags */
 void initialize_converters() {
 	GtkLabel *label_supported;
-	gchar text[512];
-	gboolean has_entry;			// true if something is supported
-	sprintf(text, "\t");		// if changed, change its removal before log_message
-	//text[0] = '\0';
+	GString *string;
+	gchar *text;
 	int count_ext = 0;
+
+	string = g_string_new("\t");
 	/* internal converters */
 	supported_filetypes |= TYPEBMP;
-	strcat(text, _("BMP images, "));
+	g_string_append(string, _("BMP images, "));
 	supported_filetypes |= TYPEPIC;
-	strcat(text, _("PIC images (IRIS), "));
+	g_string_append(string, _("PIC images (IRIS), "));
 	supported_filetypes |= TYPEPNM;
-	strcat(text, _("PGM and PPM binary images"));
-	has_entry = TRUE;
+	g_string_append(string, _("PGM and PPM binary images"));
 		
 	supported_extensions = malloc(MAX_OF_EXTENSIONS * sizeof(char*));
 	/* internal extensions */
@@ -291,9 +291,8 @@ void initialize_converters() {
 	int i, nb_raw;
 	
 	supported_filetypes |= TYPERAW;
-	if (has_entry)	strcat(text, ", ");
-	strcat(text, _("RAW images"));
-	has_entry = TRUE;
+	g_string_append(string, ", ");
+	g_string_append(string, _("RAW images"));
 	set_libraw_settings_menu_available(TRUE);	// enable libraw settings
 	initialize_libraw_settings();	// below in the file
 	
@@ -307,62 +306,57 @@ void initialize_converters() {
 #else
 	set_libraw_settings_menu_available(FALSE);	// disable libraw settings
 #endif
-	//supported_filetypes |= TYPECFA;
-	if (has_entry)	strcat(text, ", ");
-	strcat(text, _("FITS-CFA images"));
-	has_entry = TRUE;
+	g_string_append(string, ", ");
+	g_string_append(string, _("FITS-CFA images"));
 
 #if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 	supported_filetypes |= TYPEAVI;
-	if (has_entry)	strcat(text, ", ");
-	strcat(text, _("Films"));
-	has_entry = TRUE;
+	g_string_append(string, ", ");
+	g_string_append(string, _("Films"));
 #endif
 
 	supported_filetypes |= TYPESER;
-	if (has_entry)	strcat(text, ", ");
-	strcat(text, _("SER sequences"));
-	has_entry = TRUE;
+	g_string_append(string, ", ");
+	g_string_append(string, _("SER sequences"));
 
 	/* library converters (detected by configure) */
 #ifdef HAVE_LIBTIFF
 	supported_filetypes |= TYPETIFF;
-	if (has_entry)	strcat(text, ", ");
-	strcat(text, _("TIFF images"));
+	g_string_append(string, ", ");
+	g_string_append(string, _("TIFF images"));
 	supported_extensions[count_ext++] = ".tif";
 	supported_extensions[count_ext++] = ".tiff";
-	has_entry = TRUE;
 #endif
+
 #ifdef HAVE_LIBJPEG
 	supported_filetypes |= TYPEJPG;
-	if (has_entry)	strcat(text, ", ");
-	strcat(text, _("JPG images"));
+	g_string_append(string, ", ");
+	g_string_append(string, _("JPG images"));
 	supported_extensions[count_ext++] = ".jpg";
 	supported_extensions[count_ext++] = ".jpeg";
-	has_entry = TRUE;
 #endif
+
 #ifdef HAVE_LIBPNG
 	supported_filetypes |= TYPEPNG;
-	if (has_entry)	strcat(text, ", ");
-	strcat(text, _("PNG images"));
+	g_string_append(string, ", ");
+	g_string_append(string, _("PNG images"));
 	supported_extensions[count_ext++] = ".png";
-	has_entry = TRUE;
 #endif
 	supported_extensions[count_ext++] = NULL;		// NULL-terminated array
 
-	if (!has_entry)
-		sprintf(text, _("ERROR: no input file type supported for conversion."));
-	else strcat(text, ".");
+	g_string_append(string, ".");
 	label_supported = GTK_LABEL(gtk_builder_get_object(builder, "label_supported_types"));
+	text = g_string_free(string, FALSE);
 	gtk_label_set_text(label_supported, text);
-	siril_log_message(_("Supported file types: %s\n"), text+1);
+	siril_log_message(_("Supported file types: %s\n"), text + 1);
+	g_free(text);
 }
 
 int check_for_raw_extensions(const char *extension) {
 	int i, nb_raw;
 	nb_raw = get_nb_raw_supported();
 	for (i = 0; i < nb_raw; i++) {
-		if (!strcasecmp(extension, supported_raw[i].extension))
+		if (!g_ascii_strcasecmp(extension, supported_raw[i].extension))
 			return 0;
 	}
 	return 1;
@@ -371,22 +365,21 @@ int check_for_raw_extensions(const char *extension) {
 /* returns the image_type for the extension without the dot, only if it is supported by
  * the current instance of Siril. */
 image_type get_type_for_extension(const char *extension) {
-	//convflags &= (CONV1X3 | CONV3X1 | CONV1X1);	// reset file format
-	if ((supported_filetypes & TYPEBMP) && !strcasecmp(extension, "bmp")) {
+	if ((supported_filetypes & TYPEBMP) && !g_ascii_strcasecmp(extension, "bmp")) {
 		return TYPEBMP;
 	} else if ((supported_filetypes & TYPEJPG) &&
-			(!strcasecmp(extension, "jpg") || !strcasecmp(extension, "jpeg"))) {
+			(!g_ascii_strcasecmp(extension, "jpg") || !g_ascii_strcasecmp(extension, "jpeg"))) {
 		return TYPEJPG;
 	} else if ((supported_filetypes & TYPETIFF) &&
-			(!strcasecmp(extension, "tif") || !strcasecmp(extension, "tiff"))) {
+			(!g_ascii_strcasecmp(extension, "tif") || !g_ascii_strcasecmp(extension, "tiff"))) {
 		return TYPETIFF;
-	} else if ((supported_filetypes & TYPEPNG) && !strcasecmp(extension, "png")) {
+	} else if ((supported_filetypes & TYPEPNG) && !g_ascii_strcasecmp(extension, "png")) {
 		return TYPEPNG;
 	} else if ((supported_filetypes & TYPEPNM) &&
-			(!strcasecmp(extension, "pnm") || !strcasecmp(extension, "ppm") ||
-			 !strcasecmp(extension, "pgm"))) {
+			(!g_ascii_strcasecmp(extension, "pnm") || !g_ascii_strcasecmp(extension, "ppm") ||
+			 !g_ascii_strcasecmp(extension, "pgm"))) {
 		return TYPEPNM;
-	} else if ((supported_filetypes & TYPEPIC) && !strcasecmp(extension, "pic")){
+	} else if ((supported_filetypes & TYPEPIC) && !g_ascii_strcasecmp(extension, "pic")){
 		return TYPEPIC;
 	} else if ((supported_filetypes & TYPERAW) && !check_for_raw_extensions(extension)) {
 		return TYPERAW;
@@ -395,10 +388,10 @@ image_type get_type_for_extension(const char *extension) {
 	} else if ((supported_filetypes & TYPEAVI) && !check_for_film_extensions(extension)) {
 		return TYPEAVI;
 #endif
-	} else if ((supported_filetypes & TYPESER) && !strcasecmp(extension, "ser")) {
+	} else if ((supported_filetypes & TYPESER) && !g_ascii_strcasecmp(extension, "ser")) {
 		return TYPESER;
-	} else if (!strcasecmp(extension, "fit") || !strcasecmp(extension, "fits") ||
-			!strcasecmp(extension, "fts")) {
+	} else if (!g_ascii_strcasecmp(extension, "fit") || !g_ascii_strcasecmp(extension, "fits") ||
+			!g_ascii_strcasecmp(extension, "fts")) {
 		return TYPEFITS;
 	}
 	return TYPEUNDEF; // not recognized or not supported
@@ -435,6 +428,7 @@ struct _convert_data {
 	int start;
 	int total;
 	int nb_converted;
+	gboolean compatibility;
 };
 
 void on_convert_button_clicked(GtkButton *button, gpointer user_data) {
@@ -507,6 +501,7 @@ void on_convert_button_clicked(GtkButton *button, gpointer user_data) {
 	args->nb_converted = 0;
 	args->t_start.tv_sec = t_start.tv_sec;
 	args->t_start.tv_usec = t_start.tv_usec;
+	args->compatibility = com.debayer.compatibility;
 	start_in_new_thread(convert_thread_worker, args);
 	return;
 }
@@ -538,23 +533,23 @@ static gpointer convert_thread_worker(gpointer p) {
 	}
 
 	while (list) {
-		char *src_filename = (char *)list->data;
+		gchar *src_filename = (gchar *)list->data;
 		const char *src_ext = get_filename_ext(src_filename);
 		image_type imagetype;
 
 		if (!get_thread_run()) {
 			break;
 		}
-		char *name = strrchr(src_filename, '/');
+		gchar *name = g_utf8_strrchr(src_filename, strlen(src_filename), '/');
 		if (name)
-			snprintf(msg_bar, 256, _("Converting %s..."), name + 1);
-		else snprintf(msg_bar, 256, _("Converting %s..."), src_filename);
+			g_snprintf(msg_bar, 256, _("Converting %s..."), name + 1);
+		else g_snprintf(msg_bar, 256, _("Converting %s..."), src_filename);
 
 		imagetype = get_type_for_extension(src_ext);
 		if (imagetype == TYPEUNDEF) {
 			char msg[512];
 			siril_log_message(_("FILETYPE IS NOT SUPPORTED, CANNOT CONVERT: %s\n"), src_ext);
-			snprintf(msg, 512, _("File extension '%s' is not supported.\n"
+			g_snprintf(msg, 512, _("File extension '%s' is not supported.\n"
 				"Verify that you typed the extension correctly.\n"
 				"If so, you may need to install third-party software to enable "
 				"this file type conversion, look at the README file.\n"
@@ -600,7 +595,7 @@ static gpointer convert_thread_worker(gpointer p) {
 						goto clean_exit;
 					}
 				} else {
-					snprintf(dest_filename, 128, "%s%05d", destroot, indice++);
+					g_snprintf(dest_filename, 128, "%s%05d", destroot, indice++);
 					if (save_to_target_fits(fit, dest_filename)) {
 						siril_log_message(_("Error while converting to FITS (no space left?)\n"));
 						goto clean_exit;
@@ -619,7 +614,7 @@ static gpointer convert_thread_worker(gpointer p) {
 			break;
 		}
 		else {	// single image
-			fits *fit = any_to_new_fits(imagetype, src_filename);
+			fits *fit = any_to_new_fits(imagetype, src_filename, args->compatibility);
 			if (convflags & CONVDSTSER) {
 				if (convflags & CONV1X1)
 					keep_first_channel_from_fits(fit);
@@ -628,7 +623,7 @@ static gpointer convert_thread_worker(gpointer p) {
 					break;
 				}
 			} else {
-				snprintf(dest_filename, 128, "%s%05d", destroot, indice++);
+				g_snprintf(dest_filename, 128, "%s%05d", destroot, indice++);
 				if (save_to_target_fits(fit, dest_filename)) {
 					siril_log_message(_("Error while converting to FITS (no space left?)\n"));
 					break;
@@ -674,7 +669,7 @@ static gboolean end_convert_idle(gpointer p) {
 	gettimeofday(&t_end, NULL);
 	show_time(args->t_start, t_end);
 	stop_processing_thread();
-	g_list_free_full(args->list, free);
+	g_list_free_full(args->list, g_free);
 	free(args);
 	return FALSE;
 }
@@ -683,6 +678,7 @@ static gboolean end_convert_idle(gpointer p) {
 int save_to_target_fits(fits *fit, const char *dest_filename) {
 	if (convflags & CONV3X1) {	// an RGB image to 3 fits, one for each channel
 		char filename[130];
+
 		if (fit->naxis != 3) {
 			siril_log_message(_("Saving to 3 FITS files cannot be done because the source image does not have three channels\n"));
 			return 1;
@@ -716,40 +712,72 @@ int save_to_target_fits(fits *fit, const char *dest_filename) {
 	return 0;
 }
 
-int debayer_if_needed(image_type imagetype, fits *fit) {
+static int retrieveBayerPattern(char *bayer) {
+	int i;
+
+	for (i = BAYER_FILTER_MIN; i < BAYER_FILTER_MAX; i++) {
+		if (g_ascii_strcasecmp(bayer, filter_pattern[i]) == 0) {
+			return i;
+		}
+	}
+	return BAYER_FILTER_NONE;
+}
+
+int debayer_if_needed(image_type imagetype, fits *fit, gboolean compatibility) {
 	int retval = 0;
+	sensor_pattern tmp;
 	/* What the hell?
 	 * Siril's FITS are stored bottom to top, debayering will throw 
 	 * wrong results. So before demosacaing we need to transforme the image
 	 * with fits_flip_top_to_bottom() function */
 	if (imagetype == TYPEFITS && (convflags & CONVDEBAYER)) {
+		tmp = com.debayer.bayer_pattern;
 		if (fit->naxes[2] != 1) {
 			siril_log_message(_("Cannot perform debayering on image with more than one channel\n"));
 			return retval;
 		}
-		fits_flip_top_to_bottom(fit);
-		siril_log_message(_("Filter Pattern: %s\n"),
-				filter_pattern[com.debayer.bayer_pattern]);
+		if (!compatibility)
+			fits_flip_top_to_bottom(fit);
+		/* Get Bayer informations from header if available */
+		if (com.debayer.use_bayer_header) {
+			sensor_pattern bayer;
+			bayer = retrieveBayerPattern(fit->bayer_pattern);
+			if (bayer != com.debayer.bayer_pattern) {
+				if (bayer == BAYER_FILTER_NONE) {
+					siril_log_color_message(_("No Bayer pattern found in the header file.\n"), "red");
+				}
+				else {
+					siril_log_color_message(_("Bayer pattern found in header (%s) is different"
+							" from Bayer pattern in settings (%s). Overriding settings.\n"),
+							"red", filter_pattern[bayer], filter_pattern[com.debayer.bayer_pattern]);
+					com.debayer.bayer_pattern = bayer;
+				}
+			}
+		}
+		if (com.debayer.bayer_pattern >= 0)
+			siril_log_message(_("Filter Pattern: %s\n"), filter_pattern[com.debayer.bayer_pattern]);
+
 		if (debayer(fit, com.debayer.bayer_inter)) {
 			siril_log_message(_("Cannot perform debayering\n"));
 			retval = -1;
 		} else {
-			fits_flip_top_to_bottom(fit);
+			if (!compatibility)
+				fits_flip_top_to_bottom(fit);
 		}
+		com.debayer.bayer_pattern = tmp;
 	}
 	return retval;
 }
 
 /* open the file with path source from any image type and load it into a new FITS object */
-fits *any_to_new_fits(image_type imagetype, const char *source) {
+fits *any_to_new_fits(image_type imagetype, const char *source, gboolean compatibility) {
 	int retval = 0;
 	fits *tmpfit = calloc(1, sizeof(fits));
-	//tmpfit->bitpix = USHORT_IMG;	// is this still useful?
 
 	retval = any_to_fits(imagetype, source, tmpfit);
 
 	if (!retval)
-		retval = debayer_if_needed(imagetype, tmpfit);
+		retval = debayer_if_needed(imagetype, tmpfit, compatibility);
 
 	if (retval) {
 		clearfits(tmpfit);

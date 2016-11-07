@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -593,7 +593,9 @@ int pictofit(WORD *buf, fits *fit) {
 		return -1;
 	}
 	data = fit->pdata[BW_LAYER] = fit->data;
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
+#endif
 	for (i = 0; i < nbdata; i++)
 		data[i] = buf[i];
 	fit->bitpix = SHORT_IMG;
@@ -618,15 +620,21 @@ int pictofitrgb(WORD *buf, fits *fit) {
 	data[RLAYER] = fit->pdata[RLAYER] = fit->data;
 	data[GLAYER] = fit->pdata[GLAYER] = fit->data + nbdata;
 	data[BLAYER] = fit->pdata[BLAYER] = fit->data + 2 * nbdata;
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
+#endif
 	for (i = 0; i < nbdata; i++)
 		data[RLAYER][i] = buf[i + (nbdata * RLAYER)];
 
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
+#endif
 	for (i = 0; i < nbdata; i++)
 		data[GLAYER][i] = buf[i + (nbdata * GLAYER)];
 
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
+#endif
 	for (i = 0; i < nbdata; i++)
 		data[BLAYER][i] = buf[i + (nbdata * BLAYER)];
 

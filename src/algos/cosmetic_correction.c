@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <gsl/gsl_statistics_ushort.h>
 
 #include "core/siril.h"
 #include "core/proto.h"
@@ -60,7 +61,7 @@ static WORD getMedian5x5(WORD *buf, const int xx, const int yy, const int w,
 	}
 	start = 24 - n - 1;
 	quicksort_s(value, 24);
-	median = round_to_WORD(get_median_value_from_sorted_word_data(value + start, n));
+	median = round_to_WORD(gsl_stats_ushort_median_from_sorted_data(value + start, 1, n));
 	free(value);
 	return median;
 }
@@ -124,6 +125,49 @@ static WORD getAverage3x3(WORD *buf, const int xx, const int yy, const int w,
 	return round_to_WORD(value / n);
 }
 
+long count_deviant_pixels(fits *fit, double sig[2], long *icold, long *ihot) {
+	int i;
+	WORD *buf = fit->pdata[RLAYER];
+	imstats *stat;
+	double sigma, median, thresHot, thresCold;
+
+	/** statistics **/
+	stat = statistics(fit, RLAYER, NULL, STATS_BASIC, STATS_ZERO_NULLCHECK);
+	if (!stat) {
+		siril_log_message(_("Error: no data computed.\n"));
+		return 0L;
+	}
+	sigma = stat->sigma;
+	median = stat->median;
+
+	if (sig[0] == -1.0) {	// flag for no cold detection
+		thresCold = -1.0;
+	}
+	else {
+		double val = median - (sig[0] * sigma);
+		thresCold = (val > 0) ? val : 0.0;
+	}
+	if (sig[1] == -1.0) {	// flag for no hot detection
+		thresHot = USHRT_MAX_DOUBLE + 1;
+	}
+	else {
+		double val = median + (sig[1] * sigma);
+		thresHot = (val > USHRT_MAX_DOUBLE) ? USHRT_MAX_DOUBLE : val;
+	}
+
+	free(stat);
+
+	/** We count deviant pixels **/
+	*icold = 0;
+	*ihot = 0;
+	for (i = 0; i < fit->rx * fit->ry; i++) {
+		if (buf[i] >= thresHot) (*ihot)++;
+		else if (buf[i] <= thresCold) (*icold)++;
+	}
+
+	return (*icold + *ihot);
+}
+
 
 /* Gives a list of point p containing deviant pixel coordinates
  * p MUST be freed after the call
@@ -137,7 +181,11 @@ deviant_pixel *find_deviant_pixels(fits *fit, double sig[2], long *icold, long *
 	deviant_pixel *dev;
 
 	/** statistics **/
-	stat = statistics(fit, RLAYER, NULL, STATS_BASIC);
+	stat = statistics(fit, RLAYER, NULL, STATS_BASIC, STATS_ZERO_NULLCHECK);
+	if (!stat) {
+		siril_log_message(_("Error: no data computed.\n"));
+		return NULL;
+	}
 	sigma = stat->sigma;
 	median = stat->median;
 
@@ -343,7 +391,11 @@ int autoDetect(fits *fit, int layer, double sig[2], long *icold, long *ihot, dou
 
 	/* XXX: if cfa, stats are irrelevant. We should compute them taking
 	 * into account the Bayer pattern */
-	stat = statistics(fit, layer, NULL, STATS_BASIC | STATS_AVGDEV);
+	stat = statistics(fit, layer, NULL, STATS_BASIC | STATS_AVGDEV, STATS_ZERO_NULLCHECK);
+	if (!stat) {
+		siril_log_message(_("Error: no data computed.\n"));
+		return 1;
+	}
 	bkg = stat->median;
 	avgDev = stat->avgDev;
 	free(stat);

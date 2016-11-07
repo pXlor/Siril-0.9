@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -101,6 +101,11 @@ static void _update_clipped_pixels(int data) {
 	g_snprintf(buffer, sizeof(buffer), "%.3lf%%", tmp);
 	gtk_entry_set_text(clip_low, buffer);
 
+}
+
+static int is_histogram_visible() {
+	GtkWidget *window = lookup_widget("histogram_window");
+	return gtk_widget_get_visible(window);
 }
 
 gsl_histogram* computeHisto(fits* fit, int layer) {
@@ -546,7 +551,9 @@ void apply_mtf_to_fits(fits *fit, double m, double lo, double hi) {
 			"(mid=%.3lf, low=%.3lf, high=%.3lf)", m, lo, hi);
 
 	for (chan = 0; chan < nb_chan; chan++) {
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
+#endif
 		for (i = 0; i < ndata; i++) {
 			double pxl = ((double) buf[chan][i] / (double) norm);
 			pxl = (pxl - lo < 0.0) ? 0.0 : pxl - lo;
@@ -627,7 +634,9 @@ void apply_mtf_to_histo(gsl_histogram *histo, double norm, double m, double lo,
 		pxl *= pente;
 		mtf = round_to_WORD(MTF(pxl, m) * norm);
 		gsl_histogram_accumulate(mtf_histo, mtf, binval);
+#ifdef _OPENMP
 #pragma omp critical
+#endif
 		{
 			clipped[0] += clip[0];
 			clipped[1] += clip[1];
@@ -681,7 +690,11 @@ double findMidtonesBalance(fits *fit, double *shadows, double *highlights) {
 	n = fit->naxes[2];
 
 	for (i = 0; i < n; ++i) {
-		stat[i] = statistics(fit, i, NULL, STATS_BASIC | STATS_MAD);
+		stat[i] = statistics(fit, i, NULL, STATS_BASIC | STATS_MAD, STATS_ZERO_NULLCHECK);
+		if (!stat[i]) {
+			siril_log_message(_("Error: no data computed.\n"));
+			return 0.0;
+		}
 
 		if (stat[i]->median / stat[i]->normValue > 0.5)
 			++invertedChannels;

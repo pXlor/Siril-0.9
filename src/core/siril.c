@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,10 @@
  * along with Siril. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <gtk/gtk.h>
+#ifdef MAC_INTEGRATION
+#include "gtkmacintegration/gtkosxapplication.h"
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -194,7 +198,7 @@ int sub_background(fits* image, fits* background, int layer) {
 		char *msg = siril_log_message(
 				_("Images don't have the same size (w = %d|%d, h = %d|%d)\n"),
 				image->rx, background->rx, image->ry, background->ry);
-		show_dialog(msg, "Error", "gtk-dialog-error");
+		show_dialog(msg, _("Error"), "gtk-dialog-error");
 		return 1;
 	}
 	ndata = image->rx * image->ry;
@@ -423,14 +427,20 @@ int unsharp(fits *fit, double sigma, double mult, gboolean verbose) {
 }
 #endif
 
-// inplace cropping of the image in fit
+/* inplace cropping of the image in fit
+ * fit->data is not realloc, only fit->pdata points to a different area and
+ * data is correctly written to this new area, which makes this function
+ * quite dangerous to use when fit is used for something else afterwards.
+ */
 int crop(fits *fit, rectangle *bounds) {
 	int i, j, layer;
 	int newnbdata;
 	struct timeval t_start, t_end;
 
-	siril_log_color_message(_("Crop: processing...\n"), "red");
-	gettimeofday(&t_start, NULL);
+	if (fit == &gfit) {
+		siril_log_color_message(_("Crop: processing...\n"), "red");
+		gettimeofday(&t_start, NULL);
+	}
 
 	newnbdata = bounds->w * bounds->h;
 	for (layer = 0; layer < fit->naxes[2]; ++layer) {
@@ -450,10 +460,11 @@ int crop(fits *fit, rectangle *bounds) {
 	fit->rx = fit->naxes[0] = bounds->w;
 	fit->ry = fit->naxes[1] = bounds->h;
 
-	clear_stars_list();
-
-	gettimeofday(&t_end, NULL);
-	show_time(t_start, t_end);
+	if (fit == &gfit) {
+		clear_stars_list();
+		gettimeofday(&t_end, NULL);
+		show_time(t_start, t_end);
+	}
 
 	return 0;
 }
@@ -604,7 +615,11 @@ double contrast(fits* fit, int layer) {
 	int i;
 	WORD *buf = fit->pdata[layer];
 	double contrast = 0.0;
-	imstats *stat = statistics(fit, layer, &com.selection, STATS_BASIC);
+	imstats *stat = statistics(fit, layer, &com.selection, STATS_BASIC, STATS_ZERO_NULLCHECK);
+	if (!stat) {
+		siril_log_message(_("Error: no data computed.\n"));
+		return -1.0;
+	}
 	double mean = stat->mean;
 	free(stat);
 
@@ -884,7 +899,11 @@ static double evaluateNoiseOfCalibratedImage(fits *fit, fits *dark, double k) {
 
 	for (chan = 0; chan < fit->naxes[2]; chan++) {
 		imstats *stat = NULL;
-		stat = statistics(fit_tmp, chan, NULL, STATS_BASIC);
+		stat = statistics(fit_tmp, chan, NULL, STATS_BASIC, STATS_ZERO_NULLCHECK);
+		if (!stat) {
+			siril_log_message(_("Error: no data computed.\n"));
+			return 0.0;
+		}
 		noise += stat->bgnoise;
 		//printf("noise=%lf, k=%lf\n", noise, k);
 		free(stat);
@@ -962,6 +981,36 @@ static int darkOptimization(fits *brut, fits *dark, fits *offset) {
 	return 0;
 }
 
+// idle function executed at the end of the sequence preprocessing
+static gboolean end_sequence_prepro(gpointer p) {
+	struct preprocessing_data *args = (struct preprocessing_data *) p;
+	struct timeval t_end;
+	fprintf(stdout, "Ending sequence prepro idle function, retval=%d\n",
+			args->retval);
+	stop_processing_thread();// can it be done here in case there is no thread?
+	set_cursor_waiting(FALSE);
+	gettimeofday(&t_end, NULL);
+	show_time(args->t_start, t_end);
+	update_used_memory();
+	if (!args->retval && !single_image_is_loaded()) {
+		// load the new sequence
+		char *ppseqname = malloc(
+				strlen(com.seq.ppprefix) + strlen(com.seq.seqname) + 5);
+		sprintf(ppseqname, "%s%s.seq", com.seq.ppprefix, com.seq.seqname);
+		check_seq(0);
+		update_sequences_list(ppseqname);
+		free(ppseqname);
+	}
+	sequence_free_preprocessing_data(&com.seq);
+#ifdef MAC_INTEGRATION
+	GtkosxApplication *osx_app = gtkosx_application_get();
+	gtkosx_application_attention_request(osx_app, INFO_REQUEST);
+	g_object_unref (osx_app);
+#endif
+	free(args);
+	return FALSE;
+}
+
 /* doing the preprocessing. No unprotected GTK+ calls can go there.
  * returns 1 on error */
 gpointer seqpreprocess(gpointer p) {
@@ -984,7 +1033,11 @@ gpointer seqpreprocess(gpointer p) {
 		if (args->autolevel) {
 			/* TODO: evaluate the layer to apply but generally RLAYER is a good choice.
 			 * Indeed, if it is image from APN, CFA picture are in black & white */
-			imstats *stat = statistics(flat, RLAYER, NULL, STATS_BASIC);
+			imstats *stat = statistics(flat, RLAYER, NULL, STATS_BASIC, STATS_ZERO_NULLCHECK);
+			if (!stat) {
+				siril_log_message(_("Error: no data computed.\n"));
+				return GINT_TO_POINTER(1);
+			}
 			args->normalisation = stat->mean;
 			siril_log_message(_("Normalisation value auto evaluated: %.2lf\n"),
 					args->normalisation);
@@ -1029,7 +1082,7 @@ gpointer seqpreprocess(gpointer p) {
 		g_free(filename);
 		free(filename_noext);
 	} else {	// sequence
-		struct ser_struct *new_ser_file;
+		struct ser_struct *new_ser_file = NULL;
 		char source_filename[256];
 		int i;
 		long icold, ihot;
@@ -1122,15 +1175,14 @@ double background(fits* fit, int reqlayer, rectangle *selection) {
 		layer = reqlayer;
 	else if (isrgb(&gfit))
 		layer = GLAYER;		//GLAYER is better to evaluate background
-	gsl_histogram* histo = computeHisto(fit, layer);// histogram in full image
 
-	bg = gsl_histogram_max_bin(histo);
+	imstats* stat = statistics(fit, layer, selection, STATS_BASIC, STATS_ZERO_NULLCHECK);
+	if (!stat) {
+		siril_log_message(_("Error: no data computed.\n"));
+		return 0.0;
+	}
+	bg = stat->median;
 
-	gsl_histogram_free(histo);
-	imstats* stat = statistics(fit, layer, selection, STATS_BASIC);
-	if (fabs(bg - stat->median) > (10))	//totaly arbitrary. Allow to see a background at 0 when a planet take plenty of room.
-		bg = stat->median;
-//	printf("layer = %d\n", layer);
 	free(stat);
 	stat = NULL;
 	return bg;
@@ -1375,9 +1427,7 @@ gpointer median_filter(gpointer p) {
 						}
 					}
 					quicksort_s(data, args->ksize * args->ksize);
-					WORD median = round_to_WORD(
-							get_median_value_from_sorted_word_data(data,
-									args->ksize * args->ksize));
+					WORD median = round_to_WORD(gsl_stats_ushort_median_from_sorted_data(data, 1, args->ksize * args->ksize));
 					double pixel = args->amount * (median / norm);
 					pixel += (1.0 - args->amount)
 							* ((double) image[y][x] / norm);
@@ -1501,7 +1551,11 @@ int BandingEngine(fits *fit, double sigma, double amount, gboolean protect_highl
 	new_fit_image(fiximage, fit->rx, fit->ry, fit->naxes[2]);
 
 	for (chan = 0; chan < fit->naxes[2]; chan++) {
-		imstats *stat = statistics(fit, chan, NULL, STATS_BASIC | STATS_MAD);
+		imstats *stat = statistics(fit, chan, NULL, STATS_BASIC | STATS_MAD, STATS_ZERO_NULLCHECK);
+		if (!stat) {
+			siril_log_message(_("Error: no data computed.\n"));
+			return 1;
+		}
 		double background = stat->median;
 		double *rowvalue = calloc(fit->ry, sizeof(double));
 		if (rowvalue == NULL) {
@@ -1534,7 +1588,7 @@ int BandingEngine(fits *fit, double sigma, double amount, gboolean protect_highl
 				}
 			}
 
-			double median = get_median_value_from_sorted_word_data(cpyline, n);
+			double median = gsl_stats_ushort_median_from_sorted_data(cpyline, 1, n);
 			rowvalue[row] = background - median;
 			minimum = min(minimum, rowvalue[row]);
 			free(cpyline);
@@ -1589,7 +1643,11 @@ int backgroundnoise(fits* fit, double sigma[]) {
 #endif
 
 	for (layer = 0; layer < fit->naxes[2]; layer++) {
-		imstats *stat = statistics(waveimage, layer, NULL, STATS_BASIC);
+		imstats *stat = statistics(waveimage, layer, NULL, STATS_BASIC, STATS_ZERO_NULLCHECK);
+		if (!stat) {
+			siril_log_message(_("Error: no data computed.\n"));
+			return 1;
+		}
 		double sigma0 = stat->sigma;
 		double mean = stat->mean;
 		double epsilon = 0.0;
@@ -1694,7 +1752,12 @@ gpointer noise(gpointer p) {
 	}
 	*/
 	for (chan = 0; chan < args->fit->naxes[2]; chan++) {
-		imstats *stat = statistics(args->fit, chan, NULL, STATS_BASIC);
+		imstats *stat = statistics(args->fit, chan, NULL, STATS_BASIC, STATS_ZERO_NULLCHECK);
+		if (!stat) {
+			siril_log_message(_("Error: no data computed.\n"));
+			gdk_threads_add_idle(end_noise, args);
+			return GINT_TO_POINTER(1);
+		}
 		args->bgnoise[chan] = stat->bgnoise;
 		free(stat);
 	}

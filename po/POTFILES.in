@@ -25,6 +25,7 @@ src/core/utils.c
 src/gui/callbacks.c
 src/gui/histogram.c
 src/gui/PSF_list.c
+src/gui/quality_plot.c
 src/gui/registration_preview.c
 src/gui/sequence_list.c
 src/gui/statistics_list.c

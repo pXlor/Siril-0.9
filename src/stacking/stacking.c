@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,8 +25,12 @@
 #include <assert.h>
 #include <math.h>
 #include <gsl/gsl_fit.h>
+#include <gsl/gsl_statistics_ushort.h>
 #ifdef _OPENMP
 #include <omp.h>
+#endif
+#ifdef MAC_INTEGRATION
+#include "gtkmacintegration/gtkosxapplication.h"
 #endif
 
 #include "core/siril.h"
@@ -59,7 +63,7 @@ struct _data_block {
 	WORD **pix;	// buffer for a block on all images
 	WORD *tmp;	// the actual single buffer for pix
 	WORD *stack;	// the reordered stack for one pixel in all images
-	int *rejected;  // 0 if pixel ok, 1 if rejected
+	int *rejected;  // 0 if pixel ok, 1 or -1 if rejected
 };
 
 void initialize_stacking_methods() {
@@ -71,8 +75,8 @@ void initialize_stacking_methods() {
 	gtk_combo_box_set_active(GTK_COMBO_BOX(rejectioncombo), com.stack.rej_method);
 }
 
-/* scale0, mul0 and offset0 are output arguments when i = 0, input arguments otherwise */
-static int _compute_normalization_for_image(struct stacking_args *args, int i,
+/* scale0, mul0 and offset0 are output arguments when i = ref_image, input arguments otherwise */
+static int _compute_normalization_for_image(struct stacking_args *args, int i, int ref_image,
 		double *offset, double *mul, double *scale, normalization mode, double *scale0,
 		double *mul0, double *offset0) {
 	imstats *stat = NULL;
@@ -92,26 +96,26 @@ static int _compute_normalization_for_image(struct stacking_args *args, int i,
 	default:
 	case ADDITIVE_SCALING:
 		scale[i] = stat->scale;
-		if (i == 0)
-			*scale0 = scale[0];
+		if (i == ref_image)
+			*scale0 = scale[ref_image];
 		scale[i] = *scale0 / scale[i];
 		/* no break */
 	case ADDITIVE:
 		offset[i] = stat->location;
-		if (i == 0)
-			*offset0 = offset[0];
+		if (i == ref_image)
+			*offset0 = offset[ref_image];
 		offset[i] = scale[i] * offset[i] - *offset0;
 		break;
 	case MULTIPLICATIVE_SCALING:
 		scale[i] = stat->scale;
-		if (i == 0)
-			*scale0 = scale[0];
+		if (i == ref_image)
+			*scale0 = scale[ref_image];
 		scale[i] = *scale0 / scale[i];
 		/* no break */
 	case MULTIPLICATIVE:
 		mul[i] = stat->location;
-		if (i == 0)
-			*mul0 = mul[0];
+		if (i == ref_image)
+			*mul0 = mul[ref_image];
 		mul[i] = *mul0 / mul[i];
 		break;
 	}
@@ -119,12 +123,10 @@ static int _compute_normalization_for_image(struct stacking_args *args, int i,
 }
 
 int compute_normalization(struct stacking_args *args, norm_coeff *coeff, normalization mode) {
-	int i, retval = 0, cur_nb = 1;
-	double scale0, mul0, offset0;
+	int i, ref_image, retval = 0, cur_nb = 1;
+	double scale0, mul0, offset0;	// for reference frame
 	char *tmpmsg;
 
-	// should initial values be taken from statistics of the reference
-	// image instead of the first image?
 	for (i = 0; i < args->nb_images_to_stack; i++) {
 		coeff->offset[i] = 0.0;
 		coeff->mul[i] = 1.0;
@@ -138,6 +140,10 @@ int compute_normalization(struct stacking_args *args, norm_coeff *coeff, normali
 	tmpmsg[strlen(tmpmsg) - 1] = '\0';
 	set_progress_bar_data(tmpmsg, PROGRESS_RESET);
 
+	if (args->seq->reference_image == -1)
+		ref_image = 0;
+	else ref_image = args->seq->reference_image;
+
 	/* We empty the cache if needed (force to recompute) */
 	if (args->force_norm) {
 		for (i = 0; i < args->seq->number; i++) {
@@ -149,7 +155,7 @@ int compute_normalization(struct stacking_args *args, norm_coeff *coeff, normali
 	}
 
 	// compute for the first image to have scale0 mul0 and offset0
-	if (_compute_normalization_for_image(args, 0, coeff->offset, coeff->mul, coeff->scale, mode,
+	if (_compute_normalization_for_image(args, ref_image, ref_image, coeff->offset, coeff->mul, coeff->scale, mode,
 			&scale0, &mul0, &offset0)) {
 		set_progress_bar_data(_("Normalization failed."), PROGRESS_NONE);
 		return 1;
@@ -157,19 +163,23 @@ int compute_normalization(struct stacking_args *args, norm_coeff *coeff, normali
 
 	set_progress_bar_data(NULL, 1.0 / (double)args->nb_images_to_stack);
 
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) if (args->seq->type == SEQ_SER || fits_is_reentrant())
-	for (i = 1; i < args->nb_images_to_stack; ++i) {
-		if (!retval) {
+#endif
+	for (i = 0; i < args->nb_images_to_stack; ++i) {
+		if (!retval && i != ref_image) {
 			if (!get_thread_run()) {
 				retval = 1;
 				continue;
 			}
-			if (_compute_normalization_for_image(args, i, coeff->offset, coeff->mul, coeff->scale,
+			if (_compute_normalization_for_image(args, i, ref_image, coeff->offset, coeff->mul, coeff->scale,
 					mode, &scale0, &mul0, &offset0)) {
 				retval = 1;
 				continue;
 			}
+#ifdef _OPENMP
 #pragma omp atomic
+#endif
 			cur_nb++;	// only used for progress bar
 			set_progress_bar_data(NULL,
 					(double)cur_nb / ((double)args->nb_images_to_stack));
@@ -648,9 +658,9 @@ int stack_median(struct stacking_args *args) {
 	data_pool = malloc(pool_size * sizeof(struct _data_block));
 	for (i = 0; i < pool_size; i++) {
 		int j;
-		data_pool[i].pix = malloc(nb_frames * sizeof(WORD *));
-		data_pool[i].tmp = malloc(nb_frames * npixels_in_block * sizeof(WORD));
-		data_pool[i].stack = malloc(nb_frames * sizeof(WORD));
+		data_pool[i].pix = calloc(nb_frames, sizeof(WORD *));
+		data_pool[i].tmp = calloc(nb_frames, npixels_in_block * sizeof(WORD));
+		data_pool[i].stack = calloc(nb_frames, sizeof(WORD));
 		if (!data_pool[i].pix || !data_pool[i].tmp || !data_pool[i].stack) {
 			fprintf(stderr, "Memory allocation error on pix.\n");
 			fprintf(stderr, "CHANGE MEMORY SETTINGS if stacking takes too much.\n");
@@ -666,7 +676,9 @@ int stack_median(struct stacking_args *args) {
 	siril_log_message(_("Starting stacking...\n"));
 	set_progress_bar_data(_("Median stacking in progress..."), PROGRESS_RESET);
 
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) if (args->seq->type == SEQ_SER || fits_is_reentrant())
+#endif
 	for (i = 0; i < nb_parallel_stacks; i++)
 	{
 		/**** Step 1: get allocated memory for the current thread ****/
@@ -718,7 +730,9 @@ int stack_median(struct stacking_args *args) {
 			if (retval) break;
 
 			// update progress bar
+#ifdef _OPENMP
 #pragma omp atomic
+#endif
 			cur_nb++;
 
 			if (!get_thread_run()) {
@@ -748,7 +762,7 @@ int stack_median(struct stacking_args *args) {
 				}
 				quicksort_s(data->stack, nb_frames);
 				fit->pdata[my_block->channel][pixel_idx] =
-					get_median_value_from_sorted_word_data(data->stack, nb_frames);
+						gsl_stats_ushort_median_from_sorted_data(data->stack, 1, nb_frames);
 				pixel_idx++;
 			}
 		}
@@ -1476,7 +1490,7 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 		data_pool[i].pix = malloc(nb_frames * sizeof(WORD *));
 		data_pool[i].tmp = malloc(nb_frames * npixels_in_block * sizeof(WORD));
 		data_pool[i].stack = malloc(nb_frames * sizeof(WORD));
-		data_pool[i].rejected = malloc(nb_frames * sizeof(int));
+		data_pool[i].rejected = calloc(nb_frames, sizeof(int));
 		if (!data_pool[i].pix || !data_pool[i].tmp || !data_pool[i].stack || !data_pool[i].rejected) {
 			fprintf(stderr, "Memory allocation error on pix.\n");
 			fprintf(stderr, "CHANGE MEMORY SETTINGS if stacking takes too much.\n");
@@ -1492,7 +1506,9 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 	siril_log_message(_("Starting stacking...\n"));
 	set_progress_bar_data(_("Rejection stacking in progress..."), PROGRESS_RESET);
 
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static) if (args->seq->type == SEQ_SER || fits_is_reentrant())
+#endif
 	for (i = 0; i < nb_parallel_stacks; i++)
 	{
 		/**** Step 1: get allocated memory for the current thread ****/
@@ -1583,7 +1599,9 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 			if (retval) break;
 
 			// update progress bar
+#ifdef _OPENMP
 #pragma omp atomic
+#endif
 			cur_nb++;
 
 			if (!get_thread_run()) {
@@ -1633,35 +1651,39 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 
 				int N = nb_frames;// N is the number of pixels kept from the current stack
 				double median;
-				int n;
+				int n, j, r = 0;
 				switch (args->type_of_rejection) {
 				case PERCENTILE:
 					quicksort_s(data->stack, N);
-					median = get_median_value_from_sorted_word_data(data->stack, N);
-					for (frame = 0; frame < N; frame++)
-						data->rejected[frame] =
-								percentile_clipping(data->stack[frame], args->sig, median, crej);
+					median = gsl_stats_ushort_median_from_sorted_data(data->stack, 1, N);
 					for (frame = 0; frame < N; frame++) {
-						if (data->rejected[frame] != 0) {
+						data->rejected[frame] =	percentile_clipping(data->stack[frame], args->sig, median, crej);
+					}
+					for (frame = 0, j = 0; frame < N; frame++, j++) {
+						if (data->rejected[j] != 0 && N > 1) {
 							remove_pixel(data->stack, frame, N);
+							frame--;
 							N--;
 						}
 					}
 					break;
 				case SIGMA:
 					do {
-						sigma = get_standard_deviation(data->stack, N);
+						sigma = gsl_stats_ushort_sd(data->stack, 1, N);
 						quicksort_s(data->stack, N);
-						median = get_median_value_from_sorted_word_data(data->stack, N);
+						median = gsl_stats_ushort_median_from_sorted_data(data->stack, 1, N);
 						n = 0;
-						for (frame = 0; frame < N; frame++)
-							data->rejected[frame] =
-									sigma_clipping(data->stack[frame], args->sig, sigma, median, crej);
-						for (frame = 0; frame < N - n; frame++) {
-							if (data->rejected[frame] != 0) {
+						for (frame = 0; frame < N; frame++) {
+							data->rejected[frame] =	sigma_clipping(data->stack[frame], args->sig, sigma, median, crej);
+							if (data->rejected[frame])
+								r++;
+							if (N - r <= 4) break;
+						}
+						for (frame = 0, j = 0; frame < N - n; frame++, j++) {
+							if (data->rejected[j] != 0) {
 								remove_pixel(data->stack, frame, N - n);
 								n++;
-								if (N - n < 4) break;
+								frame--;
 							}
 						}
 						N = N - n;
@@ -1669,9 +1691,9 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 					break;
 				case SIGMEDIAN:
 					do {
-						sigma = get_standard_deviation(data->stack, N);
+						sigma = gsl_stats_ushort_sd(data->stack, 1, N);
 						quicksort_s(data->stack, N);
-						median = get_median_value_from_sorted_word_data(data->stack, N);
+						median = gsl_stats_ushort_median_from_sorted_data(data->stack, 1, N);
 						n = 0;
 						for (frame = 0; frame < N; frame++) {
 							if (sigma_clipping(data->stack[frame], args->sig, sigma, median, crej)) {
@@ -1684,9 +1706,9 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 				case WINSORIZED:
 					do {
 						double sigma0;
-						sigma = get_standard_deviation(data->stack, N);
+						sigma = gsl_stats_ushort_sd(data->stack, 1, N);
 						quicksort_s(data->stack, N);
-						median = get_median_value_from_sorted_word_data(data->stack, N);
+						median = gsl_stats_ushort_median_from_sorted_data(data->stack, 1, N);
 						WORD *w_stack = malloc(N * sizeof(WORD));
 						memcpy(w_stack, data->stack, N * sizeof(WORD));
 						do {
@@ -1696,23 +1718,26 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 							for (jj = 0; jj < N; jj++)
 								Winsorized(&w_stack[jj], m0, m1);
 							quicksort_s(w_stack, N);
-							median = get_median_value_from_sorted_word_data(
-									w_stack, N);
+							median = gsl_stats_ushort_median_from_sorted_data(w_stack, 1, N);
 							sigma0 = sigma;
-							sigma = 1.134 * get_standard_deviation(w_stack, N);
+							sigma = 1.134 * gsl_stats_ushort_sd(w_stack, 1, N);
 						} while ((fabs(sigma - sigma0) / sigma0) > 0.0005);
 						free(w_stack);
 						n = 0;
-						for (frame = 0; frame < N; frame++)
+						for (frame = 0; frame < N; frame++) {
 							data->rejected[frame] = sigma_clipping(
 									data->stack[frame], args->sig, sigma,
 									median, crej);
-						for (frame = 0; frame < N - n; frame++) {
-							if (data->rejected[frame] != 0) {
+							if (data->rejected[frame] != 0)
+								r++;
+							if (N - r <= 4) break;
+
+						}
+						for (frame = 0, j = 0; frame < N - n; frame++, j++) {
+							if (data->rejected[j] != 0) {
 								remove_pixel(data->stack, frame, N - n);
+								frame--;
 								n++;
-								if (N - n < 4)
-									break;
 							}
 						}
 						N = N - n;
@@ -1734,14 +1759,18 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 							sigma += (fabs((double)data->stack[frame] - (a*(double)frame + b)));
 						sigma /= (double)N;
 						n = 0;
-						for (frame = 0; frame < N; frame++)
+						for (frame = 0; frame < N; frame++) {
 							data->rejected[frame] =
 									line_clipping(data->stack[frame], args->sig, sigma, frame, a, b, crej);
-						for (frame = 0; frame < N - n; frame++) {
-							if (data->rejected[frame] != 0) {
+							if (data->rejected[frame] != 0)
+								r++;
+							if (N - r <= 4) break;
+						}
+						for (frame = 0, j = 0; frame < N - n; frame++, j++) {
+							if (data->rejected[j] != 0) {
 								remove_pixel(data->stack, frame, N - n);
+								frame--;
 								n++;
-								if (N - n < 4) break;
 							}
 						}
 						N = N - n;
@@ -1760,7 +1789,9 @@ int stack_mean_with_rejection(struct stacking_args *args) {
 				}
 				fit->pdata[my_block->channel][pdata_idx++] = round_to_WORD(sum/(double)N);
 			} // end of for x
+#ifdef _OPENMP
 #pragma omp critical
+#endif
 			{
 				irej[my_block->channel][0] += crej[0];
 				irej[my_block->channel][1] += crej[1];
@@ -2058,6 +2089,11 @@ static gboolean end_stacking(gpointer p) {
 	}
 
 	set_cursor_waiting(FALSE);
+#ifdef MAC_INTEGRATION
+	GtkosxApplication *osx_app = gtkosx_application_get();
+	gtkosx_application_attention_request(osx_app, INFO_REQUEST);
+	g_object_unref (osx_app);
+#endif
 	gettimeofday (&t_end, NULL);
 	show_time(args->t_start, t_end);
 	return FALSE;

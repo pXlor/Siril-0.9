@@ -1,16 +1,16 @@
 dnl Process this file with autoconf to produce a configure script.
 m4_define([siril_major_version], [0])
 m4_define([siril_minor_version], [9])
-m4_define([siril_micro_version], [4])
-m4_define([siril_prerelease_version], [beta.3])
+m4_define([siril_micro_version], [5])
+m4_define([siril_prerelease_version], [beta])
 m4_define([siril_version],
           [siril_major_version.siril_minor_version.siril_micro_version])
 m4_define([siril_version_full],
           [siril_major_version().siril_minor_version().siril_micro_version()m4_bpatsubst(siril_prerelease_version(), [^], [-])])
 
 dnl change siril_version_full by siril_version for stable release
-dnl AC_INIT([siril], [siril_version_full],
-AC_INIT([siril], [siril_version],
+AC_INIT([siril], [siril_version_full],
+dnl AC_INIT([siril], [siril_version],
         [https://free-astro.org/bugs/view_all_bug_page.php],
         [siril],
         [https://free-astro.org/index.php/Siril/fr]) 
@@ -104,11 +104,6 @@ dnl check png lib
 PKG_CHECK_MODULES(LIBPNG, [libpng],
 		  [AC_DEFINE([HAVE_LIBPNG], [1], [Using PNG images])],
 		  AC_MSG_WARN([libpng not found. Not using PNG importer and exporter.]))
-		  
-dnl check gif lib
-AC_CHECK_LIB(gif, EGifGetGifVersion, [])
-AS_IF([test "$ac_cv_lib_gif_EGifGetGifVersion" != yes],
-      AC_MSG_WARN([giflib not found or too old. Not using GIF exporter.]))
 
 dnl check ffms2
 PKG_CHECK_MODULES(FFMS2, [ffms2 < 2.21],
@@ -117,6 +112,11 @@ PKG_CHECK_MODULES(FFMS2, [ffms2 < 2.21],
 		  [AC_DEFINE([HAVE_FFMS2_2], [1], [Use FFMS2 > 2.21])],
 		  AC_MSG_WARN([libffms2 not found. Not using AVI importer.]))
 		  ])
+
+dnl checking several ffmpeg libraries
+PKG_CHECK_MODULES(FFMPEG, [libavformat libavutil >= 55.20 libavcodec libswscale libswresample],
+		  [AC_DEFINE([HAVE_FFMPEG], [1], [film export supported])],
+		  AC_MSG_WARN([ffmpeg libav libraries not found or too old. Not using film export formats.]))
 
 dnl check opencv
 AC_PROG_CXX
@@ -141,6 +141,57 @@ else
 fi
 
 AM_CONDITIONAL(HAVE_OPENCV, [test "x$OPENCV_LIBS" != "x"])
+
+dnl check for osx platform
+AC_MSG_CHECKING([for Mac OS X platform])
+case "$host" in
+  *-*-darwin*)
+    platform_osx=yes
+    ;;
+  *)
+    platform_osx=no
+    ;;
+esac
+AC_MSG_RESULT([$platform_osx])
+AM_CONDITIONAL(PLATFORM_OSX, test "$platform_osx" = "yes")
+
+dnl check for native osx
+gdk_targets=`$PKG_CONFIG --variable=targets gdk-3.0`
+
+gdk_windowing="x11"
+
+for target in $gdk_targets;
+do
+	case "$target" in
+		quartz)
+			gdk_windowing=quartz
+			;;
+		win32)
+			gdk_windowing=win32
+			;;
+	esac
+done
+
+AC_MSG_CHECKING([for native Mac OS X])
+if test "$gdk_windowing" = "quartz"; then
+	os_osx=yes
+	ACTIVE_PLUGINS="${ACTIVE_PLUGINS}, 'checkupdate'"
+else
+	os_osx=no
+fi
+AC_MSG_RESULT([$os_osx])
+AM_CONDITIONAL(OS_OSX, test "$os_osx" = "yes")
+
+AM_CONDITIONAL(GDK_WINDOWING_X11, test "$gdk_windowing" = "x11")
+
+if test "$os_osx" = "yes"; then
+	AC_DEFINE([OS_OSX],[1],[Defined if os is Mac OSX])
+
+	PKG_CHECK_MODULES(GTK_MAC, gtk-mac-integration-gtk3 >= 2.0.8)
+
+	AC_SUBST(GTK_MAC_CFLAGS)
+	AC_SUBST(GTK_MAC_LIBS)
+fi
 
 AC_CONFIG_FILES([Makefile src/Makefile po/Makefile.in])
 AC_OUTPUT

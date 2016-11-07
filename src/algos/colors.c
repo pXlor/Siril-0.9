@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -325,7 +325,9 @@ gpointer extract_channels(gpointer p) {
 		break;
 		/* HSL space */
 	case 1:
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
+#endif
 		for (i = 0; i < args->fit->rx * args->fit->ry; i++) {
 			double h, s, l;
 			double r = (double) buf[RLAYER][i] / USHRT_MAX_DOUBLE;
@@ -339,7 +341,9 @@ gpointer extract_channels(gpointer p) {
 		break;
 		/* HSV space */
 	case 2:
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
+#endif
 		for (i = 0; i < args->fit->rx * args->fit->ry; i++) {
 			double h, s, v;
 			double r = (double) buf[RLAYER][i] / USHRT_MAX_DOUBLE;
@@ -353,7 +357,9 @@ gpointer extract_channels(gpointer p) {
 		break;
 		/* CIE L*a*b */
 	case 3:
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
+#endif
 		for (i = 0; i < args->fit->rx * args->fit->ry; i++) {
 			double x, y, z, L, a, b;
 			double red = (double) buf[RLAYER][i] / USHRT_MAX_DOUBLE;
@@ -414,13 +420,22 @@ gpointer enhance_saturation(gpointer p) {
 	args->h_min /= 360.0;
 	args->h_max /= 360.0;
 	if (args->preserve) {
-		imstats *stat = statistics(args->fit, GLAYER, NULL, STATS_BASIC);
+		imstats *stat = statistics(args->fit, GLAYER, NULL, STATS_BASIC,
+				STATS_ZERO_NULLCHECK);
+		if (!stat) {
+			siril_log_message(_("Error: no data computed.\n"));
+			gdk_threads_add_idle(end_enhance_saturation, args);
+			return GINT_TO_POINTER(1);
+		}
 		bg = stat->median + stat->sigma;
 		bg /= stat->normValue;
 		free(stat);
+
 	}
 
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
+#endif
 	for (i = 0; i < args->fit->rx * args->fit->ry; i++) {
 		double h, s, l;
 		double r = (double) buf[RLAYER][i] / USHRT_MAX_DOUBLE;
@@ -483,7 +498,9 @@ gpointer scnr(gpointer p) {
 	gettimeofday(&t_start, NULL);
 
 	WORD norm = get_normalized_value(args->fit);
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(i) schedule(static)
+#endif
 	for (i = 0; i < nbdata; i++) {
 		double red = (double) buf[RLAYER][i] / norm;
 		double green = (double) buf[GLAYER][i] / norm;
@@ -535,7 +552,7 @@ void on_button_bkg_selection_clicked(GtkButton *button, gpointer user_data) {
 	static GtkSpinButton *selection_black_value[4] = { NULL, NULL, NULL, NULL };
 
 	if ((!com.selection.h) || (!com.selection.w)) {
-		show_dialog("Make a selection of the background area before", "Warning",
+		show_dialog(_("Make a selection of the background area before"), "Warning",
 				"gtk-dialog-warning");
 		return;
 	}
@@ -612,7 +629,12 @@ static void background_neutralize(fits* fit, rectangle black_selection) {
 
 	stats = malloc(3 * sizeof(imstats *));
 	for (chan = 0; chan < 3; chan++) {
-		stats[chan] = statistics(fit, chan, &black_selection, STATS_BASIC);
+		stats[chan] = statistics(fit, chan, &black_selection, STATS_BASIC,
+				STATS_ZERO_NULLCHECK);
+		if (!stats[chan]) {
+			siril_log_message(_("Error: no data computed.\n"));
+			return;
+		}
 		ref += stats[chan]->median;
 	}
 	ref /= 3;
@@ -651,7 +673,7 @@ void on_button_bkg_neutralization_clicked(GtkButton *button, gpointer user_data)
 	height = (int) gtk_spin_button_get_value(selection_black_value[3]);
 
 	if ((!width) || (!height)) {
-		show_dialog("Make a selection of the background area before", "Warning",
+		show_dialog(_("Make a selection of the background area before"), "Warning",
 				"gtk-dialog-warning");
 		return;
 	}
@@ -686,7 +708,7 @@ void on_button_white_selection_clicked(GtkButton *button, gpointer user_data) {
 	}
 
 	if ((!com.selection.h) || (!com.selection.w)) {
-		show_dialog("Make a selection of the white area before", "Warning",
+		show_dialog(_("Make a selection of the background area before"), "Warning",
 				"gtk-dialog-warning");
 		return;
 	}
@@ -731,10 +753,15 @@ static void get_coeff_for_wb(fits *fit, rectangle white, rectangle black,
 
 	siril_log_message(_("Background reference:\n"));
 	for (chan = 0; chan < 3; chan++) {
-		imstats *stat = statistics(fit, chan, &black, STATS_BASIC);
+		imstats *stat = statistics(fit, chan, &black, STATS_BASIC, STATS_ZERO_NULLCHECK);
+		if (!stat) {
+			siril_log_message(_("Error: no data computed.\n"));
+			return;
+		}
 		bg[chan] = stat->median / stat->normValue;
 		siril_log_message("B%d : %.5e\n", chan, bg[chan]);
 		free(stat);
+
 	}
 
 	siril_log_message(_("White reference:\n"));
@@ -802,7 +829,9 @@ static void white_balance(fits *fit, gboolean is_manual, rectangle white_selecti
 		high = gtk_range_get_value(scaleLimit[1]);
 		get_coeff_for_wb(fit, white_selection, black_selection, kw, bg, &norm, low, high);
 	}
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(chan) schedule(static)
+#endif
 	for (chan = 0; chan < 3; chan++) {
 		if (kw[chan] == 1.0) continue;
 		calibrate(fit, chan, kw[chan], bg[chan], norm);
@@ -850,7 +879,7 @@ void on_calibration_apply_button_clicked(GtkButton *button, gpointer user_data) 
 	black_selection.h = gtk_spin_button_get_value(selection_black_value[3]);
 
 	if (!black_selection.w || !black_selection.h) {
-		show_dialog("Make a selection of the black area before", "Warning",
+		show_dialog(_("Make a selection of the background area before"), "Warning",
 				"gtk-dialog-warning");
 		return;
 	}
@@ -861,7 +890,7 @@ void on_calibration_apply_button_clicked(GtkButton *button, gpointer user_data) 
 	white_selection.h = gtk_spin_button_get_value(selection_white_value[3]);
 
 	if ((!white_selection.w || !white_selection.h) && !is_manual) {
-		show_dialog("Make a selection of the white area before", "Warning",
+		show_dialog(_("Make a selection of the background area before"), "Warning",
 				"gtk-dialog-warning");
 		return;
 	}

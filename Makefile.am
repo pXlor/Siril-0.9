@@ -1,6 +1,8 @@
 ## Process this file with automake to produce Makefile.in
 
-SUBDIRS = po src
+export CC CFLAGS CPPFLAGS
+
+SUBDIRS = deps/kplot po src
 
 install-data-local:
 	@$(NORMAL_INSTALL)

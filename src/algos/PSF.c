@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -621,7 +621,9 @@ void psf_display_result(fitted_PSF *result, rectangle *area) {
  * the FWHM value with the sampling value */
 void psf_update_units(fits* fit, fitted_PSF **result) {
 
-	if (!fit->focal_length || !fit->pixel_size_x || !fit->pixel_size_y)
+	if (fit->focal_length <= 0.0 || fit->pixel_size_x <= 0.0
+			|| fit->pixel_size_y <= 0.0 || fit->binning_x <= 0
+			|| fit->binning_y <= 0)
 		return;
 
 	(*result)->fwhmx *= (radian_conversion * fit->pixel_size_x

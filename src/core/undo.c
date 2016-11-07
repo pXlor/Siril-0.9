@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 
 #include "core/siril.h"
 #include "gui/callbacks.h"
+#include "io/single_image.h"
 #include "core/undo.h"
 #include "gui/histogram.h"
 #include "core/proto.h"
@@ -166,20 +167,22 @@ int undo_save_state(char *message, ...) {
 	va_list args;
 	va_start(args, message);
 
-	if (message == NULL)
-		memset(histo, 0, FLEN_VALUE);
-	else
-		vsnprintf(histo, FLEN_VALUE, message, args);
+	if (single_image_is_loaded()) {
+		if (message == NULL)
+			memset(histo, 0, FLEN_VALUE);
+		else
+			vsnprintf(histo, FLEN_VALUE, message, args);
 
-	if (undo_build_swapfile(&gfit, &filename)) {
-		va_end(args);
-		return 1;
+		if (undo_build_swapfile(&gfit, &filename)) {
+			va_end(args);
+			return 1;
+		}
+
+		undo_add_item(&gfit, filename, histo);
+
+		/* update menus */
+		update_MenuItem();
 	}
-	undo_add_item(&gfit, filename, histo);
-
-	/* update menus */
-	update_MenuItem();
-
 	va_end(args);
 	return 0;
 }

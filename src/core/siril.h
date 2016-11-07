@@ -43,6 +43,8 @@ typedef unsigned short WORD;		// default type for internal image data
 
 #define MAX_COMMAND_WORDS 16		// max number of words to split in command line input
 
+#define MAX_SEQPSF 10			// max number of stars for which seqpsf can be run
+
 #define CMD_HISTORY_SIZE 50		// size of the command line history
 
 #define ZOOM_MAX	16.0
@@ -70,6 +72,10 @@ typedef unsigned short WORD;		// default type for internal image data
 #define STATS_MAIN		STATS_BASIC | STATS_AVGDEV | STATS_MAD | STATS_BWMV
 #define STATS_IKSS		(1 << 6)	// Iterative K-sigma Estimator of Location and Scale. Take time, needed only for stacking
 #define STATS_EXTRA		STATS_MAIN | STATS_IKSS
+
+#define	STATS_ZERO_NONE 0
+#define	STATS_ZERO_NULLCHECK (!STATS_ZERO_NONE)
+
 
 /* when requesting an image redraw, it can be asked to remap its data before redrawing it.
  * REMAP_NONE	doesn't remaps the data,
@@ -99,7 +105,8 @@ typedef enum {
 	TYPERAW = (1 << 9),
 	TYPEAVI = (1 << 10),
 	TYPESER = (1 << 11),
-	TYPEGIF = (1 << 12)
+	TYPEMP4 = (1 << 12),
+	TYPEWEBM= (1 << 13),
 } image_type;
 
 #define USE_DARK	0x01
@@ -165,7 +172,7 @@ typedef enum {
 				// when the result of a processing is displayed
 #define UNRELATED_IMAGE -2	// image loaded while a sequence was loaded too
 
-#define MAX_STARS 20000
+#define MAX_STARS 50000
 
 /* constants for loglut function */
 #define LOG 1
@@ -187,13 +194,96 @@ typedef struct libraw_config libraw;
 typedef struct stack_config stackconf;
 typedef struct cominf cominfo;
 typedef struct image_stats imstats;
-typedef struct fwhm_struct fitted_PSF;
 typedef struct rectangle_struct rectangle;
 typedef struct point_struct point;
 typedef struct gradient_struct gradient;
 typedef struct historic_struct historic;
+typedef struct fwhm_struct fitted_PSF;
 
 /* global structures */
+
+/* ORDER OF POLYNOMES */
+typedef enum {
+	POLY_1,
+	POLY_2,
+	POLY_3,
+	POLY_4,
+} poly_order;
+
+typedef enum {
+	NORMAL_DISPLAY,	
+	LOG_DISPLAY,
+	SQRT_DISPLAY,
+	SQUARED_DISPLAY,
+	ASINH_DISPLAY,
+	STF_DISPLAY,
+	HISTEQ_DISPLAY
+} display_mode;			// used in the layer_info_struct below
+#define DISPLAY_MODE_MAX HISTEQ_DISPLAY
+
+typedef enum {
+	NORMAL_COLOR,	
+	RAINBOW_COLOR
+} color_map;
+
+typedef enum {
+	MIPSLOHI,
+	MINMAX,
+	USER
+} sliders_mode;
+
+typedef enum {
+	FILE_CONVERSION,
+	IMAGE_SEQ,
+	PRE_PROC,
+	REGISTRATION,
+	PLOT,
+	STACKING,
+	OUTPUT_LOGS
+} main_tabs;
+
+typedef enum {
+	BAYER_BILINEAR,
+	BAYER_NEARESNEIGHBOR,
+	BAYER_VNG,
+	BAYER_AHD,
+	BAYER_SUPER_PIXEL
+} interpolation_method;
+
+typedef enum {
+	OPENCV_NEAREST = 0,
+	OPENCV_LINEAR = 1,
+	OPENCV_AREA = 2,
+	OPENCV_CUBIC = 3,
+	OPENCV_LANCZOS4 = 4,
+	OPENCV_INTER_MAX = 7
+} opencv_interpolation;
+
+typedef enum {
+    BAYER_FILTER_RGGB,
+    BAYER_FILTER_BGGR,
+    BAYER_FILTER_GBRG,
+    BAYER_FILTER_GRBG,
+    BAYER_FILTER_NONE = -1		//case where bayer pattern is undefined or untested
+} sensor_pattern ;
+#define BAYER_FILTER_MIN BAYER_FILTER_RGGB
+#define BAYER_FILTER_MAX BAYER_FILTER_GRBG
+
+struct layer_info_struct {
+	char *name;			// name of the layer (a filter name)
+	double wavelength;		// the wavelength of the filter, in nanometres
+	WORD lo, hi;			// the values of the cutoff sliders
+	//WORD min, max;		// the min and max values of the sliders
+	gboolean cut_over, cut_under;	// display values over hi or under lo as negative
+	display_mode rendering_mode;	// defaults to NORMAL_DISPLAY
+};
+
+typedef enum { SEQ_REGULAR, SEQ_SER,
+#if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
+	SEQ_AVI,
+#endif
+	SEQ_INTERNAL
+} sequence_type;
 
 /* image data, exists once for each image */
 struct imdata {
@@ -236,87 +326,6 @@ struct registration_data {
 	double quality;
 };
 
-/* ORDER OF POLYNOMES */
-typedef enum {
-	POLY_1,
-	POLY_2,
-	POLY_3,
-	POLY_4,
-} poly_order;
-
-typedef enum {
-	NORMAL_DISPLAY,	
-	LOG_DISPLAY,
-	SQRT_DISPLAY,
-	SQUARED_DISPLAY,
-	ASINH_DISPLAY,
-	STF_DISPLAY,
-	HISTEQ_DISPLAY
-} display_mode;			// used in the layer_info_struct below
-#define DISPLAY_MODE_MAX HISTEQ_DISPLAY
-
-typedef enum {
-	NORMAL_COLOR,	
-	RAINBOW_COLOR
-} color_map;
-
-typedef enum {
-	MIPSLOHI,
-	MINMAX,
-	USER
-} sliders_mode;
-
-typedef enum {
-	FILE_CONVERSION,
-	IMAGE_SEQ,
-	PRE_PROC,
-	REGISTRATION,
-	STACKING,
-	OUTPUT_LOGS
-} main_tabs;
-
-typedef enum {
-	BAYER_BILINEAR,
-	BAYER_NEARESNEIGHBOR,
-	BAYER_VNG,
-	BAYER_AHD,
-	BAYER_SUPER_PIXEL,
-} interpolation_method;
-
-typedef enum {
-	OPENCV_NEAREST,
-	OPENCV_LINEAR,
-	OPENCV_AREA,
-	OPENCV_CUBIC,
-	OPENCV_LANCZOS4,
-} opencv_interpolation;
-
-typedef enum {
-    BAYER_FILTER_RGGB,
-    BAYER_FILTER_BGGR,
-    BAYER_FILTER_GBRG,
-    BAYER_FILTER_GRBG,
-    BAYER_FILTER_NONE = -1		//case where bayer pattern is undefined or untested
-} sensor_pattern ;
-#define BAYER_FILTER_MIN BAYER_FILTER_RGGB
-#define BAYER_FILTER_MAX BAYER_FILTER_GRBG
-
-struct layer_info_struct {
-	char *name;			// name of the layer (a filter name)
-	double wavelength;		// the wavelength of the filter, in nanometres
-	WORD lo, hi;			// the values of the cutoff sliders
-	//WORD min, max;		// the min and max values of the sliders
-	gboolean cut_over, cut_under;	// display values over hi or under lo as negative
-	display_mode rendering_mode;	// defaults to NORMAL_DISPLAY
-};
-
-typedef enum { SEQ_REGULAR, SEQ_SER,
-#if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
-	SEQ_AVI,
-#endif
-	SEQ_INTERNAL
-} sequence_type;
-
 struct sequ {
 	char *seqname;		// name of the sequence, as in name.seq
 	int number;		// number of images in the sequence
@@ -332,11 +341,6 @@ struct sequ {
 	/* beg and end are used prior to imgparam allocation, hence their usefulness */
 	int beg;		// imgparam[0]->filenum
 	int end;		// imgparam[number-1]->filenum
-
-	/* Data used when a new sequence is builded
-	 * --> in global star registration for example
-	 */
-	int new_total;
 
 	/* registration previsualisation and manual alignment data */
 	int previewX[PREVIEW_NB], previewY[PREVIEW_NB];	// center, -1 is uninitialized value
@@ -362,6 +366,8 @@ struct sequ {
 	//struct registration_method reg_method;	// is it the right place for that?
 	
 	gboolean needs_saving;	// a dirty flag for the sequence, avoid saving it too often
+
+	fitted_PSF **photometry[MAX_SEQPSF];// psf for multiple stars for all images
 };
 
 /* this struct is used to manage data associated with a single image loaded, outside a sequence */
@@ -409,6 +415,7 @@ struct ffit {
 	char instrume[FLEN_VALUE];		// INSTRUME key
 	char telescop[FLEN_VALUE];		// TELESCOP key
 	char observer[FLEN_VALUE];		// OBSERVER key
+	char bayer_pattern[FLEN_VALUE];	// BAYERPAT key Bayer Pattern if available
 	/* data obtained from FITS or RAW files */
 	double focal_length, iso_speed, exposure, aperture, ccd_temp;
 
@@ -443,9 +450,10 @@ struct libraw_config {
 
 struct debayer_config {
 	gboolean open_debayer;			// debayer images being opened
-	gboolean ser_use_bayer_header;		// use the pattern given in the SER header
+	gboolean use_bayer_header;		// use the pattern given in the file header
 	sensor_pattern bayer_pattern;		// user-defined Bayer pattern
 	interpolation_method bayer_inter;	// interpolation method for non-libraw debayer
+	gboolean compatibility;				// ensure KSTARS compatibility if TRUE
 };
 
 struct stack_config {
@@ -569,7 +577,7 @@ struct cominf {
 
 /* this structure is used to characterize the statistics of the image */
 struct image_stats {
-	long count;
+	long total, ngoodpix;
 	double mean, avgDev, median, sigma, bgnoise, min, max, normValue, mad, sqrtbwmv,
 			location, scale;
 	char layername[6];
@@ -601,6 +609,7 @@ extern cominfo com;		// the main data struct
 extern fits gfit;		// currently loaded image
 extern fits wfit[5];		// used for temp files, can probably be replaced by local variables
 extern char **supported_extensions;
+extern char *filter_pattern[];
 #endif
 
 #endif /*SIRIL */

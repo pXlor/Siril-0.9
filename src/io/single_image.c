@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -119,7 +119,7 @@ int read_single_image(const char* filename, fits *dest, char **realname_out) {
 	} else {
 		retval = any_to_fits(imagetype, realname, dest);
 		if (!retval)
-			debayer_if_needed(imagetype, dest);
+			debayer_if_needed(imagetype, dest, com.debayer.compatibility);
 	}
 	if (retval != 0 && retval != 3)
 		siril_log_message(_("Opening %s failed.\n"), realname);
@@ -222,7 +222,9 @@ int image_find_minmax(fits *fit, int force_minmax){
 	if (fit->maxi != 0 && !force_minmax) return 1;
 
 	/* search for min and max values in all layers */
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(layer, i) schedule(dynamic,1) if(fit->naxes[2] > 1)
+#endif
 	for (layer = 0; layer < fit->naxes[2]; ++layer) {
 		WORD *buf = fit->pdata[layer];
 		fit->max[layer] = 0;

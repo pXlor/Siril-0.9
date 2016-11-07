@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -169,12 +169,12 @@ int stat_file(const char *filename, image_type *type, char *realname) {
 	for (k = 0; k < 2; k++) {
 		int i = 0;
 		while (supported_extensions[i]) {
-			char *str;
+			gchar *str;
 			if (k == 0)
 				str = strdup(supported_extensions[i]);
-			else str = convtoupper(supported_extensions[i]);
+			else str = g_ascii_strup(supported_extensions[i], strlen(supported_extensions[i]));
 			snprintf(test_name, 255, "%s%s", filename, str);
-			free(str);
+			g_free(str);
 			if (is_readable_file(test_name)) {
 				*type = get_type_for_extension(supported_extensions[i]+1);
 				assert(*type != TYPEUNDEF);
@@ -432,7 +432,7 @@ void read_and_show_textfile(char *path, char *title) {
 
 	FILE *f = fopen(path, "r");
 	if (!f) {
-		show_dialog("File not found", "Error", "gtk-dialog-error");
+		show_dialog(_("File not found"), _("Error"), "gtk-dialog-error");
 		return;
 	}
 	while (fgets(line, sizeof(line), f) != NULL)
@@ -498,52 +498,6 @@ void quicksort_s(WORD *a, int n) {
 	quicksort_s(l, a + n - l);
 }
 
-double get_median_value_from_sorted_word_data(WORD *data, int size) {
-	double median = 0;
-
-	switch (size % 2) {
-	case 0:
-		median = 0.5 * (data[(size / 2) - 1] + data[size / 2]);
-		break;
-	default:
-		median = data[(size - 1) / 2];
-		break;
-	}
-	return median;
-}
-
-/* return the sigma of a set of data. In the same time it computes
- * the mean value */
-double get_standard_deviation(WORD *data, int size) {
-	int i;
-	double sigma, mean;
-
-	mean = sigma = 0.0;
-	if (size < 2)
-		return 0.0;
-	for (i = 0; i < size; ++i) {
-		mean += (double) data[i];
-	}
-	mean /= size;
-	for (i = 0; i < size; ++i)
-		sigma += pow((double) data[i] - mean, 2);
-	sigma /= (size - 1);
-	sigma = sqrt(sigma);
-	return sigma;
-}
-
-/* returns a new string in uppercase */
-char *convtoupper(char *str) {
-	char *newstr, *p;
-	p = newstr = strdup(str);
-	while (*p) {
-		*p = toupper(*p);
-		++p;
-	}
-
-	return newstr;
-}
-
 char *remove_ext_from_filename(const char *filename) {
 	size_t filelen;
 	const char *p;
@@ -563,20 +517,6 @@ char *remove_ext_from_filename(const char *filename) {
 	file[filelen] = '\0';
 
 	return file;
-}
-
-char *replace_spaces_from_filename(const char *filename) {
-	GString *string = g_string_new(filename);
-	size_t shift = 0;
-	int i;
-
-	for (i = 0; filename[i]; i++) {
-		if (filename[i] == ' ') {
-			string = g_string_insert_c(string, i + shift, '\\');
-			shift++;
-		}
-	}
-	return g_string_free(string, FALSE);
 }
 
 // append a string to the end of an existing string
@@ -601,11 +541,11 @@ char *format_basename(char *root) {
 		root[120] = '\0';
 		len = 120;
 	}
-	if (root[len-1] == '-' || root[len-1] == '_') {
+	if (root[len - 1] == '-' || root[len - 1] == '_') {
 		return root;
 	}
 
-	char *appended = malloc(len+2);
+	char *appended = malloc(len + 2);
 	sprintf(appended, "%s_", root);
 	free(root);
 	return appended;
@@ -626,4 +566,46 @@ float computePente(WORD *lo, WORD *hi) {
 	pente = UCHAR_MAX_SINGLE / (float) (*hi - *lo);
 
 	return pente;
+}
+
+static const gchar *checking_css_filename() {
+	printf(_("Checking GTK version ... GTK-%d.%d\n"), GTK_MAJOR_VERSION, GTK_MINOR_VERSION);
+	if ((GTK_MAJOR_VERSION >= 3) && (GTK_MINOR_VERSION >= 20))
+		return "gtk.css";
+	else if ((GTK_MAJOR_VERSION >= 3) && (GTK_MINOR_VERSION < 20))
+		return "gtk_old.css";
+	else {
+		return NULL;
+	}
+}
+
+void load_css_style_sheet (char *path) {
+	GtkCssProvider *css_provider;
+	GdkDisplay *display;
+	GdkScreen *screen;
+	gchar *CSSFile;
+	const gchar *css_filename;
+
+	css_filename = checking_css_filename();
+	if (css_filename == NULL) {
+		printf(_("The version of GTK does not match requirements: (GTK-%d.%d)\n"), GTK_MAJOR_VERSION, GTK_MINOR_VERSION);
+		exit(1);
+	}
+
+	CSSFile = g_build_filename (path, css_filename, NULL);
+	if (!g_file_test (CSSFile, G_FILE_TEST_EXISTS)) {
+		g_error (_("Unable to load CSS style sheet file: %s. Please reinstall %s\n"), CSSFile, PACKAGE);
+	}
+	else {
+		css_provider = gtk_css_provider_new();
+		display = gdk_display_get_default();
+		screen = gdk_display_get_default_screen(display);
+		gtk_style_context_add_provider_for_screen(screen,
+				GTK_STYLE_PROVIDER(css_provider),
+				GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+		gtk_css_provider_load_from_path(css_provider, CSSFile, NULL);
+		fprintf(stdout, _("Successfully loaded '%s'\n"), CSSFile);
+		g_object_unref (css_provider);
+	}
+	g_free(CSSFile);
 }

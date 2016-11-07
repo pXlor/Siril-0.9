@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,7 +42,11 @@ static WORD Compute_threshold(fits *fit, double starfinder, int layer, WORD *nor
 
 	assert(layer <= 3);
 
-	stat = statistics(fit, layer, NULL, STATS_BASIC);
+	stat = statistics(fit, layer, NULL, STATS_BASIC, STATS_ZERO_NULLCHECK);
+	if (!stat) {
+		siril_log_message(_("Error: no data computed.\n"));
+		return 0;
+	}
 	threshold = (WORD) stat->median + starfinder * (WORD) stat->sigma;
 	*norm = (WORD) stat->normValue;
 	*bg = stat->median;
@@ -166,7 +170,9 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf, rectangle *area) {
 		areaY1 = area->h + areaY0;
 	}
 
+#ifdef _OPENMP
 #pragma omp parallel for num_threads(com.max_thread) private(y) schedule(static)
+#endif
 	for (y = sf->radius + areaY0; y < areaY1 - sf->radius; y++) {
 		int x;
 		for (x = sf->radius + areaX0; x < areaX1 - sf->radius; x++) {
@@ -214,11 +220,15 @@ fitted_PSF **peaker(fits *fit, int layer, starFinder *sf, rectangle *area) {
 						if (is_star(cur_star, sf)) {
 							cur_star->xpos = x + cur_star->x0 - sf->radius - 1;
 							cur_star->ypos = y + cur_star->y0 - sf->radius - 1;
+#ifdef _OPENMP
 #pragma omp critical
+#endif
 							{
-								results[nbstars] = cur_star;
-								results[nbstars + 1] = NULL;
-								nbstars++;
+								if (nbstars < MAX_STARS) {
+									results[nbstars] = cur_star;
+									results[nbstars + 1] = NULL;
+									nbstars++;
+								}
 							}
 						}
 					}

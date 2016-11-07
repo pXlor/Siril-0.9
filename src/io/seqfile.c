@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -217,10 +217,14 @@ sequence * readseqfile(const char *name){
 							/* reinitialize seqfilename if no match: need to do it because of extensions with length of 4 */
 							strcpy(seqfilename, backup_name);
 							/* test for extension in uppercase */
-							strncpy(seqfilename + strlen(seqfilename)-3, convtoupper(supported_film[i].extension), len_ext);
+							gchar *upcase = g_ascii_strup(supported_film[i].extension, len_ext);
+							strncpy(seqfilename + strlen(seqfilename) - 3, upcase,
+								len_ext);
 							if (access(seqfilename, F_OK) != -1) break;
 							/* reinitialize seqfilename if no match: need to do it because of extensions with length of 4 */
 							strcpy(seqfilename, backup_name);
+
+							g_free(upcase);
 						}
 						i++;
 					}

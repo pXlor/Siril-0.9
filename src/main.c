@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,6 +24,9 @@
 #endif
 
 #include <gtk/gtk.h>
+#ifdef MAC_INTEGRATION
+#include "gtkmacintegration/gtkosxapplication.h"
+#endif
 #include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
@@ -54,6 +57,61 @@ fits wfit[5];	// used for temp files, can probably be replaced by local variable
 GtkBuilder *builder;	// get widget references anywhere
 void initialize_scrollbars();
 
+#ifdef MAC_INTEGRATION
+
+static gboolean osx_open_file(GtkosxApplication *osx_app, gchar *path, gpointer data){
+	if (path != NULL) {
+		open_single_image(path);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+static void gui_add_osx_to_app_menu(GtkosxApplication *osx_app, const gchar *item_name, gint index) {
+	GtkWidget *item;
+
+	item = lookup_widget(item_name);
+	if (GTK_IS_MENU_ITEM(item))
+		gtkosx_application_insert_app_menu_item(osx_app, GTK_WIDGET(item), index);
+}
+
+static void set_osx_integration(GtkosxApplication *osx_app, gchar *siril_path) {
+	GtkWidget *menubar = lookup_widget("menubar1");
+	GtkWidget *file_quit_menu_item = lookup_widget("exit");
+	GtkWidget *help_menu = lookup_widget("help1");
+	GtkWidget *sep;
+	GdkPixbuf *icon;
+	GString *icon_str;
+	gchar *icon_path;
+	
+	g_signal_connect(osx_app, "NSApplicationOpenFile", G_CALLBACK(osx_open_file), NULL);
+
+	gtk_widget_hide(menubar);
+
+	gtkosx_application_set_menu_bar(osx_app, GTK_MENU_SHELL(menubar));
+
+	gui_add_osx_to_app_menu(osx_app, "help_item1", 0);
+	sep = gtk_separator_menu_item_new();
+	gtkosx_application_insert_app_menu_item(osx_app, sep, 1);
+	gui_add_osx_to_app_menu(osx_app, "settings", 2);
+	sep = gtk_separator_menu_item_new();
+	gtkosx_application_insert_app_menu_item(osx_app, sep, 3);
+
+	gtk_widget_hide(file_quit_menu_item);
+	gtk_widget_hide(help_menu);
+
+	icon_str = g_string_new(siril_path);
+	g_string_append(icon_str, "pixmaps/siril_1.svg");
+	
+	icon_path = g_string_free(icon_str, FALSE);
+	icon = gdk_pixbuf_new_from_file(icon_path, NULL);
+	gtkosx_application_set_dock_icon_pixbuf(osx_app, icon);
+		
+	gtkosx_application_ready(osx_app);
+	g_free(icon_path);
+}
+
+#endif
 
 char *siril_sources[] = {
 	"",
@@ -77,7 +135,6 @@ void signal_handled(int s) {
 	//printf("Caught signal %d\n", s);
 	undo_flush();
 	exit(EXIT_FAILURE);
-
 }
 
 int main(int argc, char *argv[]) {
@@ -97,7 +154,7 @@ int main(int argc, char *argv[]) {
 	opterr = 0;
 	memset(&com, 0, sizeof(struct cominf));	// needed?
 	com.initfile = NULL;
-
+	
 	/* for translation */
 	bindtextdomain(PACKAGE, LOCALEDIR);
 	textdomain(PACKAGE);
@@ -241,9 +298,6 @@ int main(int argc, char *argv[]) {
 	/* Keybord Shortcuts */
 	initialize_shortcuts();
 
-	/* Fill the "About" window */
-	fill_about_dialog();
-
 	/* Select combo boxes that trigger some text display or other things */
 	gtk_combo_box_set_active(GTK_COMBO_BOX(gtk_builder_get_object(builder, "comboboxstack_methods")), 0);
 	gtk_combo_box_set_active(GTK_COMBO_BOX(gtk_builder_get_object(builder, "comboboxstacksel")), 0);
@@ -292,6 +346,9 @@ int main(int argc, char *argv[]) {
 	/* initialize stacking methods */
 	initialize_stacking_methods();
 
+	/* register some callbacks */
+	register_selection_update_callback(update_export_crop_label);
+
 	/* initialization of the binning parameters */
 	GtkComboBox *binning = GTK_COMBO_BOX(gtk_builder_get_object(builder, "combobinning"));
 	gtk_combo_box_set_active(binning, 0);
@@ -334,6 +391,12 @@ int main(int argc, char *argv[]) {
 		gtk_tool_button_set_label_widget(GTK_TOOL_BUTTON(lookup_widget("histogram_button")), lookup_widget("image_histogram_dark"));
 		gtk_tool_button_set_label_widget(GTK_TOOL_BUTTON(lookup_widget("seqlist_button")), lookup_widget("image_seqlist_dark"));
 	}
+	
+	/* handling OS-X integration */
+#ifdef MAC_INTEGRATION
+	GtkosxApplication *osx_app = gtkosx_application_get();
+	set_osx_integration(osx_app, siril_path);
+#endif //MAC_INTEGRATION
 
 	/* start Siril */
 	update_used_memory();
@@ -352,6 +415,9 @@ int main(int argc, char *argv[]) {
 
 	/* quit Siril */
 	undo_flush();
+#ifdef MAC_INTEGRATION
+	g_object_unref (osx_app);
+#endif //MAC_INTEGRATION
 	return 0;
 }
 

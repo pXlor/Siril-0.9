@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,6 +47,10 @@ int get_nb_film_ext_supported() {
 	return sizeof(supported_film) / sizeof(supported_film_list);
 }
 
+static void film_init_struct(struct film_struct *film) {
+	memset(film, 0, sizeof(struct film_struct));
+}
+
 /* Check different film extensions supported in supported_film[].
  * The function return 0 if an extension is found, 1 else */
 int check_for_film_extensions(const char *extension) {
@@ -54,7 +58,7 @@ int check_for_film_extensions(const char *extension) {
 
 	nb_film = get_nb_film_ext_supported();
 	for (i = 0; i < nb_film; i++) {
-		if (!strcasecmp(extension, supported_film[i].extension)) return 0;
+		if (!g_ascii_strcasecmp(extension, supported_film[i].extension)) return 0;
 	}
 	return 1;
 }
@@ -182,8 +186,8 @@ int film_open_file(const char *sourcefile, struct film_struct *film) {
 
 	/* If you want to change the output colorspace or resize the output frame size,
 	now is the time to do it. IMPORTANT: This step is also required to prevent
-	resolution and colorspace changes midstream. You can you can always tell a frame's
-	original properties by examining the Encoded* properties in FFMS_Frame. */
+	resolution and colorspace changes midstream. You can always tell a frame's
+	original properties by examining the Encoded properties in FFMS_Frame. */
 	/* See libavutil/pixfmt.h for the list of pixel formats/colorspaces.
 	To get the name of a given pixel format, strip the leading PIX_FMT_
 	and convert to lowercase. For example, PIX_FMT_YUV420P becomes "yuv420p". */
@@ -216,7 +220,7 @@ static int *randomIndex(int n) {
 	int *index = malloc(n * sizeof (int));
 	int i = 0;
 	int x = 0;
-	int tmp =0;
+	int tmp = 0;
 
 	/* make index */
 	for (i = 0; i < n; i++) {
@@ -348,10 +352,6 @@ int film_read_frame(struct film_struct *film, int frame_no, fits *fit) {
 void film_close_file(struct film_struct *film) {
 	/* now it's time to clean up */
 	FFMS_DestroyVideoSource(film->videosource);
-}
-
-void film_init_struct(struct film_struct *film) {
-	memset(film, 0, sizeof(struct film_struct));
 }
 
 void film_display_info(struct film_struct *film) {

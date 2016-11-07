@@ -2,7 +2,7 @@
  * This file is part of Siril, an astronomy image processor.
  * Copyright (C) 2005-2011 Francois Meyer (dulle at free.fr)
  * Copyright (C) 2012-2016 team free-astro (see more in AUTHORS file)
- * Reference site is http://free-astro.vinvin.tf/index.php/Siril
+ * Reference site is https://free-astro.org/index.php/Siril
  *
  * Siril is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,14 +44,15 @@ static void select_area(fits *fit, WORD *data, int layer, rectangle *bounds) {
 	}
 }
 
-static double siril_stats_ushort_median(gsl_histogram *histo, const size_t n) {
+static double siril_stats_ushort_median(gsl_histogram *histo, const size_t n, int nullcheck) {
 	size_t i;
 	size_t hist_size = gsl_histogram_bins(histo);
 	double sum = 0.0;
 	double median = 0.0;
+	int zero = (nullcheck == 0) ? zero = 0 : 1;
 
-	/* Get the median value */
-	for (i = 0; i < hist_size; i++) {
+	/* Get the median value without 0 value*/
+	for (i = zero; i < hist_size; i++) {
 		sum += gsl_histogram_get(histo, i);
 		if (sum > ((double) n * 0.5)) {
 			median = (double) i;
@@ -62,7 +63,7 @@ static double siril_stats_ushort_median(gsl_histogram *histo, const size_t n) {
 }
 
 static double siril_stats_ushort_mad(const WORD* data, const size_t stride,
-		const size_t n, const double m) {
+		const size_t n, const double m, int nullcheck) {
 	size_t i;
 	double median;
 	gsl_histogram *histo;
@@ -73,7 +74,7 @@ static double siril_stats_ushort_mad(const WORD* data, const size_t stride,
 		const double delta = fabs(data[i * stride] - m);
 		gsl_histogram_increment(histo, delta);
 	}
-	median = siril_stats_ushort_median(histo, n);
+	median = siril_stats_ushort_median(histo, n, nullcheck);
 	gsl_histogram_free(histo);
 
 	return median;
@@ -185,12 +186,25 @@ static int IKSS(double *data, int n, double *location, double *scale) {
 	return 0;
 }
 
+static WORD* reassign_data(WORD *data, int nb, long ngoodpix) {
+	int i, j = 0;
+	WORD *ndata = calloc(ngoodpix, sizeof(WORD));
+
+	for (i = 0; i < nb; i++)
+		if (data[i] > 0) {
+			ndata[j] = data[i];
+			j++;
+		}
+	free(data);
+	return ndata;
+}
+
 /* computes statistics on the given layer of the given image. It creates the
  * histogram to easily extract the median. mean, sigma and noise
  * are computed with a cfitsio function rewritten here.
  * min and max value, average deviation, MAD, Bidweight Midvariance and IKSS are computed with gsl stats.
  */
-imstats* statistics(fits *fit, int layer, rectangle *selection, int option) {
+imstats* statistics(fits *fit, int layer, rectangle *selection, int option, int nullcheck) {
 	double mean = 0.0;
 	double median = 0.0;
 	double sigma = 0.0;
@@ -222,44 +236,53 @@ imstats* statistics(fits *fit, int layer, rectangle *selection, int option) {
 	}
 	hist_size = gsl_histogram_bins(histo);
 
-	/* Calculation of median with histogram */
-	if ((option & STATS_BASIC) || (option & STATS_AVGDEV)
-			|| (option & STATS_MAD) || (option & STATS_BWMV))
-		median = siril_stats_ushort_median(histo, nx * ny);
-	gsl_histogram_free(histo);
-
 	/* Calculation of mean, sigma and noise */
 	if (option & STATS_BASIC)
-		fits_img_stats_ushort(data, nx, ny, 0, 0, &ngoodpix, NULL, NULL, &mean,
+		fits_img_stats_ushort(data, nx, ny, nullcheck, 0, &ngoodpix, NULL, NULL, &mean,
 			&sigma, &noise, NULL, NULL, NULL, &status);
 	if (status) {
 		free(data);
 		return NULL;
 	}
+	if (ngoodpix == 0L) {
+		free(data);
+		return NULL;
+	}
+
+	/* Calculation of median with histogram */
+	if ((option & STATS_BASIC) || (option & STATS_AVGDEV)
+			|| (option & STATS_MAD) || (option & STATS_BWMV))
+		median = siril_stats_ushort_median(histo, ngoodpix, nullcheck);
+	gsl_histogram_free(histo);
+
+	if (nullcheck) {
+		data = reassign_data(data, nx * ny, ngoodpix);
+	}
+
 	if (option & STATS_BASIC)
-		gsl_stats_ushort_minmax(&min, &max, data, 1, nx * ny);
+		gsl_stats_ushort_minmax(&min, &max, data, 1, ngoodpix);
 
 	/* Calculation of average absolute deviation from the median */
 	if (option & STATS_AVGDEV)
-		avgDev = gsl_stats_ushort_absdev_m(data, 1, nx * ny, median);
+		avgDev = gsl_stats_ushort_absdev_m(data, 1, ngoodpix, median);
 
 	/* Calculation of median absolute deviation */
 	if ((option & STATS_MAD) || (option & STATS_BWMV))
-		mad = siril_stats_ushort_mad(data, 1, nx * ny, median);
+		mad = siril_stats_ushort_mad(data, 1, ngoodpix, median, nullcheck);
 
 	/* Calculation of Bidweight Midvariance */
 	if (option & STATS_BWMV)
-		bwmv = siril_stats_ushort_bwmv(data, nx * ny, mad, median);
+		bwmv = siril_stats_ushort_bwmv(data, ngoodpix, mad, median);
 
 	/* Calculation of IKSS. Used for stacking */
 	if (option & (STATS_IKSS)) {
-		double *newdata = calloc(nx * ny, sizeof(double));
+		double *newdata = calloc(ngoodpix, sizeof(double));
 
 		/* we convert in the [0, 1] range */
-		for (i = 0; i < (nx * ny); i++) {
+		for (i = 0; i < ngoodpix; i++) {
 			newdata[i] = (double) data[i] / ((double) hist_size - 1);
 		}
-		IKSS(newdata, nx * ny, &location, &scale);
+		IKSS(newdata, ngoodpix, &location, &scale);
 		/* go back to the original range */
 		location *= ((double) hist_size - 1);
 		scale *= ((double) hist_size - 1);
@@ -283,7 +306,8 @@ imstats* statistics(fits *fit, int layer, rectangle *selection, int option) {
 		break;
 	}
 
-	stat->count = (nx * ny);
+	stat->total = (nx * ny);
+	stat->ngoodpix = ngoodpix;
 	stat->mean = mean;
 	stat->avgDev = avgDev;
 	stat->mad = mad;

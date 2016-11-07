@@ -4,6 +4,8 @@
 #include "core/siril.h"
 
 #define NUMBER_OF_METHOD 5
+#define SUPER_SAMPLING 2
+
 struct registration_args;
 typedef int (*registration_function)(struct registration_args *);
 
@@ -19,8 +21,15 @@ struct registration_args {
 	gboolean run_in_thread;		// true if the registration was run in a thread
 	const gchar *prefix;		// prefix of the created sequence if any
 	gboolean follow_star;		// follow star position between frames
-	gboolean load_new_sequence; // load a new sequence if success
+	gboolean load_new_sequence;	// load a new sequence if success
 	gboolean matchSelection;	// Match stars found in the seleciton of reference image
+	opencv_interpolation interpolation; // type of rotation interpolation
+	gboolean translation_only;	// don't rotate images
+
+	/* data for generated sequence, for star alignment registration */
+	int new_total;
+	imgdata *imgparam;
+	regdata *regparam;
 };
 
 typedef enum {
@@ -54,6 +63,7 @@ int register_shift_fwhm(struct registration_args *args);
 int register_star_alignment(struct registration_args *args);
 int register_ecc(struct registration_args *args);
 void update_reg_interface(gboolean dont_change_reg_radio);
+void compute_fitting_selection(rectangle *area, int hsteps, int vsteps, int preserve_square);
 void get_the_registration_area(struct registration_args *reg_args,
 		struct registration_method *method); // for compositing
 void fill_comboboxregmethod();
