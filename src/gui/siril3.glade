@@ -12423,6 +12423,7 @@ To be enabled, the reference image must have been explicitly set and already dis
                       <object class="GtkButton" id="ButtonSaveCSV">
                         <property name="label" translatable="yes">Export to CSV</property>
                         <property name="visible">True</property>
+                        <property name="sensitive">False</property>
                         <property name="can_focus">True</property>
                         <property name="receives_default">True</property>
                         <property name="tooltip_text" translatable="yes">Export displayed plot to a CSV file.</property>
