@@ -23,7 +23,7 @@
 
 #include "core/siril.h"
 
-void free_plot_data();
+void reset_plot();
 void drawPlot();
 void notify_new_photometry();
 

@@ -163,7 +163,7 @@ static int exportCSV(pldata *plot, sequence *seq) {
 	return 0;
 }
 
-void free_plot_data() {
+static void free_plot_data() {
 	pldata *plot = plot_data;
 	while (plot) {
 		pldata *next = plot->next;
@@ -173,6 +173,14 @@ void free_plot_data() {
 		plot = next;
 	}
 	plot_data = NULL;
+}
+
+void reset_plot() {
+	free_plot_data();
+	if (sourceCombo) {
+		gtk_combo_box_set_active(GTK_COMBO_BOX(sourceCombo), 0);
+		gtk_widget_set_visible(sourceCombo, FALSE);
+	}
 }
 
 void drawPlot() {
