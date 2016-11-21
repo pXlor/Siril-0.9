@@ -57,6 +57,7 @@ void set_cursor_waiting(gboolean waiting);
 
 void set_progress_bar_data(const char *text, double percent);
 void zoomcombo_update_display_for_zoom();
+void initialize_FITS_name_entries();
 void adjust_vport_size_to_image();
 void scrollbars_hadjustment_changed_handler(GtkAdjustment *adjustment, gpointer user_data);
 void scrollbars_vadjustment_changed_handler(GtkAdjustment *adjustment, gpointer user_data);

@@ -15,7 +15,7 @@ siril_SOURCES = \
 	gui/callbacks.c gui/callbacks.h gui/histogram.c gui/histogram.h \
 	gui/PSF_list.h gui/PSF_list.c gui/sequence_list.c gui/registration_preview.c \
 	gui/statistics_list.c \
-	gui/quality_plot.c gui/quality_plot.h \
+	gui/plot.c gui/plot.h \
 	registration/registration.c registration/registration.h \
 	registration/matching/match.c registration/matching/atpmatch.c registration/matching/misc.c \
 	stacking/stacking.c stacking/stacking.h \

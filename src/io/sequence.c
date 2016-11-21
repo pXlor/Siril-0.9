@@ -41,7 +41,7 @@
 #include "core/initfile.h"
 #include "core/undo.h"
 #include "gui/callbacks.h"
-#include "gui/quality_plot.h"
+#include "gui/plot.h"
 #include "io/ser.h"
 #if defined(HAVE_FFMS2_1) || defined(HAVE_FFMS2_2)
 #include "io/films.h"
@@ -50,7 +50,7 @@
 #include "opencv/opencv.h"
 #endif
 #ifdef HAVE_FFMPEG
-#include "../io/mp4_output.h"
+#include "io/mp4_output.h"
 #endif
 #include "io/avi_pipp/avi_writer.h"
 #include "io/single_image.h"
@@ -813,6 +813,7 @@ void initialize_sequence(sequence *seq, gboolean is_zeroed) {
 	}
 	seq->nb_layers = -1;		// uninit value
 	seq->reference_image = -1;	// uninit value
+	seq->reference_star = -1;	// uninit value
 	seq->type = SEQ_REGULAR;
 	for (i=0; i<PREVIEW_NB; i++) {
 		seq->previewX[i] = -1;
@@ -896,11 +897,7 @@ void free_sequence(sequence *seq, gboolean free_seq_too) {
 	reset_plot();
 
 	for (i = 0; i < MAX_SEQPSF && seq->photometry[i]; i++) {
-		for (j = 0; j < seq->number; j++) {
-			if (seq->photometry[i][j])
-				free(seq->photometry[i][j]);
-		}
-		free(seq->photometry[i]);
+		free_photometry_set(seq, i);
 	}
 
 	if (free_seq_too)	free(seq);
@@ -1665,10 +1662,8 @@ void on_buttonExportSeq_clicked(GtkButton *button, gpointer user_data) {
 		args->convflags = TYPESER;
 		break;
 	case 2:
-#ifdef HAVE_FFMPEG
 	case 3:
 	case 4:
-#endif
 		fpsEntry = GTK_ENTRY(lookup_widget("entryAviFps"));
 		args->avi_fps = atoi(gtk_entry_get_text(fpsEntry));
 		widthEntry = GTK_ENTRY(lookup_widget("entryAviWidth"));
@@ -1690,12 +1685,10 @@ void on_buttonExportSeq_clicked(GtkButton *button, gpointer user_data) {
 			args->resize = gtk_toggle_button_get_active(checkResize);
 		}
 		args->convflags = TYPEAVI;
-#ifdef HAVE_FFMPEG
 		if (selected == 3)
 			args->convflags = TYPEMP4;
 		else if (selected == 4)
 			args->convflags = TYPEWEBM;
-#endif
 		break;
 	default:
 		free(args);

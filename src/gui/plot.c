@@ -18,6 +18,8 @@
  * along with Siril. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "plot.h"
+
 #include <cairo.h>
 #include <math.h>
 #include <stdio.h>
@@ -27,18 +29,19 @@
 #include "core/siril.h"
 #include "core/proto.h"
 #include "gui/callbacks.h"
-#include "gui/quality_plot.h"
 #include "kplot.h"
 #include "algos/PSF.h"
 
-static GtkWidget *drawingPlot = NULL, *sourceCombo = NULL, *combo = NULL, *buttonExport = NULL;
+static GtkWidget *drawingPlot = NULL, *sourceCombo = NULL, *combo = NULL,
+		 *buttonExport = NULL, *buttonClearAll = NULL, *buttonClearLatest = NULL;
 static pldata *plot_data;
 static struct kpair ref;
-static gboolean is_fwhm = FALSE, use_photometry = FALSE;
+static gboolean is_fwhm = FALSE, use_photometry = FALSE, requires_color_update = FALSE;
 static char *ylabel = NULL;
 static enum photmetry_source selected_source = ROUNDNESS;
 
 static void update_ylabel();
+static void set_colors(struct kplotcfg *cfg);
 void on_GtkEntryCSV_changed(GtkEditable *editable, gpointer user_data);
 
 static pldata *alloc_plot_data(int size) {
@@ -73,7 +76,10 @@ static void build_registration_dataset(sequence *seq, int layer, int ref_image, 
 
 static void build_photometry_dataset(sequence *seq, int dataset, int size, int ref_image, pldata *plot) {
 	int i, j;
-	fitted_PSF **psfs = seq->photometry[dataset];
+	double offset = -1001.0;
+	fitted_PSF **psfs = seq->photometry[dataset], *ref_psf;
+	if (seq->reference_star >= 0 && !seq->photometry[seq->reference_star])
+		seq->reference_star = -1;
 
 	for (i = 0, j = 0; i < size; i++) {
 		if (!seq->imgparam[i].incl) continue;
@@ -91,11 +97,28 @@ static void build_photometry_dataset(sequence *seq, int dataset, int size, int r
 					break;
 				case MAGNITUDE:
 					plot->data[j].y = psfs[i]->mag;
-					if (com.magOffset > 0.0)
-						plot->data[j].y += com.magOffset;
+					if (seq->reference_star >= 0) {
+						/* we have a reference star for the sequence,
+						 * with photometry data */
+						ref_psf = seq->photometry[seq->reference_star][i];
+						if (ref_psf)
+							offset = seq->reference_mag - ref_psf->mag;
+					}
+					else if (com.magOffset > 0.0)
+						offset = com.magOffset;
+
+					/* apply the absolute apparent magnitude offset */
+					if (offset > -1000.0)
+						plot->data[j].y += offset;
 					break;
 				case BACKGROUND:
 					plot->data[j].y = psfs[i]->B;
+					break;
+				case X_POSITION:
+					plot->data[j].y = psfs[i]->xpos;
+					break;
+				case Y_POSITION:
+					plot->data[j].y = psfs[i]->ypos;
 					break;
 			}
 		}
@@ -196,6 +219,8 @@ void reset_plot() {
 		gtk_widget_set_visible(sourceCombo, FALSE);
 		gtk_widget_set_visible(combo, FALSE);
 		gtk_widget_set_sensitive(buttonExport, FALSE);
+		gtk_widget_set_sensitive(buttonClearLatest, FALSE);
+		gtk_widget_set_sensitive(buttonClearAll, FALSE);
 	}
 }
 
@@ -208,6 +233,8 @@ void drawPlot() {
 		combo = lookup_widget("plotCombo");
 		sourceCombo = lookup_widget("plotSourceCombo");
 		buttonExport = lookup_widget("ButtonSaveCSV");
+		buttonClearAll  = lookup_widget("clearAllPhotometry");
+		buttonClearLatest = lookup_widget("clearLastPhotometry");
 	}
 
 	seq = &com.seq;
@@ -270,6 +297,37 @@ void on_ButtonSaveCSV_clicked(GtkButton *button, gpointer user_data) {
 	set_cursor_waiting(FALSE);
 }
 
+void free_photometry_set(sequence *seq, int set) {
+	int j;
+	for (j = 0; j < seq->number; j++) {
+		if (seq->photometry[set][j])
+			free(seq->photometry[set][j]);
+	}
+	free(seq->photometry[set]);
+	seq->photometry[set] = NULL;
+}
+
+void on_clearLatestPhotometry_clicked(GtkButton *button, gpointer user_data) {
+	int i;
+	for (i = 0; i < MAX_SEQPSF && com.seq.photometry[i]; i++);
+	if (i != 0) {
+		i--;
+		free_photometry_set(&com.seq, i);
+	}
+	if (i == 0)
+		reset_plot();
+	drawPlot();
+}
+
+void on_clearAllPhotometry_clicked(GtkButton *button, gpointer user_data) {
+	int i;
+	for (i = 0; i < MAX_SEQPSF && com.seq.photometry[i]; i++) {
+		free_photometry_set(&com.seq, i);
+	}
+	reset_plot();
+	drawPlot();
+}
+
 gboolean on_DrawingPlot_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	guint width, height, i, j;
 	double mean/*, sigma*/;
@@ -286,6 +344,7 @@ gboolean on_DrawingPlot_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
 
 		kplotcfg_defaults(&cfgplot);
 		kdatacfg_defaults(&cfgdata);
+		set_colors(&cfgplot);
 		cfgplot.xaxislabel = _("Frames");
 		cfgplot.yaxislabel = ylabel;
 		cfgplot.yaxislabelrot = M_PI_2 * 3.0;
@@ -336,6 +395,17 @@ gboolean on_DrawingPlot_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
 		cairo_fill(cr);
 		kplot_draw(p, width, height, cr);
 
+		/* copy graph colours for star highlight */
+		if (requires_color_update) {
+			for (i = 0; i < cfgplot.clrsz; i++) {
+				com.seq.photometry_colors[i][0] = cfgplot.clrs[i].rgba[0];
+				com.seq.photometry_colors[i][1] = cfgplot.clrs[i].rgba[1];
+				com.seq.photometry_colors[i][2] = cfgplot.clrs[i].rgba[2];
+			}
+			redraw(com.cvport, REMAP_ONLY);
+			requires_color_update = FALSE;
+		}
+
 		kplot_free(p);
 		kdata_destroy(d1);
 		kdata_destroy(ref_d);
@@ -362,18 +432,58 @@ static void update_ylabel() {
 			ylabel = _("Amplitude");
 			break;
 		case MAGNITUDE:
-			if (com.magOffset > 0.0)
+			if (com.magOffset > 0.0 || com.seq.reference_star >= 0)
 				ylabel = _("Star magnitude (absolute)");
 			else ylabel = _("Star magnitude (relative, use setmag)");
 			break;
 		case BACKGROUND:
 			ylabel = _("Background value");
 			break;
+		case X_POSITION:
+			ylabel = _("Star position on X axis");
+			break;
+		case Y_POSITION:
+			ylabel = _("Star position on Y axis");
+			break;
 	}
 }
 
 void notify_new_photometry() {
+	requires_color_update = TRUE;
 	gtk_widget_set_visible(sourceCombo, TRUE);
 	gtk_combo_box_set_active(GTK_COMBO_BOX(sourceCombo), 1);
+	gtk_widget_set_sensitive(buttonClearLatest, TRUE);
+	gtk_widget_set_sensitive(buttonClearAll, TRUE);
+}
+
+static void set_colors(struct kplotcfg *cfg) {
+	int i;
+	cfg->clrsz = MAX_SEQPSF;
+	cfg->clrs = calloc(cfg->clrsz, sizeof(struct kplotccfg));
+	for (i = 0; i < cfg->clrsz; i++) {
+		cfg->clrs[i].type = KPLOTCTYPE_RGBA;
+		cfg->clrs[i].rgba[3] = 1.0;
+	}
+	cfg->clrs[0].rgba[0] = 0x94 / 255.0;
+	cfg->clrs[0].rgba[1] = 0x04 / 255.0;
+	cfg->clrs[0].rgba[2] = 0xd3 / 255.0;
+	cfg->clrs[1].rgba[0] = 0x00 / 255.0;
+	cfg->clrs[1].rgba[1] = 0x9e / 255.0;
+	cfg->clrs[1].rgba[2] = 0x73 / 255.0;
+	cfg->clrs[2].rgba[0] = 0x56 / 255.0;
+	cfg->clrs[2].rgba[1] = 0xb4 / 255.0;
+	cfg->clrs[2].rgba[2] = 0xe9 / 255.0;
+	cfg->clrs[3].rgba[0] = 0xe6 / 255.0;
+	cfg->clrs[3].rgba[1] = 0x9f / 255.0;
+	cfg->clrs[3].rgba[2] = 0x00 / 255.0;
+	cfg->clrs[4].rgba[0] = 0xf0 / 255.0;
+	cfg->clrs[4].rgba[1] = 0xe4 / 255.0;
+	cfg->clrs[4].rgba[2] = 0x42 / 255.0;
+	cfg->clrs[5].rgba[0] = 0x00 / 255.0;
+	cfg->clrs[5].rgba[1] = 0x72 / 255.0;
+	cfg->clrs[5].rgba[2] = 0xb2 / 255.0;
+	cfg->clrs[6].rgba[0] = 0xe5 / 255.0;
+	cfg->clrs[6].rgba[1] = 0x1e / 255.0;
+	cfg->clrs[6].rgba[2] = 0x10 / 255.0;
 }
 

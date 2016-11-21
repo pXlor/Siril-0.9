@@ -366,17 +366,18 @@ int main(int argc, char *argv[]) {
 	/* initialization of default FITS extension */
 	GtkComboBox *box = GTK_COMBO_BOX(lookup_widget("combobox_ext"));
 	gtk_combo_box_set_active_id(box, com.ext);
+	initialize_FITS_name_entries();
 
 #ifdef HAVE_LIBRAW
 	set_GUI_LIBRAW();
 #endif
 	
 	/* Get CPU number and set the number of threads */
-	siril_log_message(_("Parallel processing %s: Using %d logical processor%s"),
+	siril_log_message(_("Parallel processing %s: Using %d logical processor(s).\n"),
 #ifdef _OPENMP
-			_("enabled"), com.max_thread = omp_get_num_procs(), "s.\n"
+			_("enabled"), com.max_thread = omp_get_num_procs()
 #else
-			_("disabled"), com.max_thread = 1, ".\n"
+			_("disabled"), com.max_thread = 1
 #endif
 			);
 	update_spinCPU(com.max_thread);

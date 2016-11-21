@@ -38,7 +38,6 @@
 #include "core/initfile.h"
 #include "core/undo.h"
 #include "gui/callbacks.h"
-#include "gui/quality_plot.h"
 #include "gui/PSF_list.h"
 #include "gui/histogram.h"
 #include "algos/colors.h"
@@ -57,6 +56,7 @@
 #include "stacking/stacking.h"
 #include "compositing/compositing.h"
 #include "compositing/align_rgb.h"
+#include "plot.h"
 #ifdef HAVE_OPENCV
 #include "opencv/opencv.h"
 #endif
@@ -1581,6 +1581,7 @@ static void do_popup_graymenu(GtkWidget *my_widget, GdkEventButton *event) {
 	gtk_widget_set_sensitive(lookup_widget("undo_item1"), is_undo_available());
 	gtk_widget_set_sensitive(lookup_widget("redo_item1"), is_redo_available());
 	gtk_widget_set_sensitive(lookup_widget("menu_gray_psf"), selected);
+	gtk_widget_set_sensitive(lookup_widget("menu_gray_seqpsf"), selected);
 	gtk_widget_set_sensitive(lookup_widget("menu_gray_pick_star"), selected);
 	gtk_widget_set_sensitive(lookup_widget("menu_gray_crop"), selected && is_a_single_image_loaded);
 	gtk_widget_set_sensitive(lookup_widget("menu_gray_crop_seq"), selected && sequence_is_loaded());
@@ -1831,7 +1832,11 @@ void update_MenuItem() {
 	any_RGB_image_is_loaded = isrgb(&gfit) && (single_image_is_loaded() || sequence_is_loaded());
 
 	/* File Menu */
-	gtk_widget_set_sensitive(lookup_widget("save1"), any_image_is_loaded);
+	gtk_widget_set_sensitive(lookup_widget("menu_save_fits"), any_image_is_loaded);
+	gtk_widget_set_sensitive(lookup_widget("menu_save_tiff"), any_image_is_loaded);
+	gtk_widget_set_sensitive(lookup_widget("menu_save_bmp"), any_image_is_loaded);
+	gtk_widget_set_sensitive(lookup_widget("menu_save_jpg"), any_image_is_loaded);
+	gtk_widget_set_sensitive(lookup_widget("menu_save_pbm"), any_image_is_loaded);
 	gtk_widget_set_sensitive(lookup_widget("menu_FITS_header"), any_image_is_loaded && gfit.header != NULL);
 
 	/* Edit Menu */
@@ -2414,6 +2419,35 @@ void zoomcombo_update_display_for_zoom() {
 	show_dialog(msg, _("Error"), "gtk-dialog-error");
 }
 
+void initialize_FITS_name_entries() {
+	GtkEntry *moffset, *mdark, *mflat, *final_stack;
+	GString *str[4];
+	gchar *txt[4];
+	gint i;
+
+	moffset = GTK_ENTRY(lookup_widget("offsetname_entry"));
+	mdark = GTK_ENTRY(lookup_widget("darkname_entry"));
+	mflat = GTK_ENTRY(lookup_widget("flatname_entry"));
+	final_stack = GTK_ENTRY(lookup_widget("entryresultfile"));
+
+	str[0] = g_string_new("master-offset");
+	str[1] = g_string_new("master-dark");
+	str[2] = g_string_new("master-flat");
+	str[3] = g_string_new("stack_result");
+
+	for (i = 0; i < 4; i++) {
+		g_string_append(str[i], com.ext);
+		txt[i] = g_string_free(str[i], FALSE);
+	}
+	gtk_entry_set_text(moffset, txt[0]);
+	gtk_entry_set_text(mdark, txt[1]);
+	gtk_entry_set_text(mflat, txt[2]);
+	gtk_entry_set_text(final_stack, txt[3]);
+
+	for (i = 0; i < 4; i++)
+		g_free(txt[i]);
+}
+
 void adjust_vport_size_to_image() {
 	int vport;
 	// make GtkDrawingArea the same size than the image
@@ -2439,8 +2473,9 @@ void set_output_filename_to_sequence_name() {
 				gtk_builder_get_object(builder, "entryresultfile"));
 	if (!com.seq.seqname || *com.seq.seqname == '\0')
 		return;
-	g_snprintf(msg, sizeof(msg), "%s%sstacked.fit", com.seq.seqname,
-			ends_with(com.seq.seqname, "_") ? "" : "_");
+	g_snprintf(msg, sizeof(msg), "%s%sstacked%s", com.seq.seqname,
+			ends_with(com.seq.seqname, "_") ?
+					"" : (ends_with(com.seq.seqname, "-") ? "" : "_"), com.ext);
 	gtk_entry_set_text(output_file, msg);
 }
 
@@ -2451,11 +2486,7 @@ void adjust_refimage(int n) {
 
 	//fprintf(stdout, "adjust refimage: %d (ref is %d)\n", n, com.seq.reference_image);
 	g_signal_handlers_block_by_func(ref_butt, on_ref_frame_toggled, NULL);
-	if (com.seq.reference_image == n) {
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ref_butt), TRUE);
-	} else {
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ref_butt), FALSE);
-	}
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ref_butt), com.seq.reference_image == n);
 	g_signal_handlers_unblock_by_func(ref_butt, on_ref_frame_toggled, NULL);
 }
 
@@ -2775,7 +2806,7 @@ void on_register_all_toggle(GtkToggleButton *togglebutton, gpointer user_data) {
  */
 gboolean redraw_drawingarea(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	int image_width, image_height, window_width, window_height;
-	int vport;
+	int vport, i = 0;
 	double zoom;
 
 	// we need to identify which vport is being redrawn
@@ -2791,6 +2822,7 @@ gboolean redraw_drawingarea(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	image_width = (int) (((double) window_width) / zoom);
 	image_height = (int) (((double) window_height) / zoom);
 
+	/* draw the RGB and gray images */
 	if (vport == RGB_VPORT) {
 		if (com.rgbbuf) {
 			cairo_scale(cr, zoom, zoom);
@@ -2824,52 +2856,67 @@ gboolean redraw_drawingarea(GtkWidget *widget, cairo_t *cr, gpointer data) {
 		cairo_stroke(cr);
 	}
 
-	/* draw a cross on excluded images */
-	if (sequence_is_loaded() && com.seq.imgparam && com.seq.current >= 0
-			&& !com.seq.imgparam[com.seq.current].incl) {
-		if (image_width > gfit.rx)
-			image_width = gfit.rx;
-		if (image_height > gfit.ry)
-			image_height = gfit.ry;
-		cairo_set_dash(cr, NULL, 0, 0);
-		cairo_set_source_rgb(cr, 1.0, 0.8, 0.7);
-		cairo_set_line_width(cr, 2.0 / zoom);
-		cairo_move_to(cr, 0, 0);
-		cairo_line_to(cr, image_width, image_height);
-		cairo_move_to(cr, 0, image_height);
-		cairo_line_to(cr, image_width, 0);
-		cairo_stroke(cr);
-	}
-
 	/* draw detected stars and highlight the selected star */
 	if (com.stars) {
 		/* com.stars is a NULL-terminated array */
-		int i = 0;
 		cairo_set_dash(cr, NULL, 0, 0);
 		cairo_set_source_rgba(cr, 1.0, 0.4, 0.0, 0.9);
-		cairo_set_line_width(cr, 1.5);	//set_label_text_from_main_thread("labelcwd", com.wd);
+		cairo_set_line_width(cr, 1.5);
 
 		while (com.stars[i]) {
-			double size = sqrt(com.stars[i]->fwhmx / 2.) * 2 * sqrt(log(2.) * 2); // by design Sx>Sy. We redefine FWHM to be sure to have the value in px
+			// by design Sx>Sy, we redefine FWHM to be sure to have the value in px
+			double size = sqrt(com.stars[i]->fwhmx / 2.) * 2 * sqrt(log(2.) * 3);
+
 			if (i == com.selected_star) {
 				cairo_set_line_width(cr, 2);
 				cairo_set_source_rgba(cr, 0.0, 0.4, 1.0, 0.6);
 				cairo_rectangle(cr, com.stars[i]->xpos - 1.5 * size,
 						com.stars[i]->ypos - 1.5 * size, 3 * size, 3 * size);
 				cairo_stroke(cr);
-				cairo_set_line_width(cr, 1.5);
+
+				cairo_set_line_width(cr, 1.5/zoom);
 				cairo_set_source_rgba(cr, 1.0, 0.4, 0.0, 0.9);
 			}
-			cairo_arc(cr, com.stars[i]->xpos, com.stars[i]->ypos, size, 0.,
-					2. * M_PI);
+			cairo_arc(cr, com.stars[i]->xpos, com.stars[i]->ypos, size, 0., 2. * M_PI);
 			cairo_stroke(cr);
 			i++;
 		}
 	}
 
-	/* draw preview rectangles */
 	if (sequence_is_loaded()) {
-		int i;
+		/* draw seqpsf stars */
+		for (i = 0; i < MAX_SEQPSF && com.seq.photometry[i]; i++) {
+			cairo_set_dash(cr, NULL, 0, 0);
+			cairo_set_source_rgba(cr, com.seq.photometry_colors[i][0],
+					com.seq.photometry_colors[i][1],
+					com.seq.photometry_colors[i][2], 1.0);
+			cairo_set_line_width(cr, 2.0/zoom);
+			fitted_PSF *the_psf = com.seq.photometry[i][com.seq.current];
+			if (the_psf) {
+				double size = sqrt(the_psf->fwhmx / 2.) * 2 * sqrt(log(2.) * 4);
+				cairo_arc(cr, the_psf->xpos, the_psf->ypos, size, 0., 2. * M_PI);
+				cairo_stroke(cr);
+			}
+		}
+
+		/* draw a cross on excluded images */
+		if (com.seq.imgparam && com.seq.current >= 0 &&
+				!com.seq.imgparam[com.seq.current].incl) {
+			if (image_width > gfit.rx)
+				image_width = gfit.rx;
+			if (image_height > gfit.ry)
+				image_height = gfit.ry;
+			cairo_set_dash(cr, NULL, 0, 0);
+			cairo_set_source_rgb(cr, 1.0, 0.8, 0.7);
+			cairo_set_line_width(cr, 2.0 / zoom);
+			cairo_move_to(cr, 0, 0);
+			cairo_line_to(cr, image_width, image_height);
+			cairo_move_to(cr, 0, image_height);
+			cairo_line_to(cr, image_width, 0);
+			cairo_stroke(cr);
+		}
+
+		/* draw preview rectangles for the manual registration */
 		for (i = 0; i < PREVIEW_NB; i++) {
 			if (com.seq.previewX[i] >= 0) {
 				int textX, textY;
@@ -2901,6 +2948,7 @@ gboolean redraw_drawingarea(GtkWidget *widget, cairo_t *cr, gpointer data) {
 		}
 	}
 
+	/* draw background removal gradient selection boxes */
 	if (com.grad && com.grad_boxes_drawn) {
 		int i = 0;
 		while (i < com.grad_nb_boxes) {
@@ -3254,6 +3302,7 @@ void on_combobox_ext_changed(GtkComboBox *box, gpointer user_data) {
 	com.ext = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(box));
 	com.len_ext = strlen(com.ext);
 	writeinitfile();
+	initialize_FITS_name_entries();
 }
 
 void gtk_main_quit() {

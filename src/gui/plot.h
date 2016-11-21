@@ -18,14 +18,15 @@
  * along with Siril. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SRC_GUI_QUALITY_PLOT_H_
-#define SRC_GUI_QUALITY_PLOT_H_
+#ifndef SRC_GUI_PLOT_H_
+#define SRC_GUI_PLOT_H_
 
 #include "core/siril.h"
 
 void reset_plot();
 void drawPlot();
 void notify_new_photometry();
+void free_photometry_set(sequence *seq, int set);
 
 typedef struct plot_data_struct {
 	struct kpair *data;
@@ -40,7 +41,9 @@ enum photmetry_source {
 	FWHM,
 	AMPLITUDE,
 	MAGNITUDE,
-	BACKGROUND
+	BACKGROUND,
+	X_POSITION,
+	Y_POSITION
 };
 
-#endif /* SRC_GUI_QUALITY_PLOT_H_ */
+#endif /* SRC_GUI_PLOT_H_ */

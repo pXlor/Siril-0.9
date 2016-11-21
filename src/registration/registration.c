@@ -33,7 +33,7 @@
 
 #include "core/siril.h"
 #include "gui/callbacks.h"
-#include "gui/quality_plot.h"
+#include "gui/plot.h"
 #include "core/proto.h"
 #include "core/initfile.h"
 #include "registration/registration.h"

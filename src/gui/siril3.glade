@@ -11032,7 +11032,6 @@ If not set manually, the first image of the sequence is taken as reference.</pro
 A first computation pass will be done on all images before exporting, it may take some time, only the first export of a sequence.
 			</property>
                         <property name="halign">center</property>
-                        <property name="vexpand">True</property>
                         <property name="draw_indicator">True</property>
                       </object>
                       <packing>
@@ -12437,15 +12436,37 @@ To be enabled, the reference image must have been explicitly set and already dis
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkSeparator" id="plotsep">
+                      <object class="GtkButton" id="clearAllPhotometry">
+                        <property name="label" translatable="yes">Clear all</property>
                         <property name="visible">True</property>
-                        <property name="can_focus">False</property>
+                        <property name="sensitive">False</property>
+                        <property name="can_focus">True</property>
+                        <property name="receives_default">True</property>
+                        <property name="tooltip_text" translatable="yes">Clear all curves displayed in photometry.</property>
+                        <property name="halign">center</property>
+                        <signal name="clicked" handler="on_clearAllPhotometry_clicked" swapped="no"/>
                       </object>
                       <packing>
-                        <property name="expand">True</property>
+                        <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="padding">10</property>
                         <property name="position">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="clearLastPhotometry">
+                        <property name="label" translatable="yes">Clear latest</property>
+                        <property name="visible">True</property>
+                        <property name="sensitive">False</property>
+                        <property name="can_focus">True</property>
+                        <property name="receives_default">True</property>
+                        <property name="tooltip_text" translatable="yes">Clear the last curve added in photometry.</property>
+                        <property name="halign">center</property>
+                        <signal name="clicked" handler="on_clearLatestPhotometry_clicked" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">4</property>
                       </packing>
                     </child>
                     <child>
@@ -12459,13 +12480,16 @@ To be enabled, the reference image must have been explicitly set and already dis
                           <item translatable="yes">Amplitude</item>
                           <item translatable="yes">Magnitude</item>
                           <item translatable="yes">Background</item>
+                          <item translatable="yes">X position</item>
+                          <item translatable="yes">Y position</item>
                         </items>
                         <signal name="changed" handler="on_plotCombo_changed" swapped="no"/>
                       </object>
                       <packing>
                         <property name="expand">False</property>
                         <property name="fill">True</property>
-                        <property name="position">4</property>
+                        <property name="pack_type">end</property>
+                        <property name="position">6</property>
                       </packing>
                     </child>
                     <child>

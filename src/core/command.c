@@ -43,7 +43,7 @@
 #include "gui/callbacks.h"
 #include "gui/PSF_list.h"
 #include "gui/histogram.h"
-#include "gui/quality_plot.h"
+#include "gui/plot.h"
 #include "algos/colors.h"
 #include "algos/PSF.h"
 #include "algos/star_finder.h"
@@ -155,6 +155,7 @@ command commande[] = {
 	{"setcpu", 1, "setcpu number", process_set_cpu},
 #endif
 	{"setmag", 1, "setmag magnitude", process_set_mag},
+	{"setmagseq", 1, "setmagseq magnitude", process_set_mag_seq},
 	{"split", 3, "split R G B", process_split},
 	{"stat", 0, "stat", process_stat},
 	{"stackall", 0, "stackall", process_stackall},
@@ -167,6 +168,7 @@ command commande[] = {
 	{"unselect", 2, "unselect from to", process_unselect},
 	{"unsharp", 2, "unsharp sigma multi", process_unsharp},
 	{"unsetmag", 0, "unsetmag", process_unset_mag},
+	{"unsetmagseq", 0, "unsetmagseq", process_unset_mag_seq},
 //	{"unsharp2", 5, "unsharp2 sigma multi src dest number", process_unsharp2},
 
 	{"visu", 2, "visu low high", process_visu},
@@ -672,9 +674,7 @@ int process_rotatepi(int nb){
 
 int process_set_mag(int nb) {
 	int layer = match_drawing_area_widget(com.vport[com.cvport], FALSE);
-	double mag;
-
-	mag = atof(word[1]);
+	double mag = atof(word[1]);
 
 	if (layer != -1) {
 
@@ -700,7 +700,37 @@ int process_set_mag(int nb) {
 
 int process_unset_mag(int nb) {
 	com.magOffset = 0.0;
+	return 0;
+}
 
+int process_set_mag_seq(int nb) {
+	if (!sequence_is_loaded()) {
+		siril_log_message(_("This command can be used only when a sequence is loaded\n"));
+		return 1;
+	}
+	double mag = atof(word[1]);
+	int i;
+	for (i = 0; i < MAX_SEQPSF && com.seq.photometry[i]; i++);
+	com.seq.reference_star = i-1;
+	if (i == 0) {
+		siril_log_message(_("Run a PSF for the sequence first (see seqpsf)\n"));
+		return 1;
+	}
+	com.seq.reference_mag = mag;
+	siril_log_message(_("Reference magnitude has been set for star %d to %f and will be computed for each image\n"), i-1, mag);
+	drawPlot();
+	return 0;
+}
+
+int process_unset_mag_seq(int nb) {
+	if (!sequence_is_loaded()) {
+		siril_log_message(_("This command can be used only when a sequence is loaded\n"));
+		return 1;
+	}
+	com.seq.reference_star = -1;
+	com.seq.reference_mag = -1001.0;
+	siril_log_message(_("Reference magnitude unset for sequence\n"));
+	drawPlot();
 	return 0;
 }
 
@@ -1347,9 +1377,9 @@ int process_split(int nb){
 		siril_log_message(_("Siril cannot split layers. Make sure your image is in RGB mode.\n"));
 		return 1;
 	}
-	sprintf(R, "%s.fit", word[1]);
-	sprintf(G, "%s.fit", word[2]);
-	sprintf(B, "%s.fit", word[3]);
+	sprintf(R, "%s%s", word[1], com.ext);
+	sprintf(G, "%s%s", word[2], com.ext);
+	sprintf(B, "%s%s", word[3], com.ext);
 	save1fits16(R, &gfit, RLAYER);
 	save1fits16(G, &gfit, GLAYER);
 	save1fits16(B, &gfit, BLAYER);
@@ -1403,8 +1433,10 @@ gpointer stackall_worker(gpointer args) {
 				args.seq = seq;
 				args.filtering_criterion = stack_filter_all;
 				args.nb_images_to_stack = seq->number;
-				snprintf(filename, 256, "%s%sstacked.fit", seq->seqname,
-						ends_with(seq->seqname, "_") ? "" : "_");
+				snprintf(filename, 256, "%s%sstacked%s", seq->seqname,
+						ends_with(seq->seqname, "_") ?
+								"" : (ends_with(com.seq.seqname, "-") ? "" : "_"),
+						com.ext);
 				gettimeofday(&args.t_start, NULL);
 
 				retval = stack_summing(&args);

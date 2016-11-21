@@ -43,7 +43,7 @@ typedef unsigned short WORD;		// default type for internal image data
 
 #define MAX_COMMAND_WORDS 16		// max number of words to split in command line input
 
-#define MAX_SEQPSF 10			// max number of stars for which seqpsf can be run
+#define MAX_SEQPSF 7			// max number of stars for which seqpsf can be run
 
 #define CMD_HISTORY_SIZE 50		// size of the command line history
 
@@ -368,6 +368,9 @@ struct sequ {
 	gboolean needs_saving;	// a dirty flag for the sequence, avoid saving it too often
 
 	fitted_PSF **photometry[MAX_SEQPSF];// psf for multiple stars for all images
+	int reference_star;	// reference star for apparent magnitude (index of photometry)
+	double reference_mag;	// reference magnitude for the reference star
+	double photometry_colors[MAX_SEQPSF][3]; // colors for each photometry curve
 };
 
 /* this struct is used to manage data associated with a single image loaded, outside a sequence */
@@ -563,7 +566,7 @@ struct cominf {
 	fitted_PSF **stars;		// list of stars detected in the current image
 	gboolean star_is_seqdata;	// the only star in stars belongs to seq, don't free it
 	int selected_star;		// current selected star in the GtkListStore
-	double magOffset;		// offset to reduce the real magnitude
+	double magOffset;		// offset to reduce the real magnitude, single image
 	
 	gradient *grad;
 	int grad_nb_boxes, grad_size_boxes;
