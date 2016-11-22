@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-11-20 20:35+0100\n"
-"PO-Revision-Date: 2016-11-17 16:53+0100\n"
+"PO-Revision-Date: 2016-11-21 23:41+0200\n"
 "Last-Translator: Konstantinos Stavropoulos <kookoo_gr@yahoo.com>\n"
 "Language-Team: \n"
 "Language: el\n"
@@ -2814,21 +2814,20 @@ msgid "Export displayed plot to a CSV file."
 msgstr "Εξαγωγή του τρέχοντος διαγράμματος σε αρχείο CSV."
 
 #: ../src/gui/siril3.glade.h:610
-#, fuzzy
 msgid "Clear all"
-msgstr "εξαίρεση όλων"
+msgstr "Καθαρισμός όλων "
 
 #: ../src/gui/siril3.glade.h:611
 msgid "Clear all curves displayed in photometry."
-msgstr ""
+msgstr "Καθαρισμός όλων των καμπυλών που προβάλλονται στη φωτομετρία."
 
 #: ../src/gui/siril3.glade.h:612
 msgid "Clear latest"
-msgstr ""
+msgstr "Καθαρισμός του τελευταίου"
 
 #: ../src/gui/siril3.glade.h:613
 msgid "Clear the last curve added in photometry."
-msgstr ""
+msgstr "Καθαρισμός της τελευταίας καμπύλης που προστέθηκε στη φωτομετρία."
 
 #: ../src/gui/siril3.glade.h:614
 msgid "Select which information to display from photometry data."
@@ -2855,14 +2854,12 @@ msgid "Background"
 msgstr "Υπόβαθρο"
 
 #: ../src/gui/siril3.glade.h:620
-#, fuzzy
 msgid "X position"
-msgstr "Σύνθεση HSL"
+msgstr "Θέση Χ"
 
 #: ../src/gui/siril3.glade.h:621
-#, fuzzy
 msgid "Y position"
-msgstr "Σύνθεση HSL"
+msgstr "Θέση Υ"
 
 #: ../src/gui/siril3.glade.h:622
 msgid "Select the source of graph information."
@@ -3571,7 +3568,6 @@ msgid "This star has already been picked !\n"
 msgstr "Αυτό το αστέρι έχει ήδη επιλεχθεί !\n"
 
 #: ../src/algos/star_finder.c:299
-#, fuzzy
 msgid "Peaker"
 msgstr "Peaker"
 
@@ -3791,9 +3787,8 @@ msgstr ""
 "αλληλουχία\n"
 
 #: ../src/core/command.c:716
-#, fuzzy
 msgid "Run a PSF for the sequence first (see seqpsf)\n"
-msgstr "PSF για την αλληλουχία"
+msgstr "Τρέξτε ένα PSF πρώτα για την αλληλουχία (δείτε το seqpsf)\n"
 
 #: ../src/core/command.c:720
 #, c-format
@@ -3801,11 +3796,12 @@ msgid ""
 "Reference magnitude has been set for star %d to %f and will be computed for "
 "each image\n"
 msgstr ""
+"Το μέγεθος της αναφοράς έχει οριστεί για το αστέρι %d έως %f και θα "
+"υπολογιστεί για κάθε εικόνα\n"
 
 #: ../src/core/command.c:732
-#, fuzzy
 msgid "Reference magnitude unset for sequence\n"
-msgstr "Όλες οι εικόνες της αλληλουχίας έχουν επιλεχθεί\n"
+msgstr "Το μέγεθος αναφοράς απενεργοποιήθηκε για την αλληλουχία.\n"
 
 #: ../src/core/command.c:790
 #, c-format
@@ -4821,11 +4817,11 @@ msgstr "Τιμή υποβάθρου"
 
 #: ../src/gui/plot.c:443
 msgid "Star position on X axis"
-msgstr ""
+msgstr "Θέση αστεριού στον άξονα Χ"
 
 #: ../src/gui/plot.c:446
 msgid "Star position on Y axis"
-msgstr ""
+msgstr "Θέση αστεριού στον άξονα Υ"
 
 #: ../src/gui/registration_preview.c:65
 #, c-format
@@ -5432,6 +5428,9 @@ msgid ""
 "Parameters for mp4 file creation were incorrect. Image dimension has to be a "
 "multiple of 2, fps and file name non nul, quality between 1 and 5."
 msgstr ""
+"Οι παράμετροι για τη δημιουργία του αρχείο mp4 ήταν λάθος. Η διάσταση της "
+"εικόνας πρέπει να είναι πολλαπλάσιο του 2, το fps και το όνομα του αρχείου "
+"να μην είναι κενά, η ποιότητα ανάμεσα στο 1 και το 5."
 
 #: ../src/io/seqfile.c:248
 msgid "The file seems to be corrupted\n"
@@ -5718,9 +5717,10 @@ msgstr ""
 
 #. Get CPU number and set the number of threads
 #: ../src/main.c:376
-#, fuzzy, c-format
+#, c-format
 msgid "Parallel processing %s: Using %d logical processor(s).\n"
-msgstr "Παράλληλη επεξεργασία %s: Γίνεται χρήση %d λογικών επεξεργαστών%s"
+msgstr ""
+"Παράλληλη επεξεργασία %s : Γίνεται χρήση %d λογικού(ών) επεξεργαστή(ών).\n"
 
 #: ../src/main.c:378
 msgid "enabled"
