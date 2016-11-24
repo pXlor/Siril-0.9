@@ -8,14 +8,14 @@ msgstr ""
 "Project-Id-Version: Siril in Italiano\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-11-20 20:35+0100\n"
-"PO-Revision-Date: 2016-11-16 23:51+0100\n"
+"PO-Revision-Date: 2016-11-24 18:44+0100\n"
 "Last-Translator: Sonia Zorba <sonia@zonia3000.net>\n"
 "Language-Team: Italian <sonia@zonia3000.net>\n"
 "Language: it_IT\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 1.8.11\n"
+"X-Generator: Poedit 1.6.10\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: ../src/gui/siril3.glade.h:1
@@ -2799,21 +2799,20 @@ msgid "Export displayed plot to a CSV file."
 msgstr "Esporta il grafico visualizzato in un file CSV."
 
 #: ../src/gui/siril3.glade.h:610
-#, fuzzy
 msgid "Clear all"
-msgstr "escludi tutte"
+msgstr "Pulisci tutte"
 
 #: ../src/gui/siril3.glade.h:611
 msgid "Clear all curves displayed in photometry."
-msgstr ""
+msgstr "Pulisci tutte le curve mostrate in fotometria."
 
 #: ../src/gui/siril3.glade.h:612
 msgid "Clear latest"
-msgstr ""
+msgstr "Pulisci le ultime"
 
 #: ../src/gui/siril3.glade.h:613
 msgid "Clear the last curve added in photometry."
-msgstr ""
+msgstr "Pulisci l'ultima curva aggiunta nella fotometria."
 
 #: ../src/gui/siril3.glade.h:614
 msgid "Select which information to display from photometry data."
@@ -2840,14 +2839,12 @@ msgid "Background"
 msgstr "Sfondo"
 
 #: ../src/gui/siril3.glade.h:620
-#, fuzzy
 msgid "X position"
-msgstr "Composizione HSL"
+msgstr "Posizione X"
 
 #: ../src/gui/siril3.glade.h:621
-#, fuzzy
 msgid "Y position"
-msgstr "Composizione HSL"
+msgstr "Posizione Y"
 
 #: ../src/gui/siril3.glade.h:622
 msgid "Select the source of graph information."
@@ -3457,8 +3454,9 @@ msgstr "Miglioramento della saturazione: elaborazione...\n"
 #: ../src/algos/cosmetic_correction.c:396 ../src/algos/star_finder.c:47
 #: ../src/core/command.c:1397 ../src/core/siril.c:620 ../src/core/siril.c:904
 #: ../src/core/siril.c:1038 ../src/core/siril.c:1181 ../src/core/siril.c:1556
-#: ../src/core/siril.c:1648 ../src/core/siril.c:1757 ../src/gui/histogram.c:695
-#: ../src/gui/statistics_list.c:306 ../src/io/sequence.c:1253
+#: ../src/core/siril.c:1648 ../src/core/siril.c:1757
+#: ../src/gui/histogram.c:695 ../src/gui/statistics_list.c:306
+#: ../src/io/sequence.c:1253
 msgid "Error: no data computed.\n"
 msgstr "Errore, nessun dato calcolato.\n"
 
@@ -3773,9 +3771,8 @@ msgid "This command can be used only when a sequence is loaded\n"
 msgstr "Questo comando può essere usato solo quando una sequenza è caricata\n"
 
 #: ../src/core/command.c:716
-#, fuzzy
 msgid "Run a PSF for the sequence first (see seqpsf)\n"
-msgstr "PSF per la sequenza"
+msgstr "Esegui prima una PSF per la sequenza (vedi seqpsf)\n"
 
 #: ../src/core/command.c:720
 #, c-format
@@ -3783,11 +3780,12 @@ msgid ""
 "Reference magnitude has been set for star %d to %f and will be computed for "
 "each image\n"
 msgstr ""
+"La magnitudine di riferimento è stata impostata per la stella %d a %f  e "
+"sarà calcolata per ciascuna immagine\n"
 
 #: ../src/core/command.c:732
-#, fuzzy
 msgid "Reference magnitude unset for sequence\n"
-msgstr "Selezionate tutte le immagini dalla sequenza\n"
+msgstr "Magnitudine di riferimento non impostata per la sequenza\n"
 
 #: ../src/core/command.c:790
 #, c-format
@@ -4064,7 +4062,8 @@ msgstr "Le immagini non hanno la stessa dimensione (w = %d|%d, h = %d|%d)\n"
 #: ../src/io/image_format_fits.c:202 ../src/io/image_format_fits.c:216
 #: ../src/io/image_format_fits.c:231 ../src/io/image_format_fits.c:333
 #: ../src/io/image_format_fits.c:342 ../src/io/image_format_fits.c:663
-#: ../src/io/image_formats_internal.c:47 ../src/io/image_formats_internal.c:102
+#: ../src/io/image_formats_internal.c:47
+#: ../src/io/image_formats_internal.c:102
 #: ../src/io/image_formats_internal.c:167
 #: ../src/io/image_formats_internal.c:335
 #: ../src/io/image_formats_internal.c:347
@@ -4807,11 +4806,11 @@ msgstr "Valore dello sfondo"
 
 #: ../src/gui/plot.c:443
 msgid "Star position on X axis"
-msgstr ""
+msgstr "Posizione della stella sull'asse X"
 
 #: ../src/gui/plot.c:446
 msgid "Star position on Y axis"
-msgstr ""
+msgstr "Posizione della stella sull'asse Y"
 
 #: ../src/gui/registration_preview.c:65
 #, c-format
@@ -5396,6 +5395,9 @@ msgid ""
 "Parameters for mp4 file creation were incorrect. Image dimension has to be a "
 "multiple of 2, fps and file name non nul, quality between 1 and 5."
 msgstr ""
+"I parametri per la creazione del file mp4 non sono corretti. La dimensione "
+"dell'immagine deve essere un multiplo di 2, fps e nome del file devono "
+"essere non nulli, la qualità deve essere compresa tra 1 e 5."
 
 #: ../src/io/seqfile.c:248
 msgid "The file seems to be corrupted\n"
@@ -5681,9 +5683,9 @@ msgstr ""
 
 #. Get CPU number and set the number of threads
 #: ../src/main.c:376
-#, fuzzy, c-format
+#, c-format
 msgid "Parallel processing %s: Using %d logical processor(s).\n"
-msgstr "Elaborazione parallela %s: utilizzando %d processori logici %s"
+msgstr "Elaborazione parallela %s: Utilizzando %d processori logici.\n"
 
 #: ../src/main.c:378
 msgid "enabled"
