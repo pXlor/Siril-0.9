@@ -53,7 +53,7 @@ The install is similar to the usual GNU/Linux package build, except that the
 configure script is not directly shipped and has to be created and run with the
 following command:
 
-    autogen.sh
+    ./autogen.sh
     make
     sudo make install
 
