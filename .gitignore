@@ -1,6 +1,10 @@
 .svn*
 *.o
 *.gmo
+.project
+.autotools
+.cproject
+.settings/
 INSTALL
 *Makefile
 *Makefile.in
