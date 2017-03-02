@@ -41,6 +41,7 @@ compilation time, or their support won't be compiled.
 	* libavcodec
 	* libswscale
 	* libswresample
+	* gnuplot (not needed at compilation time)
 
 All these libraries are available in most Linux distributions and free systems,
 maybe with the exception of ffms2 that is not as popular as others and may need
@@ -83,3 +84,4 @@ by FFMS2 (probably all ffmpeg formats, which is a lot) to SER, and even any
 image sequence to SER.
 Siril supports SER v3.
 See https://free-astro.org/index.php/SER for more details.
+

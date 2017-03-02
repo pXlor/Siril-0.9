@@ -1,6 +1,7 @@
 .svn*
 *.o
 *.gmo
+*.mo
 .project
 .autotools
 .cproject
@@ -29,5 +30,6 @@ m4/pkg.m4
 missing
 po/POTFILES
 po/stamp-it
+po/siril.pot
 src/siril
 stamp-h1
